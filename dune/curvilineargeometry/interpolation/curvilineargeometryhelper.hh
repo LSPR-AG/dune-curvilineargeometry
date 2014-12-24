@@ -1,16 +1,13 @@
 /*******************************************************************
- * Curvilinear Element Interpolator
+ * Curvilinear Geometry Helper
  * 
  * author: Aleksejs Fomins
- * date: 01.08.2014 - created
+ * date: 01.10.2014 - created
  * 
  * description:
- * Provides the lagrange polynomial interpolation of mesh elements
- * - Stores interpolatory vertices of the element, given by its GeometryType and Interpolation Order
- * - Currently only manages Simplex geometries, error is thrown for any other geometry type
- * - Constructs analytic polynomial representing the map from reference to curvilinear element. Also provides direct numerical evaluation of this map for computational speedup
- * - Provides curvilinear interpolators for subentities of this element
  * 
+ * All sort of common functionality
+ *
  * 
  * 
  *******************************************************************/
@@ -54,6 +51,23 @@ class CurvilinearGeometryHelper {
 
     /** \brief Empty constructor. This class only contains static members anyway */
     CurvilinearGeometryHelper() {}
+
+
+    /** \brief Returns the name of the geometry based on the geometry type. Useful for logging messages
+     *  \param[in]  gt	    GeometryType of the element of interest
+     */
+    static std::string geometryName (Dune::GeometryType gt)
+    {
+    	if (gt.isVertex())         { return "vertex"; }
+    	if (gt.isLine())           { return "edge"; }
+    	if (gt.isTriangle())       { return "triangle"; }
+    	if (gt.isQuadrilateral())  { return "quadrilateral"; }
+    	if (gt.isCube())           { return "cube"; }
+    	if (gt.isHexahedron())     { return "hexahedron"; }
+    	if (gt.isTetrahedron())    { return "tetrahedron"; }
+    	if (gt.isPrism())          { return "prism"; }
+    	if (gt.isPyramid())        { return "pyramid"; }
+    }
 
 
     /** \brief Number of degrees of freedom of an element (number of interpolation points)
@@ -284,11 +298,11 @@ class CurvilinearGeometryHelper {
         switch (subentityIndex)
         {
         case 0 :  rez = std::vector<int> {0, 1};  break;
-        case 1 :  rez = std::vector<int> {0, 2};  break;
-        case 2 :  rez = std::vector<int> {0, 3};  break;
-        case 3 :  rez = std::vector<int> {1, 2};  break;
-        case 4 :  rez = std::vector<int> {1, 3};  break;
-        case 5 :  rez = std::vector<int> {2, 3};  break;
+        case 1 :  rez = std::vector<int> {1, 2};  break;
+        case 2 :  rez = std::vector<int> {2, 0};  break;
+        case 3 :  rez = std::vector<int> {3, 0};  break;
+        case 4 :  rez = std::vector<int> {3, 2};  break;
+        case 5 :  rez = std::vector<int> {3, 1};  break;
         default : DUNE_THROW(Dune::IOError, "Curvilinear Helper: Wrong input arguments for SubentityCorners " );
         }
 
@@ -302,9 +316,9 @@ class CurvilinearGeometryHelper {
         switch (subentityIndex)
         {
         case 0 :  rez = std::vector<int> {0, 1, 2};  break;
-        case 1 :  rez = std::vector<int> {0, 1, 3};  break;
-        case 2 :  rez = std::vector<int> {0, 2, 3};  break;
-        case 3 :  rez = std::vector<int> {1, 2, 3};  break;
+        case 1 :  rez = std::vector<int> {0, 2, 3};  break;
+        case 2 :  rez = std::vector<int> {2, 1, 3};  break;
+        case 3 :  rez = std::vector<int> {0, 3, 1};  break;
         default : DUNE_THROW(Dune::IOError, "Curvilinear Helper: Wrong input arguments for SubentityCorners " );
         }
 
@@ -332,16 +346,18 @@ class CurvilinearGeometryHelper {
         IntegerCoordinateVector simplexGrid = simplexGridEnumerate<3>(order);
         for (int i = 0; i < simplexGrid.size(); i++) { coord_map[simplexGrid[i][0]][simplexGrid[i][1]][simplexGrid[i][2]] = i; }
 
+        std::cout << "subFaceReqInd=" << subentityIndex << std::endl;
+
         for (int i = 0; i <= order; i++)
         {
             for (int j = 0; j <= order - i; j++)
             {
                 switch (subentityIndex)
                 {
-                    case 0 : rez.push_back(coord_map[j][i][0]);               return rez;  // Face (0 1 2)
-                    case 1 : rez.push_back(coord_map[0][j][i]);               return rez;  // Face (0 2 3)
-                    case 2 : rez.push_back(coord_map[j][order - i - j][i]);   return rez;  // Face (2 1 3)
-                    case 3 : rez.push_back(coord_map[i][0][j]);               return rez;  // Face (0 3 1)
+                    case 0 : rez.push_back(coord_map[j][i][0]);               break;  // Face (0 1 2)
+                    case 1 : rez.push_back(coord_map[0][j][i]);               break;  // Face (0 2 3)
+                    case 2 : rez.push_back(coord_map[j][order - i - j][i]);   break;  // Face (2 1 3)
+                    case 3 : rez.push_back(coord_map[i][0][j]);               break;  // Face (0 3 1)
                 }
             }
         }
@@ -363,12 +379,12 @@ class CurvilinearGeometryHelper {
         {
             switch (subentityIndex)
             {
-                case 0 : rez.push_back(coord_map[i][0][0]);              return rez;  // Edge (0 1)
-                case 1 : rez.push_back(coord_map[order - i][i][0]);      return rez;  // Edge (1 2)
-                case 2 : rez.push_back(coord_map[0][order - i][0]);      return rez;  // Edge (2 0)
-                case 3 : rez.push_back(coord_map[0][0][order - i]);      return rez;  // Edge (3 0)
-                case 4 : rez.push_back(coord_map[0][i][order - i]);      return rez;  // Edge (3 2)
-                case 5 : rez.push_back(coord_map[i][0][order - i]);      return rez;  // Edge (3 1)
+                case 0 : rez.push_back(coord_map[i][0][0]);          break;  // Edge (0 1)
+                case 1 : rez.push_back(coord_map[order - i][i][0]);  break;  // Edge (1 2)
+                case 2 : rez.push_back(coord_map[0][order - i][0]);  break;  // Edge (2 0)
+                case 3 : rez.push_back(coord_map[0][0][order - i]);  break;  // Edge (3 0)
+                case 4 : rez.push_back(coord_map[0][i][order - i]);  break;  // Edge (3 2)
+                case 5 : rez.push_back(coord_map[i][0][order - i]);  break;  // Edge (3 1)
             }
         }
         return rez;

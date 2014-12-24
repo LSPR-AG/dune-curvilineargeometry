@@ -54,8 +54,8 @@ class ElementTwoOrders {
     typedef std::vector< GlobalVector > GlobalVectorVector;
     typedef std::vector< CompositeVector > CompositeVectorVector;
     typedef std::vector<ct> sampleVector;
-    typedef polynomial<ct, mydim> Polynomial;
-    typedef std::vector<Polynomial> PolynomialVector;
+    typedef Polynomial<ct, mydim> LocalPolynomial;
+    typedef std::vector<LocalPolynomial> PolynomialVector;
     typedef Function<GlobalVector, ct> GlobalFunction;
     typedef CurvilinearElementInterpolator<double, mydim, mydim + 1> CompositeInterpolator;
 
@@ -90,8 +90,8 @@ public:
         PolynomialVector intPoly_global_O1 = intPoly_composite_O1;      intPoly_global_O1.erase(intPoly_global_O1.end());
         PolynomialVector intPoly_global_O2 = intPoly_composite_O2;      intPoly_global_O2.erase(intPoly_global_O2.end());
 
-        Polynomial J_O1 = JacobianDeterminantAnalytical(intPoly_global_O1);
-        Polynomial J_O2 = JacobianDeterminantAnalytical(intPoly_global_O2);
+        LocalPolynomial J_O1 = JacobianDeterminantAnalytical(intPoly_global_O1);
+        LocalPolynomial J_O2 = JacobianDeterminantAnalytical(intPoly_global_O2);
 
         integralO1_    = (intPoly_composite_O1[mydim] * J_O1).integrateRefSimplex();
         integralO2_ = (intPoly_composite_O2[mydim] * J_O2).integrateRefSimplex();
@@ -130,9 +130,9 @@ private:
         return rez;
     }
 
-    Polynomial JacobianDeterminantAnalytical(const PolynomialVector & analyticalMap) const
+    LocalPolynomial JacobianDeterminantAnalytical(const PolynomialVector & analyticalMap) const
     {
-        Polynomial rez;
+        LocalPolynomial rez;
         GlobalVector mid;
         switch(mydim)
         {

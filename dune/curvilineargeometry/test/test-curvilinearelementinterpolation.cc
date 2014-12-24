@@ -34,9 +34,9 @@ typedef std::vector<FieldVector1D> FieldVectorVector1D;
 typedef std::vector<FieldVector2D> FieldVectorVector2D;
 typedef std::vector<FieldVector3D> FieldVectorVector3D;
 
-typedef polynomial<double, 1> Polynomial1D;
-typedef polynomial<double, 2> Polynomial2D;
-typedef polynomial<double, 3> Polynomial3D;
+typedef Polynomial<double, 1> Polynomial1D;
+typedef Polynomial<double, 2> Polynomial2D;
+typedef Polynomial<double, 3> Polynomial3D;
 typedef std::vector<Polynomial1D> PolynomialVector1D;
 typedef std::vector<Polynomial2D> PolynomialVector2D;
 typedef std::vector<Polynomial3D> PolynomialVector3D;
@@ -136,7 +136,7 @@ std::vector<FieldVector< double, dimworld > > evaluateInterpolatorNumerical(
 template <int dim, int dimworld>
 std::vector<FieldVector< double, dimworld > > evaluatePolynomialVector(
         std::vector< FieldVector< double, dim > > & localsample,
-        std::vector< polynomial<double, dim> >& polynomialvector )
+        std::vector< Polynomial<double, dim> >& polynomialvector )
 {
     std::vector<FieldVector< double, dimworld > > rez;
     for (int i = 0; i < localsample.size(); i++) {
@@ -211,7 +211,7 @@ template <typename Functor>
 void edgeTest3D(Functor f)
 {
     CurvilinearElementInterpolator<double, 1, 3> interps[5];
-    std::vector<polynomial<double, 1> > analytics[5];
+    std::vector<Polynomial<double, 1> > analytics[5];
 
     FieldVectorVector1D random1D_20 = sampleRandom<1>(20);
     FieldVectorVector3D sample_real_3D_line_p20_randomtest = evaluateFunction<1,3>(random1D_20, f);
@@ -257,7 +257,7 @@ template <typename Functor>
 void surfaceTest3D(Functor f)
 {
     CurvilinearElementInterpolator<double, 2, 3> interps[5];
-    std::vector<polynomial<double, 2> > analytics[5];
+    std::vector<Polynomial<double, 2> > analytics[5];
 
     FieldVectorVector2D random2D_20 = sampleRandom<2>(20);
     FieldVectorVector3D sample_real_3D_surface_p20_randomtest = evaluateFunction<2,3, Functor>(random2D_20, f);
@@ -301,7 +301,7 @@ template <typename Functor>
 void volumeTest3D(Functor f)
 {
     CurvilinearElementInterpolator<double, 3, 3> interps[5];
-    std::vector<polynomial<double, 3> > analytics[5];
+    std::vector<Polynomial<double, 3> > analytics[5];
 
     FieldVectorVector3D random3D_20 = sampleRandom<3>(20);
     FieldVectorVector3D sample_real_3D_volume_p20_randomtest = evaluateFunction<3,3, Functor>(random3D_20, f);

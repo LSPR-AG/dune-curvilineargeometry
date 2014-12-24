@@ -55,8 +55,8 @@ class CurvilinearElementInterpolator {
 
     typedef FieldVector<ctype, mydimension> LocalVector;
     typedef FieldVector< ctype, coorddimension > GlobalVector;
-    typedef polynomial<ctype, mydimension> Polynomial;
-    typedef std::vector<Polynomial> PolynomialVector;
+    typedef Polynomial<ctype, mydimension> LocalPolynomial;
+    typedef std::vector<LocalPolynomial> PolynomialVector;
 
     typedef std::vector<std::vector<int>> IntegerCoordinateVector;
 
@@ -124,8 +124,8 @@ class CurvilinearElementInterpolator {
      */
     GlobalVector vertex(int i) const { return point_[i]; }
 
-    /** \brief Interpolatory vertex coordinate vector */
-    std::vector<GlobalVector> vertices() const { return point_;  }
+    /** \brief Coordinates of all interpolatory points */
+    std::vector<GlobalVector> vertexSet() const { return point_; }
 
     /** \brief Internal vertex index of a corner in the interpolatory vertex vector
      *  \param[in]  i	Internal corner index of this corner
@@ -144,7 +144,7 @@ class CurvilinearElementInterpolator {
     int nSubentity(int codim) const { return refElement_->size(codim); }
 
 
-    /** \brief  Lagrange Polynomial corresponding to a given vertex, evaluated at local reference coordinates (u,v,w)
+    /** \brief  Lagrange LocalPolynomial corresponding to a given vertex, evaluated at local reference coordinates (u,v,w)
      *  \param[in]  vertexIndex		The internal index of the associated interpolatory vertex
      *  \param[in]  local		The local coordinate to evaluate the polynomial
      * 
@@ -577,7 +577,7 @@ class CurvilinearElementInterpolator {
         // Step 1. Construct monomial basis and set of local coordinates
         for (int i = 0; i < simplexPoints.size(); i++)
         {
-                monomial_basis.push_back(Polynomial(polySummand(1.0, simplexPoints[i])));
+                monomial_basis.push_back(LocalPolynomial(PolynomialTraits::Monomial(1.0, simplexPoints[i])));
         }
 
         // Step 2. Evaluate monomial basis into matrix
@@ -597,7 +597,7 @@ class CurvilinearElementInterpolator {
         // Step 4. Construct Lagrange polynomials - linear combinations of monomials with matrix rows
         for (int i = 0; i < dof; i++)
         {
-            Polynomial tmpPoly;
+            LocalPolynomial tmpPoly;
 
             for (int j = 0; j < dof; j++)
             {
@@ -609,7 +609,7 @@ class CurvilinearElementInterpolator {
         // Step 5. Construct interpolatoryVector - for each coordinate a linear combination of coordinate of points and lagrange polynomials
         for (int d = 0; d < coorddimension; d++)
         {
-            Polynomial tmpPoly;
+            LocalPolynomial tmpPoly;
             for (int i = 0; i < dof; i++)
             {
                 tmpPoly.axpy(lagrange_basis[i], point_[i][d]);

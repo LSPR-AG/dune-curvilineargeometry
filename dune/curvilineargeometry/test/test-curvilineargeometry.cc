@@ -43,6 +43,8 @@ typedef std::vector<FieldVector1D> FieldVectorVector1D;
 typedef std::vector<FieldVector2D> FieldVectorVector2D;
 typedef std::vector<FieldVector3D> FieldVectorVector3D;
 
+typedef PolynomialTraits::Monomial  Monomial;
+
 
 // ************************************************************************************************
 // IMPLEMENTING AUXILIARY METHODS
@@ -220,51 +222,51 @@ template<> struct myFunctorNonlinear1<double, 3, 3> { FieldVector3D operator()(c
 
 // Returns one of 5 possible polynomials such that polynomial order = index
 template<class ctype, int mydim>
-polynomial<ctype, mydim> BasisPolynomial1D(int index)
+Polynomial<ctype, mydim> BasisPolynomial1D(int index)
 {
-    polynomial<ctype, mydim> rez(polySummand(1, 0));
+    Polynomial<ctype, mydim> rez(Monomial(1, 0));
 
-    if (index > 0) { rez.append(polySummand(2, 1)); }
-    if (index > 1) { rez.append(polySummand(3, 2)); }
-    if (index > 2) { rez.append(polySummand(4, 3)); }
-    if (index > 3) { rez.append(polySummand(5, 4)); }
-    if (index > 4) { rez.append(polySummand(6, 5)); }
+    if (index > 0) { rez.append(Monomial(2, 1)); }
+    if (index > 1) { rez.append(Monomial(3, 2)); }
+    if (index > 2) { rez.append(Monomial(4, 3)); }
+    if (index > 3) { rez.append(Monomial(5, 4)); }
+    if (index > 4) { rez.append(Monomial(6, 5)); }
 
     return rez;
 }
 
 // Returns one of 5 possible polynomials such that polynomial order = index
 template<class ctype, int mydim>
-polynomial<ctype, mydim> BasisPolynomial2D(int index)
+Polynomial<ctype, mydim> BasisPolynomial2D(int index)
 {
-    polynomial<ctype, mydim> rez(polySummand(1, 0, 0));
+    Polynomial<ctype, mydim> rez(Monomial(1, 0, 0));
 
-    if (index > 0) { rez.append(polySummand(2, 1, 0));  rez.append(polySummand(2, 0, 1)); }
-    if (index > 1) { rez.append(polySummand(3, 2, 0));  rez.append(polySummand(3, 0, 2)); rez.append(polySummand(1, 1, 1)); }
-    if (index > 2) { rez.append(polySummand(4, 3, 0));  rez.append(polySummand(4, 0, 3)); rez.append(polySummand(1, 1, 2)); }
-    if (index > 3) { rez.append(polySummand(5, 4, 0));  rez.append(polySummand(5, 0, 4)); rez.append(polySummand(1, 1, 3)); }
-    if (index > 4) { rez.append(polySummand(6, 5, 0));  rez.append(polySummand(6, 0, 5)); rez.append(polySummand(1, 1, 4)); }
+    if (index > 0) { rez.append(Monomial(2, 1, 0));  rez.append(Monomial(2, 0, 1)); }
+    if (index > 1) { rez.append(Monomial(3, 2, 0));  rez.append(Monomial(3, 0, 2)); rez.append(Monomial(1, 1, 1)); }
+    if (index > 2) { rez.append(Monomial(4, 3, 0));  rez.append(Monomial(4, 0, 3)); rez.append(Monomial(1, 1, 2)); }
+    if (index > 3) { rez.append(Monomial(5, 4, 0));  rez.append(Monomial(5, 0, 4)); rez.append(Monomial(1, 1, 3)); }
+    if (index > 4) { rez.append(Monomial(6, 5, 0));  rez.append(Monomial(6, 0, 5)); rez.append(Monomial(1, 1, 4)); }
 
     return rez;
 }
 
 // Returns one of 5 possible polynomials such that polynomial order = index
 template<class ctype, int mydim>
-polynomial<ctype, mydim> BasisPolynomial3D(int index)
+Polynomial<ctype, mydim> BasisPolynomial3D(int index)
 {
-    polynomial<ctype, mydim> rez(polySummand(1, 0, 0, 0));
+    Polynomial<ctype, mydim> rez(Monomial(1, 0, 0, 0));
 
-    if (index > 0) { rez.append(polySummand(2, 1, 0, 0));  rez.append(polySummand(2, 0, 1, 0));  rez.append(polySummand(2, 0, 0, 1)); }
-    if (index > 1) { rez.append(polySummand(3, 2, 0, 0));  rez.append(polySummand(3, 0, 2, 0));  rez.append(polySummand(3, 0, 0, 2)); rez.append(polySummand(1, 1, 1, 0)); }
-    if (index > 2) { rez.append(polySummand(4, 3, 0, 0));  rez.append(polySummand(4, 0, 3, 0));  rez.append(polySummand(4, 0, 0, 3)); rez.append(polySummand(1, 1, 1, 1)); }
-    if (index > 3) { rez.append(polySummand(5, 4, 0, 0));  rez.append(polySummand(5, 0, 4, 0));  rez.append(polySummand(5, 0, 0, 4)); rez.append(polySummand(1, 1, 1, 2)); }
-    if (index > 4) { rez.append(polySummand(6, 5, 0, 0));  rez.append(polySummand(6, 0, 5, 0));  rez.append(polySummand(6, 0, 0, 5)); rez.append(polySummand(1, 1, 1, 3)); }
+    if (index > 0) { rez.append(Monomial(2, 1, 0, 0));  rez.append(Monomial(2, 0, 1, 0));  rez.append(Monomial(2, 0, 0, 1)); }
+    if (index > 1) { rez.append(Monomial(3, 2, 0, 0));  rez.append(Monomial(3, 0, 2, 0));  rez.append(Monomial(3, 0, 0, 2)); rez.append(Monomial(1, 1, 1, 0)); }
+    if (index > 2) { rez.append(Monomial(4, 3, 0, 0));  rez.append(Monomial(4, 0, 3, 0));  rez.append(Monomial(4, 0, 0, 3)); rez.append(Monomial(1, 1, 1, 1)); }
+    if (index > 3) { rez.append(Monomial(5, 4, 0, 0));  rez.append(Monomial(5, 0, 4, 0));  rez.append(Monomial(5, 0, 0, 4)); rez.append(Monomial(1, 1, 1, 2)); }
+    if (index > 4) { rez.append(Monomial(6, 5, 0, 0));  rez.append(Monomial(6, 0, 5, 0));  rez.append(Monomial(6, 0, 0, 5)); rez.append(Monomial(1, 1, 1, 3)); }
 
     return rez;
 }
 
 template<class ctype, int mydim>
-polynomial<ctype, mydim> BasisPolynomial(int index)
+Polynomial<ctype, mydim> BasisPolynomial(int index)
 {
     switch (mydim)
     {
@@ -277,20 +279,20 @@ polynomial<ctype, mydim> BasisPolynomial(int index)
 
 // Construct a mydim+1 polynomial vector to test the Surface Dot Product Integral
 template<class ctype, int mydim>
-std::vector< polynomial<ctype, mydim> > BasisVectorDiagonal()
+std::vector< Polynomial<ctype, mydim> > BasisVectorDiagonal()
 {
-    std::vector< polynomial<ctype, mydim> > rez;
+    std::vector< Polynomial<ctype, mydim> > rez;
 
     switch (mydim)
     {
     case 1:
-        rez.push_back(polynomial<ctype, mydim> (polySummand(1, 1)));
-        rez.push_back(polynomial<ctype, mydim> (polySummand(1, 1)));
+        rez.push_back(Polynomial<ctype, mydim> (Monomial(1, 1)));
+        rez.push_back(Polynomial<ctype, mydim> (Monomial(1, 1)));
         break;
     case 2:
-        rez.push_back(polynomial<ctype, mydim> (polySummand(1, 1, 0)));
-        rez.push_back(polynomial<ctype, mydim> (polySummand(1, 0, 1)));
-        rez.push_back(polynomial<ctype, mydim> (polySummand(1, 1, 1)));
+        rez.push_back(Polynomial<ctype, mydim> (Monomial(1, 1, 0)));
+        rez.push_back(Polynomial<ctype, mydim> (Monomial(1, 0, 1)));
+        rez.push_back(Polynomial<ctype, mydim> (Monomial(1, 1, 1)));
         break;
     }
 
@@ -635,7 +637,7 @@ bool SimplexTest(Functor f, int ord, int f_type, int f_order, std::string f_name
 
         for (int bf_ord = 0; bf_ord <= 5; bf_ord++)
         {
-            polynomial<ctype, mydim> basisP = BasisPolynomial<ctype, mydim>(bf_ord);
+            Polynomial<ctype, mydim> basisP = BasisPolynomial<ctype, mydim>(bf_ord);
 
             double int_rez = SimplexGeom.integrateScalar(basisP, tmpTolerance);
             double int_rez_cached = SimplexGeomCached.integrateScalar(basisP, tmpTolerance);
@@ -662,7 +664,7 @@ bool SimplexTest(Functor f, int ord, int f_type, int f_order, std::string f_name
     {
         double tmpTolerance = 1.0e-10;
 
-        std::vector<polynomial<ctype, mydim>> basisVectorP = BasisVectorDiagonal<ctype, mydim>();
+        std::vector<Polynomial<ctype, mydim>> basisVectorP = BasisVectorDiagonal<ctype, mydim>();
 
         // Need a basis function which is a vector in global coordinates
         double int_rez = SimplexGeom.integrateAnalyticalDot(basisVectorP);

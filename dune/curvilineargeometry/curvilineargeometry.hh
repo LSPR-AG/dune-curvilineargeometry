@@ -133,7 +133,7 @@ namespace Dune
     template< int dim >
     struct hasSingleGeometryType
     {
-      static const bool v = false;
+      static const bool v = true;
       static const unsigned int topologyId = ~0u;
     };
   };
@@ -142,13 +142,13 @@ namespace Dune
   // Function that calculates the total integrand, by multiplying the passed integrand and the square root of the squared integration element.
   template<class ct, int mydim, typename Functor>
   struct BoundaryFunctor {
-      typedef polynomial<ct, mydim> Polynomial;
+      typedef Polynomial<ct, mydim> LocalPolynomial;
       typedef FieldVector< ct, mydim > LocalCoordinate;
 
       Functor basis_function_;
-      Polynomial integration_element_squared_;
+      LocalPolynomial integration_element_squared_;
 
-      BoundaryFunctor(const Functor & basis_function, const Polynomial & integration_element_squared) :
+      BoundaryFunctor(const Functor & basis_function, const LocalPolynomial & integration_element_squared) :
           basis_function_ (basis_function),
           integration_element_squared_ (integration_element_squared)
       {}
@@ -160,11 +160,11 @@ namespace Dune
   template<class ct, int mydim>
   struct PolynomialFunctor
   {
-      typedef polynomial<ct, mydim> Polynomial;
+      typedef Polynomial<ct, mydim> LocalPolynomial;
       typedef FieldVector< ct, mydim > LocalCoordinate;
-      Polynomial p_;
+      LocalPolynomial p_;
 
-      PolynomialFunctor(const Polynomial & p) : p_(p) {}
+      PolynomialFunctor(const LocalPolynomial & p) : p_(p) {}
 
       double operator()(const LocalCoordinate & x) const { return p_.evaluate(x); }
   };
@@ -223,8 +223,8 @@ namespace Dune
     //! type of element interpolator
     typedef CurvilinearElementInterpolator <ct, mydim, cdim> ElementInterpolator;
 
-    typedef polynomial<ctype, mydimension> Polynomial;
-    typedef std::vector<Polynomial> PolynomialVector;
+    typedef Polynomial<ctype, mydimension> LocalPolynomial;
+    typedef std::vector<LocalPolynomial> PolynomialVector;
 
     // Types for subentity geometries
     typedef CurvilinearElementInterpolator< ctype, mydim - 1, cdim > SubentityInterpolator;
@@ -232,7 +232,7 @@ namespace Dune
 
     typedef FieldVector< ctype, mydimension - 1 > SubLocalCoordinate;
 
-    typedef polynomial<ctype, mydimension - 1> SubentityPolynomial;
+    typedef Polynomial<ctype, mydimension - 1> SubentityPolynomial;
     typedef std::vector<SubentityPolynomial> SubentityPolynomialVector;
 
   private:
@@ -306,7 +306,14 @@ namespace Dune
     /** \brief obtain the name of the reference element */
     Dune::GeometryType type () const { return elementInterpolator_.type(); }
 
-    int vertex (int i) const { return elementInterpolator_.vertex(i); }
+    /** \brief obtain the polynomial vector mapping from local to global geometry of the element */
+    PolynomialVector interpolatoryVectorAnalytical() const { return elementInterpolator_.interpolatoryVectorAnalytical(); }
+
+    /** \brief obtain an interpolatory vertex of the geometry */
+    GlobalCoordinate vertex (int i) const { return elementInterpolator_.vertex(i); }
+
+    /** \brief obtain all interpolatory vertices of the geometry */
+    std::vector<GlobalCoordinate> vertexSet() const { return elementInterpolator_.vertexSet(); }
 
     /** \brief obtain number of vertices associated with the interpolatory polynomial */
     int nVertex () const { return elementInterpolator_.dofPerOrder(); }
@@ -503,7 +510,7 @@ namespace Dune
      * during the interpolation stage. Thus to calculate |det(J)|, it is enough to find the sign of
      * det(J) inside the element and multiply by it.
      */
-    Polynomial JacobianDeterminantAnalytical() const
+    LocalPolynomial JacobianDeterminantAnalytical() const
     {
         PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
         return JacobianDeterminantAnalytical(analyticalMap);
@@ -520,7 +527,7 @@ namespace Dune
     }
 
     // Calculates analytically det|JJ^T|, without taking the square root. Re-uses NormalIntegrationElementAnalytical
-    Polynomial IntegrationElementSquaredAnalytical() const
+    LocalPolynomial IntegrationElementSquaredAnalytical() const
     {
         PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
         return IntegrationElementSquaredAnalytical(analyticalMap);
@@ -537,7 +544,7 @@ namespace Dune
      *
      *  \returns the result of the integral
      */
-    ctype integrateScalar(const Polynomial & P, double tolerance) const
+    ctype integrateScalar(const LocalPolynomial & P, double tolerance) const
     {
         if (mydimension == coorddimension) { return integrateAnalyticalScalar(P); }
         else                               { return integrateNumerical(PolynomialFunctor<ct, mydim>(P), tolerance); }
@@ -554,7 +561,7 @@ namespace Dune
     template <typename Functor>
     ctype integrateNumerical(const Functor & f, double tolerance) const
     {
-        Polynomial integrationElementSquared = IntegrationElementSquaredAnalytical();
+        LocalPolynomial integrationElementSquared = IntegrationElementSquaredAnalytical();
         return integrateNumerical(f, tolerance, integrationElementSquared);
     }
 
@@ -567,9 +574,9 @@ namespace Dune
      *
      *  TODO: Need to throw error if called with mydim != cdim
      */
-    ctype integrateAnalyticalScalar(const Polynomial & P) const
+    ctype integrateAnalyticalScalar(const LocalPolynomial & P) const
     {
-        Polynomial JDet = JacobianDeterminantAnalytical();
+        LocalPolynomial JDet = JacobianDeterminantAnalytical();
         return integrateAnalyticalScalar(P, JDet);
     }
 
@@ -651,8 +658,6 @@ namespace Dune
 
   protected:
     const ReferenceElement &refElement () const { return elementInterpolator_.refElement(); }
-
-    PolynomialVector interpolatoryVectorAnalytical() const { return elementInterpolator_.interpolatoryVectorAnalytical(); }
 
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
@@ -926,9 +931,9 @@ namespace Dune
       return MatrixHelper::template sqrtDetAAT< mydimension, coorddimension >( jacobianTransposed( local, analyticalMap ) );
     }
 
-    Polynomial JacobianDeterminantAnalytical(const PolynomialVector & analyticalMap) const
+    LocalPolynomial JacobianDeterminantAnalytical(const PolynomialVector & analyticalMap) const
     {
-        Polynomial rez;
+        LocalPolynomial rez;
 
         switch(coorddimension)
         {
@@ -969,14 +974,14 @@ namespace Dune
         return rez;
     }
 
-    Polynomial IntegrationElementSquaredAnalytical(const PolynomialVector & analyticalMap) const
+    LocalPolynomial IntegrationElementSquaredAnalytical(const PolynomialVector & analyticalMap) const
     {
-        Polynomial rez;
+        LocalPolynomial rez;
         switch (mydimension)
         {
         case 1:
             for (int i = 0; i < coorddimension; i++) {
-                Polynomial tmp = analyticalMap[i].derivative(0);
+                LocalPolynomial tmp = analyticalMap[i].derivative(0);
                 rez.mergeTo(tmp * tmp);
             }
             break;
@@ -991,14 +996,14 @@ namespace Dune
     }
 
     template <typename Functor>
-    ctype integrateNumerical(Functor f, double tolerance, const Polynomial & integrationElementSquared) const
+    ctype integrateNumerical(Functor f, double tolerance, const LocalPolynomial & integrationElementSquared) const
     {
         BoundaryFunctor<ct, mydim, Functor> Integrand(f, integrationElementSquared);
         NumericalRecursiveInterpolationIntegrator<ct, mydim> NInt( type() );
         return NInt.integrate( Integrand, tolerance);
     }
 
-    ctype integrateAnalyticalScalar(const Polynomial & P, const Polynomial & jacobianDeterminant) const
+    ctype integrateAnalyticalScalar(const LocalPolynomial & P, const LocalPolynomial & jacobianDeterminant) const
     {
         return (P * jacobianDeterminant).integrateRefSimplex();
     }
@@ -1006,7 +1011,7 @@ namespace Dune
     ctype integrateAnalyticalDot(const PolynomialVector & PVec, const PolynomialVector & normalIntegrationElement ) const
     {
         // Construct boundary integration element normal polynomial vector
-        Polynomial integrand;
+        LocalPolynomial integrand;
         for (int i = 0; i < coorddimension; i++) { integrand.mergeTo(PVec[i] * normalIntegrationElement[i]); }
         return integrand.integrateRefSimplex();
     }
@@ -1108,8 +1113,8 @@ namespace Dune
     typedef typename Base::JacobianTransposed JacobianTransposed;
     typedef typename Base::JacobianInverseTransposed JacobianInverseTransposed;
 
-    typedef polynomial<ctype, mydimension> Polynomial;
-    typedef std::vector<Polynomial> PolynomialVector;
+    typedef Polynomial<ctype, mydimension> LocalPolynomial;
+    typedef std::vector<LocalPolynomial> PolynomialVector;
 
     typedef FieldVector< ctype, mydimension - 1 > SubLocalCoordinate;
 
@@ -1193,7 +1198,7 @@ namespace Dune
         return Base::integrationElement ( local, analyticalMap_ );
     }
 
-    Polynomial JacobianDeterminantAnalytical() const
+    LocalPolynomial JacobianDeterminantAnalytical() const
     {
         return Base::JacobianDeterminantAnalytical(analyticalMap_);
     }
@@ -1203,12 +1208,12 @@ namespace Dune
         return Base::NormalIntegrationElementAnalytical(analyticalMap_);
     }
 
-    Polynomial IntegrationElementSquaredAnalytical() const
+    LocalPolynomial IntegrationElementSquaredAnalytical() const
     {
         return Base::IntegrationElementSquaredAnalytical(analyticalMap_);
     }
 
-    ctype integrateScalar(const Polynomial & P, double tolerance) const
+    ctype integrateScalar(const LocalPolynomial & P, double tolerance) const
     {
         if (mydimension == coorddimension) { return integrateAnalyticalScalar(P); }
         else                               { return integrateNumerical(PolynomialFunctor<ct, mydim>(P), tolerance); }
@@ -1220,7 +1225,7 @@ namespace Dune
         return Base::integrateNumerical(f, tolerance, IntElem2_);
     }
 
-    ctype integrateAnalyticalScalar(const Polynomial & P) const
+    ctype integrateAnalyticalScalar(const LocalPolynomial & P) const
     {
         return Base::integrateAnalyticalScalar(P, JacobianDet_);
     }
@@ -1273,8 +1278,8 @@ namespace Dune
 
   private:
     mutable PolynomialVector analyticalMap_;
-    mutable Polynomial JacobianDet_;
-    mutable Polynomial IntElem2_;
+    mutable LocalPolynomial JacobianDet_;
+    mutable LocalPolynomial IntElem2_;
     mutable PolynomialVector NormIntElem_;
   };
 
