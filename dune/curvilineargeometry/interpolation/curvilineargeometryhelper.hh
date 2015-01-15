@@ -49,6 +49,14 @@ class CurvilinearGeometryHelper {
 
   public:
 
+
+    // Public typedefs
+    typedef  int     InternalIndexType;
+    typedef  int     InterpolatoryOrderType;
+
+
+
+
     /** \brief Empty constructor. This class only contains static members anyway */
     CurvilinearGeometryHelper() {}
 
@@ -100,7 +108,7 @@ class CurvilinearGeometryHelper {
      *  \param[in]  order	Interpolation Order of the element of interest
      *  \param[in]  i		Internal corner index of the corner of interest
      */
-    static int cornerID(Dune::GeometryType geomType, int order, int i)
+    static InternalIndexType cornerID(Dune::GeometryType geomType, int order, InternalIndexType i)
     {
         if (!geomType.isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: cornerID() only implemented for Simplex geometries at the moment"); }
 
@@ -225,11 +233,12 @@ class CurvilinearGeometryHelper {
 
 
     // Returns d-1 subentity corner local indices, sorted
-    static std::vector<int> linearElementSubentityCornerInternalIndexSet(GeometryType gt, int subentityCodim, int subentityIndex)
+    static std::vector<InternalIndexType> linearElementSubentityCornerInternalIndexSet(GeometryType gt, int subentityCodim, InternalIndexType subentityIndex)
     {
-        std::vector<int> rez;
+        std::vector<InternalIndexType> rez;
 
         if (gt.isTriangle() && (subentityCodim == 1))          { rez = linearTriangleSubentityEdgeIndexSet(subentityIndex);  }
+        else if (gt.isTetrahedron() && (subentityCodim == 0))  { rez = std::vector<InternalIndexType> {0, 1, 2, 3};          }
         else if (gt.isTetrahedron() && (subentityCodim == 1))  { rez = linearTetrahedronSubentityTriangleIndexSet(subentityIndex);  }
         else if (gt.isTetrahedron() && (subentityCodim == 2))  { rez = linearTetrahedronSubentityEdgeIndexSet(subentityIndex);  }
         else  {  DUNE_THROW(Dune::IOError, "Curvilinear Helper: Not implemented element subentityIndex for this element type " ); }
@@ -246,7 +255,7 @@ class CurvilinearGeometryHelper {
      *  FIXME: The Subentity internal index is not in sync with the Dune convention
      */
     template <class ct, int mydim>
-    static std::vector<int> subentityInternalCoordinateSet(Dune::GeometryType entityGeometry, int order, int subentityCodim, int subentityIndex)
+    static std::vector<InternalIndexType> subentityInternalCoordinateSet(Dune::GeometryType entityGeometry, int order, int subentityCodim, int subentityIndex)
     {
     	int nSubentity = Dune::ReferenceElements< ct, mydim >::general(entityGeometry).size(subentityCodim);
 
@@ -257,7 +266,7 @@ class CurvilinearGeometryHelper {
         	DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: SubentityInterpolator() - Unexpected subentity index");
         }
 
-        std::vector<int> rez;
+        std::vector<InternalIndexType> rez;
 
              if ((entityGeometry.dim() == 3) && (subentityCodim == 1) ) {  rez = tetrahedronSubentityTriangleIndexSet(order, subentityIndex); }
         else if ((entityGeometry.dim() == 3) && (subentityCodim == 2) ) {  rez = tetrahedronSubentityEdgeIndexSet(order, subentityIndex); }
@@ -269,6 +278,28 @@ class CurvilinearGeometryHelper {
 
 
 
+    // Returns corner id's of this entity
+    static std::vector<int> entityVertexCornerSubset(
+            Dune::GeometryType gt,
+            const std::vector<int> & vertexIndexSet,
+            InterpolatoryOrderType order) const
+    {
+        std::vector<int> corner;
+
+        // Get corner number
+        int cornerNo = Dune::ReferenceElements::general(gt).size(gt.dim());
+        //int cornerNo = gt.dim() + 1;  // for simplices
+
+        // Get corners
+        for (int j = 0; j < cornerNo; j++) {
+            InternalIndexType internalId = Dune::CurvilinearGeometryHelper::cornerID(gt, order, j );
+            corner.push_back(vertexIndexSet[internalId]);
+        }
+
+        return corner;
+    }
+
+
   private:
 
     /** \brief  internal corner vertex index subset corresponding to subentity corners of a linear element
@@ -276,49 +307,49 @@ class CurvilinearGeometryHelper {
      *
      *  FIXME - the orientation convention has not been sync with Dune
      */
-    static std::vector<int> linearTriangleSubentityEdgeIndexSet(int subentityIndex)
+    static std::vector<InternalIndexType> linearTriangleSubentityEdgeIndexSet(InternalIndexType subentityIndex)
     {
-        std::vector<int> rez;
+        std::vector<InternalIndexType> rez;
 
         switch (subentityIndex)
         {
-        case 0 :  rez = std::vector<int> {0, 1};  break;
-        case 1 :  rez = std::vector<int> {1, 2};  break;
-        case 2 :  rez = std::vector<int> {0, 2};  break;
+        case 0 :  rez = std::vector<InternalIndexType> {0, 1};  break;
+        case 1 :  rez = std::vector<InternalIndexType> {1, 2};  break;
+        case 2 :  rez = std::vector<InternalIndexType> {0, 2};  break;
         default : DUNE_THROW(Dune::IOError, "Curvilinear Helper: Wrong input arguments for SubentityCorners " );
         }
 
         return rez;
     }
 
-    static std::vector<int> linearTetrahedronSubentityEdgeIndexSet(int subentityIndex)
+    static std::vector<InternalIndexType> linearTetrahedronSubentityEdgeIndexSet(InternalIndexType subentityIndex)
     {
-        std::vector<int> rez;
+        std::vector<InternalIndexType> rez;
 
         switch (subentityIndex)
         {
-        case 0 :  rez = std::vector<int> {0, 1};  break;
-        case 1 :  rez = std::vector<int> {1, 2};  break;
-        case 2 :  rez = std::vector<int> {2, 0};  break;
-        case 3 :  rez = std::vector<int> {3, 0};  break;
-        case 4 :  rez = std::vector<int> {3, 2};  break;
-        case 5 :  rez = std::vector<int> {3, 1};  break;
+        case 0 :  rez = std::vector<InternalIndexType> {0, 1};  break;
+        case 1 :  rez = std::vector<InternalIndexType> {1, 2};  break;
+        case 2 :  rez = std::vector<InternalIndexType> {2, 0};  break;
+        case 3 :  rez = std::vector<InternalIndexType> {3, 0};  break;
+        case 4 :  rez = std::vector<InternalIndexType> {3, 2};  break;
+        case 5 :  rez = std::vector<InternalIndexType> {3, 1};  break;
         default : DUNE_THROW(Dune::IOError, "Curvilinear Helper: Wrong input arguments for SubentityCorners " );
         }
 
         return rez;
     }
 
-    static std::vector<int> linearTetrahedronSubentityTriangleIndexSet(int subentityIndex)
+    static std::vector<InternalIndexType> linearTetrahedronSubentityTriangleIndexSet(InternalIndexType subentityIndex)
     {
-        std::vector<int> rez;
+        std::vector<InternalIndexType> rez;
 
         switch (subentityIndex)
         {
-        case 0 :  rez = std::vector<int> {0, 1, 2};  break;
-        case 1 :  rez = std::vector<int> {0, 2, 3};  break;
-        case 2 :  rez = std::vector<int> {2, 1, 3};  break;
-        case 3 :  rez = std::vector<int> {0, 3, 1};  break;
+        case 0 :  rez = std::vector<InternalIndexType> {0, 1, 2};  break;
+        case 1 :  rez = std::vector<InternalIndexType> {0, 2, 3};  break;
+        case 2 :  rez = std::vector<InternalIndexType> {2, 1, 3};  break;
+        case 3 :  rez = std::vector<InternalIndexType> {0, 3, 1};  break;
         default : DUNE_THROW(Dune::IOError, "Curvilinear Helper: Wrong input arguments for SubentityCorners " );
         }
 
@@ -335,9 +366,9 @@ class CurvilinearGeometryHelper {
      *
      *  FIXME - the orientation convention has not been sync with Dune
      */
-    static std::vector<int> tetrahedronSubentityTriangleIndexSet(int order, int subentityIndex)
+    static std::vector<InternalIndexType> tetrahedronSubentityTriangleIndexSet(int order, InternalIndexType subentityIndex)
     {
-    	std::vector<int> rez;
+    	std::vector<InternalIndexType> rez;
         // Can't figure out a nice way to do this
         // For now will write all coordinate numbers in a ((order + 1) x (order + 1) x (order + 1)) matrix and map from there
 
@@ -364,9 +395,9 @@ class CurvilinearGeometryHelper {
         return rez;
     }
 
-    static std::vector<int> tetrahedronSubentityEdgeIndexSet(int order, int subentityIndex)
+    static std::vector<InternalIndexType> tetrahedronSubentityEdgeIndexSet(int order, InternalIndexType subentityIndex)
     {
-        std::vector<int> rez;
+        std::vector<InternalIndexType> rez;
         // Can't figure out a nice way to do this
         // For now will write all coordinate numbers in a ((order + 1) x (order + 1) x (order + 1)) matrix and map from there
 
@@ -390,9 +421,9 @@ class CurvilinearGeometryHelper {
         return rez;
     }
 
-    static std::vector<int> triangleSubentityEdgeIndexSet(int order, int subentityIndex)
+    static std::vector<InternalIndexType> triangleSubentityEdgeIndexSet(int order, InternalIndexType subentityIndex)
     {
-        std::vector<int> rez;
+        std::vector<InternalIndexType> rez;
 
         // Can't figure out a nice way to do this
         // For now will write all coordinate numbers in a ((order + 1) x (order + 1)) matrix and map from there
