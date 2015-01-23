@@ -53,18 +53,20 @@ class CurvilinearElementInterpolator {
     static const int mydimension= mydim;
     static const int coorddimension = cdim;
 
+    typedef typename Dune::CurvilinearGeometryHelper::InternalIndexType        InternalIndexType;
+    typedef typename Dune::CurvilinearGeometryHelper::InterpolatoryOrderType   InterpolatoryOrderType;
+    typedef typename Dune::CurvilinearGeometryHelper::IntegerCoordinateVector  IntegerCoordinateVector;
+
     typedef FieldVector<ctype, mydimension> LocalVector;
     typedef FieldVector< ctype, coorddimension > GlobalVector;
     typedef Polynomial<ctype, mydimension> LocalPolynomial;
     typedef std::vector<LocalPolynomial> PolynomialVector;
 
-    typedef std::vector<std::vector<int>> IntegerCoordinateVector;
-
     typedef Dune::ReferenceElement< ctype, mydimension > ReferenceElement;
     typedef Dune::ReferenceElements< ctype, mydimension > ReferenceElements;
 
     const ReferenceElement *refElement_;
-    int order_;
+    InterpolatoryOrderType order_;
 
     std::vector<GlobalVector> point_;
 
@@ -81,7 +83,10 @@ class CurvilinearElementInterpolator {
      *  \param[in] order	the interpolation order of this element
      *
      */
-    CurvilinearElementInterpolator (const ReferenceElement &refElement, const std::vector<GlobalVector> & point, int order) :
+    CurvilinearElementInterpolator (
+    		const ReferenceElement &refElement,
+    		const std::vector<GlobalVector> & point,
+    		InterpolatoryOrderType order) :
         refElement_( &refElement ),
         point_(point)
   {
@@ -96,7 +101,10 @@ class CurvilinearElementInterpolator {
      *  \param[in] order	the interpolation order of this element
      *
      */  
-    CurvilinearElementInterpolator (Dune::GeometryType gt, const std::vector<GlobalVector> & point, int order) :
+    CurvilinearElementInterpolator (
+    		Dune::GeometryType gt,
+    		const std::vector<GlobalVector> & point,
+    		InterpolatoryOrderType order) :
         refElement_( &ReferenceElements::general( gt ) ),
         point_(point)
   {
@@ -108,7 +116,7 @@ class CurvilinearElementInterpolator {
 
 
     /** \brief Interpolaton order of this element */
-    int order() const { return order_; }
+    InterpolatoryOrderType order() const { return order_; }
 
     /** \brief GeometryType of this element */
     Dune::GeometryType type () const { return refElement_->type(); }
@@ -122,20 +130,23 @@ class CurvilinearElementInterpolator {
     /** \brief Coordinate of the interpolatory point_
      *  \param[in]  i	interpolatory vertex internal index
      */
-    GlobalVector vertex(int i) const { return point_[i]; }
+    GlobalVector vertex(InternalIndexType vertexIndex) const { return point_[vertexIndex]; }
 
     /** \brief Coordinates of all interpolatory points */
     std::vector<GlobalVector> vertexSet() const { return point_; }
 
     /** \brief Internal vertex index of a corner in the interpolatory vertex vector
-     *  \param[in]  i	Internal corner index of this corner
+     *  \param[in]  cornerLinearIndex	index of a corner wrt set of corners of the entity
      */
-    int cornerID(int i) const  { return Dune::CurvilinearGeometryHelper::cornerID(type(), order_, i); }
+    InternalIndexType cornerIndex(InternalIndexType cornerLinearIndex) const
+    {
+    	return Dune::CurvilinearGeometryHelper::cornerIndex(type(), order_, cornerLinearIndex);
+    }
 
-    /** \brief Coordinate of a corner
-     *  \param[in]  i	Internal corner index of this corner
+    /** \brief Coordinate of a corner, given corner index
+     *  \param[in]  cornerLinearIndex	index of a corner wrt set of corners of the entity
      */
-    GlobalVector corner(int i) const { return vertex(cornerID(i)); }
+    GlobalVector corner(InternalIndexType cornerLinearIndex) const { return vertex(cornerIndex(cornerLinearIndex)); }
 
     /** \brief Number of corners of this element */
     int nCorner() const { return refElement_->size(mydim); }
@@ -150,7 +161,7 @@ class CurvilinearElementInterpolator {
      * 
      *  note: there is one lagrange polynomial corresponding to each interpolatory vertex, therefore it makes sense to have the same index for polynomials and vertices
      */
-    double lagrangePolynomial(int vertexIndex, const LocalVector &local) const
+    double lagrangePolynomial(InternalIndexType vertexIndex, const LocalVector &local) const
     {
         if (!type().isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: lagrangePolynomial() only implemented for Simplex geometries at the moment"); }
 
@@ -199,7 +210,7 @@ class CurvilinearElementInterpolator {
      *  \param[in]  subentityNo		Subentity internal index inside the element
      */
     template<int subdim>
-    CurvilinearElementInterpolator< ctype, subdim, cdim > SubentityInterpolator(int subentityNo) const
+    CurvilinearElementInterpolator< ctype, subdim, cdim > SubentityInterpolator(InternalIndexType subentityNo) const
     {
         if (!type().isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: SubentityInterpolator() only implemented for Simplex geometries at the moment"); }
         if ((subentityNo < 0)||(subentityNo >= nSubentity(mydim - subdim)))
@@ -207,7 +218,7 @@ class CurvilinearElementInterpolator {
         	DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: SubentityInterpolator() - Unexpected subentity index");
         }
 
-        std::vector<int> subentityIndex = Dune::CurvilinearGeometryHelper::subentityInternalCoordinateSet<ctype, mydim>(type(), order_, mydim - subdim, subentityNo);
+        std::vector<InternalIndexType> subentityIndex = Dune::CurvilinearGeometryHelper::subentityInternalCoordinateSet<ctype, mydim>(type(), order_, mydim - subdim, subentityNo);
         std::vector<GlobalVector> subentityPoint;
         for (int i = 0; i < subentityIndex.size(); i++)  { subentityPoint.push_back(point_[subentityIndex[i]]); }
 
@@ -225,7 +236,7 @@ class CurvilinearElementInterpolator {
      *  \param[in]  vertexIndex		The internal index of the associated interpolatory vertex
      *  \param[in]  u			first local coordinate
      */
-    double lagrangePolynomialEdge(int vertexIndex, double u) const {
+    double lagrangePolynomialEdge(InternalIndexType vertexIndex, double u) const {
         double u2; double u3; double u4; double u5;
 
         switch (order_)
@@ -281,12 +292,13 @@ class CurvilinearElementInterpolator {
         }
     }
 
+
     /** \brief  Lagrange polynomial for triangle
      *  \param[in]  vertexIndex		The internal index of the associated interpolatory vertex
      *  \param[in]  u			first local coordinate
      *  \param[in]  v			second local coordinate
      */
-    double lagrangePolynomialTriangle(int vertexIndex, double u, double v) const {
+    double lagrangePolynomialTriangle(InternalIndexType vertexIndex, double u, double v) const {
         double u2; double u3; double u4; double u5;
         double v2; double v3; double v4; double v5;
 
@@ -385,13 +397,14 @@ class CurvilinearElementInterpolator {
       }
     }
 
+
     /** \brief  Lagrange polynomial for tetrahedron
      *  \param[in]  vertexIndex		The internal index of the associated interpolatory vertex
      *  \param[in]  u			first local coordinate
      *  \param[in]  v			second local coordinate
      *  \param[in]  w			third local coordinate
      */
-    double lagrangePolynomialTetrahedron(int vertexIndex, double u, double v, double w) const {
+    double lagrangePolynomialTetrahedron(InternalIndexType vertexIndex, double u, double v, double w) const {
       double u2; double u3; double u4; double u5;
       double v2; double v3; double v4; double v5;
       double w2; double w3; double w4; double w5;
@@ -560,6 +573,7 @@ class CurvilinearElementInterpolator {
         }    break;
     }
   }
+
 
     /** \brief  Analytic map from local to global coordinates, given explicitly by the polynomial class. Implementation for simplex  */
     PolynomialVector interpolatoryVectorAnalyticalSimplex() const {

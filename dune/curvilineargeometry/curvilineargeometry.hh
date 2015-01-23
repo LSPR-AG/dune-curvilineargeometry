@@ -198,18 +198,17 @@ namespace Dune
     typedef CurvilinearGeometry< ct, mydim, cdim, Traits > This;
 
   public:
-    //! coordinate type
-    typedef ct ctype;
 
-    //! geometry dimension
-    static const int mydimension= mydim;
-    //! coordinate dimension
-    static const int coorddimension = cdim;
+    typedef ct ctype;                           //! coordinate type
+    static const int mydimension= mydim;        //! geometry dimension
+    static const int coorddimension = cdim;     //! coordinate dimension
 
-    //! type of local coordinates
-    typedef FieldVector< ctype, mydimension > LocalCoordinate;
-    //! type of global coordinates
-    typedef FieldVector< ctype, coorddimension > GlobalCoordinate;
+    // Plain data types used
+    typedef typename Dune::CurvilinearGeometryHelper::InternalIndexType         InternalIndexType;
+    typedef typename Dune::CurvilinearGeometryHelper::InterpolatoryOrderType    InterpolatoryOrderType;
+
+    typedef FieldVector< ctype, mydimension > LocalCoordinate;        //! type of local coordinates
+    typedef FieldVector< ctype, coorddimension > GlobalCoordinate;    //! type of global coordinates
 
     //! type of jacobian transposed
     typedef FieldMatrix< ctype, mydimension, coorddimension > JacobianTransposed;
@@ -226,14 +225,6 @@ namespace Dune
     typedef Polynomial<ctype, mydimension> LocalPolynomial;
     typedef std::vector<LocalPolynomial> PolynomialVector;
 
-    // Types for subentity geometries
-    typedef CurvilinearElementInterpolator< ctype, mydim - 1, cdim > SubentityInterpolator;
-    typedef std::vector< SubentityInterpolator > SubentityInterpolatorVector;
-
-    typedef FieldVector< ctype, mydimension - 1 > SubLocalCoordinate;
-
-    typedef Polynomial<ctype, mydimension - 1> SubentityPolynomial;
-    typedef std::vector<SubentityPolynomial> SubentityPolynomialVector;
 
   private:
 
@@ -259,7 +250,7 @@ namespace Dune
     template< class Vertices>
     CurvilinearGeometry ( const ReferenceElement &refElement,
                           const Vertices &vertices,
-                          int order)
+                          InterpolatoryOrderType order)
     {
         elementInterpolator_ = ElementInterpolator( refElement, vertices, order);
     }
@@ -277,7 +268,7 @@ namespace Dune
     template< class Vertices>
     CurvilinearGeometry ( Dune::GeometryType gt,
                           const Vertices &vertices,
-                          int order)
+                          InterpolatoryOrderType order)
     {
         elementInterpolator_ = ElementInterpolator( gt, vertices, order);
     }
@@ -301,7 +292,7 @@ namespace Dune
 
     ElementInterpolator interpolator() { return elementInterpolator_; }
 
-    int order() const { return elementInterpolator_.order(); }
+    InterpolatoryOrderType order() const { return elementInterpolator_.order(); }
 
     /** \brief obtain the name of the reference element */
     Dune::GeometryType type () const { return elementInterpolator_.type(); }
@@ -322,17 +313,17 @@ namespace Dune
     int nCorner () const { return refElement().size( mydimension ); }
 
     /** \brief obtain coordinates of the i-th corner */
-    GlobalCoordinate corner ( int i ) const
+    GlobalCoordinate corner ( InternalIndexType cornerLinearIndex ) const
     {
-      assert( (i >= 0) && (i < nCorner()) );
-      return elementInterpolator_.corner(i);
+      assert( (cornerLinearIndex >= 0) && (cornerLinearIndex < nCorner()) );
+      return elementInterpolator_.corner(cornerLinearIndex);
     }
 
     /** \brief obtain a vector of coordinates of all corners */
     std::vector< GlobalCoordinate > cornerSet() const
     {
         std::vector< GlobalCoordinate > rez;
-        for (int i = 0; i < nCorner(); i++) { rez.push_back(corner(i)); }
+        for (InternalIndexType i = 0; i < nCorner(); i++) { rez.push_back(corner(i)); }
         return rez;
     }
 
@@ -355,11 +346,10 @@ namespace Dune
      *  \returns a vector of CurvilinearGeometry classes corresponding to mydim-1 subentity geometries
      */
     template<int subdim>
-    CurvilinearGeometry< ctype, subdim, cdim>  subentityGeometry(int subentityNo) const
+    CurvilinearGeometry< ctype, subdim, cdim>  subentityGeometry(InternalIndexType subentityIndex) const
     {
-    	CurvilinearElementInterpolator <ct, subdim, cdim> subentityInterpolator = elementInterpolator_.template SubentityInterpolator<subdim>(subentityNo);
-
-        return CurvilinearGeometry< ctype, subdim, cdim> (subentityInterpolator);
+    	CurvilinearElementInterpolator <ct, subdim, cdim> interp = elementInterpolator_.template SubentityInterpolator<subdim>(subentityIndex);
+        return CurvilinearGeometry< ctype, subdim, cdim> (interp);
     }
 
     /** \brief Construct a global coordinate normal of the curvilinear element evaluated at a given local coordinate
@@ -397,7 +387,7 @@ namespace Dune
      *  TODO: Try understand if normal to 2D curved face in 3D is meaningful
      *
      */
-    GlobalCoordinate subentityNormal(int indexInInside, const LocalCoordinate &local ) const
+    GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
         PolynomialVector analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
         return subentityNormal(indexInInside, local, false, false, analyticalMap);
@@ -411,7 +401,7 @@ namespace Dune
      *  \return unit vector normal to the subentity
      *
      */
-    GlobalCoordinate subentityUnitNormal(int indexInInside, const LocalCoordinate &local ) const
+    GlobalCoordinate subentityUnitNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
         PolynomialVector analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
         return subentityNormal(indexInInside, local, true, false, analyticalMap);
@@ -425,24 +415,11 @@ namespace Dune
      *  \return unit vector normal to the subentity
      *
      */
-    GlobalCoordinate subentityIntegrationNormal(int indexInInside, const LocalCoordinate &local ) const
+    GlobalCoordinate subentityIntegrationNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
         PolynomialVector analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
         return subentityNormal(indexInInside, local, false, true, analyticalMap);
     }
-
-/*    GlobalCoordinate subentityNormal(int indexInInside, const SubLocalCoordinate &local ) const
-    {
-        // Only available for subentities for which the normal is defined
-        if ((cdim < 2)||(cdim > 3)||(mydim != cdim)) { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: Subentity Normal only available in world dimensions 2 and 3, and elements of world dimension"); }
-
-        // Retrieve the interpolators for all cdim-1 dubeentites of this element
-        // NOTE: the edges will be oriented such that the clockwise-pi/2 rotation of tangent will always be the outer normal
-        // NOTE: the triangles will be oriented such that the negative left cross product of tangent will always be the outer normal
-        SubentityGeometryVector subentity_geometries = subentityGeometries();
-
-        return subentity_geometries[subentityNo].normal(local);
-    }*/
 
 
     /** \brief evaluate the inverse mapping
@@ -657,7 +634,9 @@ namespace Dune
     JacobianInverseTransposed jacobianInverseTransposed ( const LocalCoordinate &local ) const;
 
   protected:
+
     const ReferenceElement &refElement () const { return elementInterpolator_.refElement(); }
+
 
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
@@ -674,7 +653,9 @@ namespace Dune
       return jt;
     }
 
+
     JacobianInverseTransposed jacobianInverseTransposed ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const;
+
 
     // If the global point is too far away from the global centre of the element
     // return false. Then it can not be inside, because elements with surface curvature
@@ -717,15 +698,22 @@ namespace Dune
        }
     }
 
+
     // Checking if a point is inside an edge by simply verifying it lies between its two corners. Only for edges in 1D
     bool isInsideTestBarycentricEdge( const GlobalCoordinate &globalC, ctype tolerance) const
     {
         return ((corner(0)[0] - globalC[0] <= tolerance) && (globalC[0]- corner(1)[0] <= tolerance));
     }
 
+
     // Checking if a point is inside a triangle by calculating global simplex coordinates. Only for triangles in 2D
     bool isInsideTestBarycentricTriangle( const GlobalCoordinate &globalC, ctype tolerance) const
     {
+        typedef CurvilinearElementInterpolator< ctype, mydim - 1, cdim > SubentityInterpolator;
+        typedef std::vector< SubentityInterpolator > SubentityInterpolatorVector;
+        typedef Polynomial<ctype, mydimension - 1> SubentityPolynomial;
+        typedef std::vector<SubentityPolynomial> SubentityPolynomialVector;
+
         SubentityInterpolatorVector edgeInterpolatorSet;
         edgeInterpolatorSet.push_back(elementInterpolator_.Subentity<1>(0));
         edgeInterpolatorSet.push_back(elementInterpolator_.Subentity<1>(1));
@@ -754,9 +742,15 @@ namespace Dune
         return (barycentric_sum / tri_area - 1 < tolerance);
     }
 
+
     // Checking if a point is inside a triangle by calculating global simplex coordinates. Only for triangles in 3D
     bool isInsideTestBarycentricTetrahedron( const GlobalCoordinate &globalC, ctype tolerance) const
     {
+    	typedef CurvilinearElementInterpolator< ctype, mydim - 1, cdim > SubentityInterpolator;
+    	typedef std::vector< SubentityInterpolator > SubentityInterpolatorVector;
+        typedef Polynomial<ctype, mydimension - 1> SubentityPolynomial;
+        typedef std::vector<SubentityPolynomial> SubentityPolynomialVector;
+
         SubentityInterpolatorVector faceInterpolatorSet;
         faceInterpolatorSet.push_back(elementInterpolator_.Subentity<2>(0));
         faceInterpolatorSet.push_back(elementInterpolator_.Subentity<2>(1));
@@ -794,6 +788,7 @@ namespace Dune
         return (barycentric_sum / tet_vol - 1 < tolerance);
     }
 
+
     // Calculate edge normal by rotating the tangential vector by pi/2 clockwise
     GlobalCoordinate normalEdge(const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
@@ -824,6 +819,7 @@ namespace Dune
         return rez;
     }
 
+
     // Calculate triangle normal by computing the negative left cross product of the tangential vectors
     GlobalCoordinate normalTriangle(const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
@@ -838,8 +834,9 @@ namespace Dune
         return rez;
     }
 
+
     // Finds the normal in local coordinates using referenceElement, then maps it to global using inverse Jacobi transform
-    GlobalCoordinate subentityNormal(int indexInInside, const LocalCoordinate &local, bool is_normalized, bool is_integrationelement, const PolynomialVector & analyticalMap ) const
+    GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local, bool is_normalized, bool is_integrationelement, const PolynomialVector & analyticalMap ) const
     {
         JacobianInverseTransposed jit = jacobianInverseTransposed(local, analyticalMap);
         LocalCoordinate refNormal = refElement().integrationOuterNormal(indexInInside);
@@ -1116,8 +1113,6 @@ namespace Dune
     typedef Polynomial<ctype, mydimension> LocalPolynomial;
     typedef std::vector<LocalPolynomial> PolynomialVector;
 
-    typedef FieldVector< ctype, mydimension - 1 > SubLocalCoordinate;
-
 
     template< class Vertices >
     CachedCurvilinearGeometry ( const ReferenceElement &refElement,
@@ -1151,9 +1146,9 @@ namespace Dune
      *  \returns a vector of CachedCurvilinearGeometry classes corresponding to mydim-1 subentity geometries
      */
     template<int subdim>
-    CachedCurvilinearGeometry< ctype, subdim, cdim>  subentityCachedGeometry(int subentityNo) const
+    CachedCurvilinearGeometry< ctype, subdim, cdim>  subentityCachedGeometry(InternalIndexType subentityIndex) const
     {
-        return CachedCurvilinearGeometry< ctype, subdim, cdim> (elementInterpolator_. template SubentityInterpolator<subdim>(subentityNo));
+        return CachedCurvilinearGeometry< ctype, subdim, cdim> (elementInterpolator_. template SubentityInterpolator<subdim>(subentityIndex));
     }
 
 
@@ -1170,19 +1165,19 @@ namespace Dune
     }
 
 
-    GlobalCoordinate subentityNormal(int indexInInside, const LocalCoordinate &local ) const
+    GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
         return Base::subentityNormal(indexInInside, local, false, false, analyticalMap_);
     }
 
 
-    GlobalCoordinate subentityUnitNormal(int indexInInside, const LocalCoordinate &local ) const
+    GlobalCoordinate subentityUnitNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
         return Base::subentityNormal(indexInInside, local, true, false, analyticalMap_);
     }
 
 
-    GlobalCoordinate subentityIntegrationNormal(int indexInInside, const LocalCoordinate &local ) const
+    GlobalCoordinate subentityIntegrationNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
         return Base::subentityNormal(indexInInside, local, false, true, analyticalMap_);
     }

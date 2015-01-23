@@ -44,15 +44,14 @@ namespace Dune {
 
 
 class CurvilinearGeometryHelper {
-  protected:
-    typedef std::vector<std::vector<int>> IntegerCoordinateVector;
-
   public:
 
-
     // Public typedefs
+	// **************************************************************
     typedef  int     InternalIndexType;
     typedef  int     InterpolatoryOrderType;
+
+    typedef std::vector<std::vector<int>> IntegerCoordinateVector;
 
 
 
@@ -108,9 +107,9 @@ class CurvilinearGeometryHelper {
      *  \param[in]  order	Interpolation Order of the element of interest
      *  \param[in]  i		Internal corner index of the corner of interest
      */
-    static InternalIndexType cornerID(Dune::GeometryType geomType, int order, InternalIndexType i)
+    static InternalIndexType cornerIndex(Dune::GeometryType geomType, int order, InternalIndexType i)
     {
-        if (!geomType.isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: cornerID() only implemented for Simplex geometries at the moment"); }
+        if (!geomType.isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: cornerIndex() only implemented for Simplex geometries at the moment"); }
 
         int ind = 0;
         int dofperorder = dofPerOrder(geomType, order);
@@ -279,20 +278,21 @@ class CurvilinearGeometryHelper {
 
 
     // Returns corner id's of this entity
+    template<class ct, int mydim>
     static std::vector<int> entityVertexCornerSubset(
             Dune::GeometryType gt,
             const std::vector<int> & vertexIndexSet,
-            InterpolatoryOrderType order) const
+            InterpolatoryOrderType order)
     {
         std::vector<int> corner;
 
         // Get corner number
-        int cornerNo = Dune::ReferenceElements::general(gt).size(gt.dim());
+        int cornerNo = Dune::ReferenceElements<ct, mydim>::general(gt).size(gt.dim());
         //int cornerNo = gt.dim() + 1;  // for simplices
 
         // Get corners
         for (int j = 0; j < cornerNo; j++) {
-            InternalIndexType internalId = Dune::CurvilinearGeometryHelper::cornerID(gt, order, j );
+            InternalIndexType internalId = Dune::CurvilinearGeometryHelper::cornerIndex(gt, order, j );
             corner.push_back(vertexIndexSet[internalId]);
         }
 
