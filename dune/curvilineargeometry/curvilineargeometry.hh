@@ -1092,6 +1092,9 @@ namespace Dune
 
     typedef CurvilinearElementInterpolator <ct, mydim, cdim> ElementInterpolator;
 
+    typedef typename Dune::CurvilinearGeometryHelper::InternalIndexType         InternalIndexType;
+    typedef typename Dune::CurvilinearGeometryHelper::InterpolatoryOrderType    InterpolatoryOrderType;
+
     //! coordinate type
     typedef ct ctype;
     //! geometry dimension

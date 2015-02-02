@@ -149,6 +149,26 @@ class CurvilinearGeometryHelper {
     }
 
 
+    /** \brief Generates an integer vector corresponding to the internal coordinate of one of the corners of an entity
+     *
+     *  \param[in]  gt 		geometry type of the entity
+     *  \param[in]  subInd	corner subentity index
+     */
+    template <int cdim>
+    static Dune::FieldVector<int, cdim> cornerInternalCoordinate(GeometryType gt, InternalIndexType subInd)
+    {
+    	int mydim = gt.dim();
+    	assert(mydim <= cdim);    // Embedded geometry can not exceed the geometry of the world
+    	assert(gt.isSimplex());   // So far only simplex geometries allowed
+    	assert(subInd <= mydim);  // In simplex geometries nCorners = mydim + 1
+
+    	Dune::FieldVector<int, cdim> rez;         // By convention initialized as 0-vector
+    	if (subInd > 0) { rez[subInd - 1] = 1; }  // Thus generating coordinates {[0,0,0], [1,0,0], [0,1,0], [0,0,1]}
+
+    	return rez;
+    }
+
+
     /** \brief Generates a vector of integer vectors which label the positions of a regular grid over a simplex
      *  \param[in]  n 		the number of linear intervals
      */
@@ -231,45 +251,57 @@ class CurvilinearGeometryHelper {
     }
 
 
-    // Returns d-1 subentity corner local indices, sorted
-    static std::vector<InternalIndexType> linearElementSubentityCornerInternalIndexSet(GeometryType gt, int subentityCodim, InternalIndexType subentityIndex)
-    {
-        std::vector<InternalIndexType> rez;
-
-        if (gt.isTriangle() && (subentityCodim == 1))          { rez = linearTriangleSubentityEdgeIndexSet(subentityIndex);  }
-        else if (gt.isTetrahedron() && (subentityCodim == 0))  { rez = std::vector<InternalIndexType> {0, 1, 2, 3};          }
-        else if (gt.isTetrahedron() && (subentityCodim == 1))  { rez = linearTetrahedronSubentityTriangleIndexSet(subentityIndex);  }
-        else if (gt.isTetrahedron() && (subentityCodim == 2))  { rez = linearTetrahedronSubentityEdgeIndexSet(subentityIndex);  }
-        else  {  DUNE_THROW(Dune::IOError, "Curvilinear Helper: Not implemented element subentityIndex for this element type " ); }
-
-        return rez;
-    }
-
     /** \brief List of internal vertex indices of an element corresponding to the interpolatory vertices of a subentity of the element
      *  \param[in]  entityGeometry	GeometryType of the element of interest
      *  \param[in]  order		Interpolation Order of the element of interest
      *  \param[in]  subentityCodim	Codimension of the subentity of interest
      *  \param[in]  subentityIndex		Subentity internal index inside the element
-     * 
-     *  FIXME: The Subentity internal index is not in sync with the Dune convention
      */
-    template <class ct, int mydim>
+    template <class ct, int cdim>
     static std::vector<InternalIndexType> subentityInternalCoordinateSet(Dune::GeometryType entityGeometry, int order, int subentityCodim, int subentityIndex)
     {
-    	int nSubentity = Dune::ReferenceElements< ct, mydim >::general(entityGeometry).size(subentityCodim);
+    	typedef Dune::FieldVector<int, cdim> IntFieldVector;
+
+    	std::vector<InternalIndexType> rez;
+
+    	const Dune::ReferenceElement< ct, cdim > & ref = Dune::ReferenceElements< ct, cdim >::general(entityGeometry);
+
+    	int nSubentity = ref.size(subentityCodim);
+    	int nSubCorner = ref.size(0, subentityCodim, cdim);
+
+        if (!entityGeometry.isSimplex())                           { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: subentityInternalCoordinateSet() only implemented for Simplex geometries at the moment"); }
+        if ((subentityCodim < 0)||(subentityCodim >= cdim))        { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: subentityInternalCoordinateSet() - Unexpected subentity codimension"); }
+        if ((subentityIndex < 0)||(subentityIndex >= nSubentity))  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: subentityInternalCoordinateSet() - Unexpected subentity index"); }
 
 
-        if (!entityGeometry.isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: subentityInternalCoordinates() only implemented for Simplex geometries at the moment"); }
-        if ((subentityIndex < 0)||(subentityIndex >= nSubentity))
-        {
-        	DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: SubentityInterpolator() - Unexpected subentity index");
+        // Special cases
+        // ********************************************************
+
+        // If coordinates of the element itself are requested, just return all coordinates
+        if (subentityCodim == 0)  {
+        	for (int i = 0; i < nSubCorner; i++ ) { rez.push_back(i); }
+        	return rez;
         }
 
-        std::vector<InternalIndexType> rez;
+        // If coordinates of a corner are requested, then it is simply 1 corner of the element
+        if (subentityCodim == cdim)  { return std::vector<InternalIndexType> (1, cornerIndex(entityGeometry, order, subentityIndex)); }
 
-             if ((entityGeometry.dim() == 3) && (subentityCodim == 1) ) {  rez = tetrahedronSubentityTriangleIndexSet(order, subentityIndex); }
-        else if ((entityGeometry.dim() == 3) && (subentityCodim == 2) ) {  rez = tetrahedronSubentityEdgeIndexSet(order, subentityIndex); }
-        else if ((entityGeometry.dim() == 2) && (subentityCodim == 1) ) {  rez = triangleSubentityEdgeIndexSet(order, subentityIndex); }
+
+        // General case
+        // ********************************************************
+
+        // Get corner internal indices, and associated internal coordinates
+        std::vector<InternalIndexType> cornerInd;
+        std::vector<IntFieldVector> cornerInternalCoord;
+        for (int i = 0; i < nSubCorner; i++)  {
+        	cornerInd.push_back(ref.subEntity(subentityIndex, subentityCodim, i, cdim));
+        	cornerInternalCoord.push_back(cornerInternalCoordinate<cdim>(entityGeometry, cornerInd[i]));
+        }
+
+        // Consider each geometry separately
+             if ((cdim == 3) && (subentityCodim == 1) )  { rez = tet2TriIndexSet (order, cornerInternalCoord); }
+        else if ((cdim == 3) && (subentityCodim == 2) )  { rez = tet2EdgeIndexSet(order, cornerInternalCoord); }
+        else if ((cdim == 2) && (subentityCodim == 1) )  { rez = tri2EdgeIndexSet(order, cornerInternalCoord); }
         else { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: subentityInternalCoordinates() - unexpected dimension-codimension pair"); }
 
         return rez;
@@ -302,145 +334,123 @@ class CurvilinearGeometryHelper {
 
   private:
 
-    /** \brief  internal corner vertex index subset corresponding to subentity corners of a linear element
-     *  \param[in]  subentityIndex		Subentity internal index inside the element
+
+    /** \brief Computes internal indices of all interpolatory vertices of a face subentity of a tetrahedron
      *
-     *  FIXME - the orientation convention has not been sync with Dune
-     */
-    static std::vector<InternalIndexType> linearTriangleSubentityEdgeIndexSet(InternalIndexType subentityIndex)
-    {
-        std::vector<InternalIndexType> rez;
-
-        switch (subentityIndex)
-        {
-        case 0 :  rez = std::vector<InternalIndexType> {0, 1};  break;
-        case 1 :  rez = std::vector<InternalIndexType> {1, 2};  break;
-        case 2 :  rez = std::vector<InternalIndexType> {0, 2};  break;
-        default : DUNE_THROW(Dune::IOError, "Curvilinear Helper: Wrong input arguments for SubentityCorners " );
-        }
-
-        return rez;
-    }
-
-    static std::vector<InternalIndexType> linearTetrahedronSubentityEdgeIndexSet(InternalIndexType subentityIndex)
-    {
-        std::vector<InternalIndexType> rez;
-
-        switch (subentityIndex)
-        {
-        case 0 :  rez = std::vector<InternalIndexType> {0, 1};  break;
-        case 1 :  rez = std::vector<InternalIndexType> {1, 2};  break;
-        case 2 :  rez = std::vector<InternalIndexType> {2, 0};  break;
-        case 3 :  rez = std::vector<InternalIndexType> {3, 0};  break;
-        case 4 :  rez = std::vector<InternalIndexType> {3, 2};  break;
-        case 5 :  rez = std::vector<InternalIndexType> {3, 1};  break;
-        default : DUNE_THROW(Dune::IOError, "Curvilinear Helper: Wrong input arguments for SubentityCorners " );
-        }
-
-        return rez;
-    }
-
-    static std::vector<InternalIndexType> linearTetrahedronSubentityTriangleIndexSet(InternalIndexType subentityIndex)
-    {
-        std::vector<InternalIndexType> rez;
-
-        switch (subentityIndex)
-        {
-        case 0 :  rez = std::vector<InternalIndexType> {0, 1, 2};  break;
-        case 1 :  rez = std::vector<InternalIndexType> {0, 2, 3};  break;
-        case 2 :  rez = std::vector<InternalIndexType> {2, 1, 3};  break;
-        case 3 :  rez = std::vector<InternalIndexType> {0, 3, 1};  break;
-        default : DUNE_THROW(Dune::IOError, "Curvilinear Helper: Wrong input arguments for SubentityCorners " );
-        }
-
-        return rez;
-    }
-
-
-    /** \brief  internal interpolatory vertex index subset corresponding to the subentity interpolatory vertices
-     *  \param[in]  gt			GeometryType of the subentity
-     *  \param[in]  order		Interpolation Order of the element of interest
-     *  \param[in]  subentityIndex		Subentity internal index inside the element
-     * 
-     *  FIXME - there should exist a nicer algorithm to do this...
+     *  \param[in]  order                  interpolatory order of the entity
+     *  \param[in]  cornerInternalCoord    internal integer coordinates of the corners of the face within the reference tetrahedron
      *
-     *  FIXME - the orientation convention has not been sync with Dune
-     */
-    static std::vector<InternalIndexType> tetrahedronSubentityTriangleIndexSet(int order, InternalIndexType subentityIndex)
+     *  [FIXME] - there should exist a nicer algorithm to do this...
+     *
+     *  Algorithm:
+     *    1) Write all coordinate numbers in a ((order + 1) x (order + 1) x (order + 1)) matrix
+     *    2) Construct a parametric face connecting provided subentity corners
+     *    3) Collect all points on that line in an array and return it
+     * */
+    template <int cdim>
+    static std::vector<InternalIndexType> tet2TriIndexSet(int order, std::vector<Dune::FieldVector<int, cdim> > & cornerInternalCoord)
     {
-    	std::vector<InternalIndexType> rez;
-        // Can't figure out a nice way to do this
-        // For now will write all coordinate numbers in a ((order + 1) x (order + 1) x (order + 1)) matrix and map from there
+    	typedef Dune::FieldVector<int, cdim> IntFieldVector;
+
+        std::vector<InternalIndexType> rez;
 
         // Build a 3D matrix consisting of coordinate numbers in the point_ vector in the shape of reference simplex
         int coord_map [order + 1][order + 1][order + 1];
         IntegerCoordinateVector simplexGrid = simplexGridEnumerate<3>(order);
         for (int i = 0; i < simplexGrid.size(); i++) { coord_map[simplexGrid[i][0]][simplexGrid[i][1]][simplexGrid[i][2]] = i; }
 
-        std::cout << "subFaceReqInd=" << subentityIndex << std::endl;
+        // Find the direction vectors
+        IntFieldVector v1 = cornerInternalCoord[1] - cornerInternalCoord[0];
+        IntFieldVector v2 = cornerInternalCoord[2] - cornerInternalCoord[0];
+
 
         for (int i = 0; i <= order; i++)
         {
             for (int j = 0; j <= order - i; j++)
             {
-                switch (subentityIndex)
-                {
-                    case 0 : rez.push_back(coord_map[j][i][0]);               break;  // Face (0 1 2)
-                    case 1 : rez.push_back(coord_map[0][j][i]);               break;  // Face (0 2 3)
-                    case 2 : rez.push_back(coord_map[j][order - i - j][i]);   break;  // Face (2 1 3)
-                    case 3 : rez.push_back(coord_map[i][0][j]);               break;  // Face (0 3 1)
-                }
+            	IntFieldVector mapIndex;
+            	mapIndex.axpy(order, cornerInternalCoord[0]);
+            	mapIndex.axpy(i, v1);
+            	mapIndex.axpy(j, v2);
+            	rez.push_back(coord_map[mapIndex[0]][mapIndex[1]][mapIndex[2]]);
             }
         }
         return rez;
     }
 
-    static std::vector<InternalIndexType> tetrahedronSubentityEdgeIndexSet(int order, InternalIndexType subentityIndex)
+
+    /** \brief Computes internal indices of all interpolatory vertices of an edge subentity of a tetrahedron
+     *
+     *  \param[in]  order                  interpolatory order of the entity
+     *  \param[in]  cornerInternalCoord    internal integer coordinates of the corners of the edge within the reference tetrahedron
+     *
+     *  \note Can't figure out a nice way to do this.
+     *
+     *  Algorithm:
+     *    1) Write all coordinate numbers in a ((order + 1) x (order + 1) x (order + 1)) matrix
+     *    2) Construct a parametric line connecting provided subentity corners
+     *    3) Collect all points on that line in an array and return it
+     * */
+    template <int cdim>
+    static std::vector<InternalIndexType> tet2EdgeIndexSet(int order, std::vector<Dune::FieldVector<int, cdim> > & cornerInternalCoord)
     {
+    	typedef Dune::FieldVector<int, cdim> IntFieldVector;
+
         std::vector<InternalIndexType> rez;
-        // Can't figure out a nice way to do this
-        // For now will write all coordinate numbers in a ((order + 1) x (order + 1) x (order + 1)) matrix and map from there
 
         // Build a 3D matrix consisting of coordinate numbers in the point_ vector in the shape of reference simplex
         int coord_map [order + 1][order + 1][order + 1];
         IntegerCoordinateVector simplexGrid = simplexGridEnumerate<3>(order);
         for (int i = 0; i < simplexGrid.size(); i++) { coord_map[simplexGrid[i][0]][simplexGrid[i][1]][simplexGrid[i][2]] = i; }
 
+        // Find the direction vectors
+        IntFieldVector v = cornerInternalCoord[1] - cornerInternalCoord[0];
+
         for (int i = 0; i <= order; i++)
         {
-            switch (subentityIndex)
-            {
-                case 0 : rez.push_back(coord_map[i][0][0]);          break;  // Edge (0 1)
-                case 1 : rez.push_back(coord_map[order - i][i][0]);  break;  // Edge (1 2)
-                case 2 : rez.push_back(coord_map[0][order - i][0]);  break;  // Edge (2 0)
-                case 3 : rez.push_back(coord_map[0][0][order - i]);  break;  // Edge (3 0)
-                case 4 : rez.push_back(coord_map[0][i][order - i]);  break;  // Edge (3 2)
-                case 5 : rez.push_back(coord_map[i][0][order - i]);  break;  // Edge (3 1)
-            }
+        	IntFieldVector mapIndex;
+        	mapIndex.axpy(order, cornerInternalCoord[0]);
+        	mapIndex.axpy(i, v);
+        	rez.push_back(coord_map[mapIndex[0]][mapIndex[1]][mapIndex[2]]);
         }
         return rez;
     }
 
-    static std::vector<InternalIndexType> triangleSubentityEdgeIndexSet(int order, InternalIndexType subentityIndex)
-    {
-        std::vector<InternalIndexType> rez;
 
-        // Can't figure out a nice way to do this
-        // For now will write all coordinate numbers in a ((order + 1) x (order + 1)) matrix and map from there
+    /** \brief Computes internal indices of all interpolatory vertices of an edge subentity of a triangle
+     *
+     *  \param[in]  order                  interpolatory order of the entity
+     *  \param[in]  cornerInternalCoord    internal integer coordinates of the corners of the edge within the reference triangle
+     *
+     *  \note Can't figure out a nice way to do this.
+     *
+     *  Algorithm:
+     *    1) Write all coordinate numbers in a ((order + 1) x (order + 1)) matrix
+     *    2) Construct a parametric line connecting provided subentity corners
+     *    3) Collect all points on that line in an array and return it
+     * */
+    template <int cdim>
+    static std::vector<InternalIndexType> tri2EdgeIndexSet(int order, std::vector<Dune::FieldVector<int, cdim> > & cornerInternalCoord)
+    {
+    	typedef Dune::FieldVector<int, cdim> IntFieldVector;
+
+        std::vector<InternalIndexType> rez;
 
         // Build a 2D matrix consisting of coordinate numbers in the point_ vector in the shape of reference simplex
         int coord_map [order + 1][order + 1];
         IntegerCoordinateVector simplexGrid = simplexGridEnumerate<2>(order);
         for (int i = 0; i < simplexGrid.size(); i++) { coord_map[simplexGrid[i][0]][simplexGrid[i][1]] = i; }
 
+        // Find the direction vector
+        IntFieldVector v = cornerInternalCoord[1] - cornerInternalCoord[0];
+
+
         for (int i = 0; i <= order; i++)
         {
-            switch(subentityIndex)
-            {
-                case 0: rez.push_back(coord_map[i][0]);          break;  // Edge (0 1)
-                case 1: rez.push_back(coord_map[order - i][i]);  break;  // Edge (1 2)
-                case 2: rez.push_back(coord_map[0][order - i]);  break;  // Edge (2 0)
-            }
+        	IntFieldVector mapIndex;
+        	mapIndex.axpy(order, cornerInternalCoord[0]);
+        	mapIndex.axpy(i, v);
+        	rez.push_back(coord_map[mapIndex[0]][mapIndex[1]]);
         }
         return rez;
     }
