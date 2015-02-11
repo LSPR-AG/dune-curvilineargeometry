@@ -154,15 +154,15 @@ class CurvilinearGeometryHelper {
      *  \param[in]  gt 		geometry type of the entity
      *  \param[in]  subInd	corner subentity index
      */
-    template <int cdim>
-    static Dune::FieldVector<int, cdim> cornerInternalCoordinate(GeometryType gt, InternalIndexType subInd)
+    template <typename ctype, int cdim>
+    static Dune::FieldVector<ctype, cdim> cornerInternalCoordinate(GeometryType gt, InternalIndexType subInd)
     {
     	int mydim = gt.dim();
     	assert(mydim <= cdim);    // Embedded geometry can not exceed the geometry of the world
     	assert(gt.isSimplex());   // So far only simplex geometries allowed
     	assert(subInd <= mydim);  // In simplex geometries nCorners = mydim + 1
 
-    	Dune::FieldVector<int, cdim> rez;         // By convention initialized as 0-vector
+    	Dune::FieldVector<ctype, cdim> rez;         // By convention initialized as 0-vector
     	if (subInd > 0) { rez[subInd - 1] = 1; }  // Thus generating coordinates {[0,0,0], [1,0,0], [0,1,0], [0,0,1]}
 
     	return rez;
@@ -295,7 +295,7 @@ class CurvilinearGeometryHelper {
         std::vector<IntFieldVector> cornerInternalCoord;
         for (int i = 0; i < nSubCorner; i++)  {
         	cornerInd.push_back(ref.subEntity(subentityIndex, subentityCodim, i, cdim));
-        	cornerInternalCoord.push_back(cornerInternalCoordinate<cdim>(entityGeometry, cornerInd[i]));
+        	cornerInternalCoord.push_back(cornerInternalCoordinate<int, cdim>(entityGeometry, cornerInd[i]));
         }
 
         // Consider each geometry separately
