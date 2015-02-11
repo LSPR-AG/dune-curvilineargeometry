@@ -25,13 +25,14 @@
 #ifndef DUNE_POLYNOMIAL_HH
 #define DUNE_POLYNOMIAL_HH
 
+#include <config.h>
 
+#include <stdint.h>
 #include <iostream>
 #include <vector>
 #include <string>
 #include <algorithm>
 #include <math.h>
-#include <config.h>
 #include <dune/common/fvector.hh>
 
 
