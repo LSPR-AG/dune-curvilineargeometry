@@ -593,7 +593,7 @@ bool SimplexTest(Functor f, int ord, int f_type, int f_order, std::string f_name
         for (int biter = 0; biter < nSubentities; biter++)
         {
         	SubentityGeometry subElement = SimplexGeom.template subentityGeometry < mydim - 1>(biter);
-        	SubentityCachedGeometry subCachedElement = SimplexGeomCached.template subentityCachedGeometry < mydim - 1>(biter);
+        	SubentityCachedGeometry subCachedElement = SimplexGeomCached.template subentityGeometry < mydim - 1>(biter);
 
             for (int i = 0; i < sublocal_coordinates.size(); i++)
             {

@@ -400,6 +400,7 @@ protected:
       // If not, because of too small tolerance, then this is a computationally infeasible request.
       bool feasible_expected_error = ( expected_err > 1e-20 );
 
+      // Check if relative error within tolerance (aka finish if err/val <= tolerance)
       bool feasible_error = (totalError > expected_err);
 
       // For now, also limit maximum number of iterations such that the computation time does not explode

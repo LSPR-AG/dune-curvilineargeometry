@@ -27,7 +27,6 @@
 
 #include <config.h>
 
-#include <stdint.h>
 #include <iostream>
 #include <vector>
 #include <string>
@@ -99,6 +98,8 @@ class Polynomial {
   typedef PolynomialTraits::Monomial     Monomial;
   typedef typename std::vector<Monomial> SummandVector;
   typedef FieldVector< ctype, dim > LocalCoordinate;
+
+  typedef unsigned int uint;
 
 public:
   SummandVector poly_;

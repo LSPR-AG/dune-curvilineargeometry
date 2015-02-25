@@ -1149,7 +1149,7 @@ namespace Dune
      *  \returns a vector of CachedCurvilinearGeometry classes corresponding to mydim-1 subentity geometries
      */
     template<int subdim>
-    CachedCurvilinearGeometry< ctype, subdim, cdim>  subentityCachedGeometry(InternalIndexType subentityIndex) const
+    CachedCurvilinearGeometry< ctype, subdim, cdim>  subentityGeometry(InternalIndexType subentityIndex) const
     {
         return CachedCurvilinearGeometry< ctype, subdim, cdim> (elementInterpolator_. template SubentityInterpolator<subdim>(subentityIndex));
     }
