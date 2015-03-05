@@ -338,6 +338,7 @@ namespace Dune
      */
     GlobalCoordinate global ( const LocalCoordinate &local ) const
     {
+    	std::cout << " requested global from local " << local << " of dim " << local.size() << " for global size " << coorddimension << "at interpvert size " << vertexSet().size()  << std::endl;
         return elementInterpolator_.realCoordinate(local);
     }
 
@@ -449,6 +450,11 @@ namespace Dune
      */
     bool local ( const GlobalCoordinate &globalC, LocalCoordinate & localC ) const
     {
+    	std::cout << " 0_o" << std::endl;
+
+    	std::cout << " requested local from global " << globalC << " of dim " << globalC.size() << std::endl;
+    	if (mydim == 0)  { return true; }
+
         if (!type().isSimplex()) { DUNE_THROW(Dune::IOError, "__ERROR: curvilinear local() method only available for Simplex geometries at the moment :("); }
 
         if (mydimension != coorddimension) {

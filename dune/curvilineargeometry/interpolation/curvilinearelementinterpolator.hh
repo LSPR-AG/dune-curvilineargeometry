@@ -183,6 +183,9 @@ class CurvilinearElementInterpolator {
      */
     GlobalVector realCoordinate(const LocalVector &local) const
     {
+    	// In case of 0-dim geometry, a 0-dim vector is mapped to a single point defining the geometry
+    	if (mydim == 0) { return point_[0]; }
+
         GlobalVector rez;
 
         for (int j = 0; j < coorddimension; j++) { rez[j] = 0; }
@@ -217,6 +220,8 @@ class CurvilinearElementInterpolator {
         {
         	DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: SubentityInterpolator() - Unexpected subentity index");
         }
+
+        if (mydim == 0)  { assert(subdim == 0); }  // Vertex subentity can not be lower than a vertex itself
 
         std::vector<InternalIndexType> subentityIndex = Dune::CurvilinearGeometryHelper::subentityInternalCoordinateSet<ctype, mydim>(type(), order_, mydim - subdim, subentityNo);
         std::vector<GlobalVector> subentityPoint;
@@ -578,8 +583,17 @@ class CurvilinearElementInterpolator {
     /** \brief  Analytic map from local to global coordinates, given explicitly by the polynomial class. Implementation for simplex  */
     PolynomialVector interpolatoryVectorAnalyticalSimplex() const {
         int dof = dofPerOrder();
-
         PolynomialVector rez;
+
+        // Specialization for points - just return a constant polynomial vector
+    	if (mydim == 0) {
+    		for (int d = 0; d < coorddimension; d++)
+    		{
+    			rez.push_back(LocalPolynomial(Dune::PolynomialTraits::Monomial(point_[0][d], 0)));
+    		}
+    		return rez;
+    	}
+
 
         PolynomialVector monomial_basis;
         PolynomialVector lagrange_basis;

@@ -115,6 +115,7 @@ class CurvilinearGeometryHelper {
         int dofperorder = dofPerOrder(geomType, order);
 
         switch(geomType.dim()) {
+        case 0 :  ind = 0;  break;  // Vertex
         case 1 :  // EDGE
         {
             switch (i)
@@ -260,6 +261,8 @@ class CurvilinearGeometryHelper {
     template <class ct, int cdim>
     static std::vector<InternalIndexType> subentityInternalCoordinateSet(Dune::GeometryType entityGeometry, int order, int subentityCodim, int subentityIndex)
     {
+    	if (entityGeometry.dim() == 0) { return std::vector<InternalIndexType>(1, 0); }
+
     	typedef Dune::FieldVector<int, cdim> IntFieldVector;
 
     	std::vector<InternalIndexType> rez;
@@ -370,8 +373,8 @@ class CurvilinearGeometryHelper {
             {
             	IntFieldVector mapIndex;
             	mapIndex.axpy(order, cornerInternalCoord[0]);
-            	mapIndex.axpy(i, v1);
-            	mapIndex.axpy(j, v2);
+            	mapIndex.axpy(j, v1);  // Order matters, because the inner loop must loop over
+            	mapIndex.axpy(i, v2);  // the first vector
             	rez.push_back(coord_map[mapIndex[0]][mapIndex[1]][mapIndex[2]]);
             }
         }
