@@ -146,16 +146,16 @@ private:
             mid[1] = 0.1;
             break;
         case 3:
-            rez.mergeTo( analyticalMap[0].derivative(0) * ( analyticalMap[1].derivative(1) * analyticalMap[2].derivative(2) - analyticalMap[1].derivative(2) * analyticalMap[2].derivative(1) ) );
-            rez.mergeTo( analyticalMap[0].derivative(1) * ( analyticalMap[1].derivative(2) * analyticalMap[2].derivative(0) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(2) ) );
-            rez.mergeTo( analyticalMap[0].derivative(2) * ( analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[1].derivative(1) * analyticalMap[2].derivative(0) ) );
+            rez += analyticalMap[0].derivative(0) * ( analyticalMap[1].derivative(1) * analyticalMap[2].derivative(2) - analyticalMap[1].derivative(2) * analyticalMap[2].derivative(1) );
+            rez += analyticalMap[0].derivative(1) * ( analyticalMap[1].derivative(2) * analyticalMap[2].derivative(0) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(2) );
+            rez += analyticalMap[0].derivative(2) * ( analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[1].derivative(1) * analyticalMap[2].derivative(0) );
             mid[0] = 0.1;
             mid[1] = 0.1;
             mid[2] = 0.1;
             break;
         }
         // Change sign if determinant is negative
-        if (rez.evaluate(mid) < 0) { rez.multScalar(-1); }
+        if (rez.evaluate(mid) < 0) { rez *= -1; }
 
         return rez;
     }

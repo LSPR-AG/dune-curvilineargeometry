@@ -226,11 +226,11 @@ Polynomial<ctype, mydim> BasisPolynomial1D(int index)
 {
     Polynomial<ctype, mydim> rez(Monomial(1, 0));
 
-    if (index > 0) { rez.append(Monomial(2, 1)); }
-    if (index > 1) { rez.append(Monomial(3, 2)); }
-    if (index > 2) { rez.append(Monomial(4, 3)); }
-    if (index > 3) { rez.append(Monomial(5, 4)); }
-    if (index > 4) { rez.append(Monomial(6, 5)); }
+    if (index > 0) { rez += Monomial(2, 1); }
+    if (index > 1) { rez += Monomial(3, 2); }
+    if (index > 2) { rez += Monomial(4, 3); }
+    if (index > 3) { rez += Monomial(5, 4); }
+    if (index > 4) { rez += Monomial(6, 5); }
 
     return rez;
 }
@@ -241,11 +241,11 @@ Polynomial<ctype, mydim> BasisPolynomial2D(int index)
 {
     Polynomial<ctype, mydim> rez(Monomial(1, 0, 0));
 
-    if (index > 0) { rez.append(Monomial(2, 1, 0));  rez.append(Monomial(2, 0, 1)); }
-    if (index > 1) { rez.append(Monomial(3, 2, 0));  rez.append(Monomial(3, 0, 2)); rez.append(Monomial(1, 1, 1)); }
-    if (index > 2) { rez.append(Monomial(4, 3, 0));  rez.append(Monomial(4, 0, 3)); rez.append(Monomial(1, 1, 2)); }
-    if (index > 3) { rez.append(Monomial(5, 4, 0));  rez.append(Monomial(5, 0, 4)); rez.append(Monomial(1, 1, 3)); }
-    if (index > 4) { rez.append(Monomial(6, 5, 0));  rez.append(Monomial(6, 0, 5)); rez.append(Monomial(1, 1, 4)); }
+    if (index > 0) { rez += Monomial(2, 1, 0);  rez += Monomial(2, 0, 1); }
+    if (index > 1) { rez += Monomial(3, 2, 0);  rez += Monomial(3, 0, 2); rez += Monomial(1, 1, 1); }
+    if (index > 2) { rez += Monomial(4, 3, 0);  rez += Monomial(4, 0, 3); rez += Monomial(1, 1, 2); }
+    if (index > 3) { rez += Monomial(5, 4, 0);  rez += Monomial(5, 0, 4); rez += Monomial(1, 1, 3); }
+    if (index > 4) { rez += Monomial(6, 5, 0);  rez += Monomial(6, 0, 5); rez += Monomial(1, 1, 4); }
 
     return rez;
 }
@@ -256,11 +256,11 @@ Polynomial<ctype, mydim> BasisPolynomial3D(int index)
 {
     Polynomial<ctype, mydim> rez(Monomial(1, 0, 0, 0));
 
-    if (index > 0) { rez.append(Monomial(2, 1, 0, 0));  rez.append(Monomial(2, 0, 1, 0));  rez.append(Monomial(2, 0, 0, 1)); }
-    if (index > 1) { rez.append(Monomial(3, 2, 0, 0));  rez.append(Monomial(3, 0, 2, 0));  rez.append(Monomial(3, 0, 0, 2)); rez.append(Monomial(1, 1, 1, 0)); }
-    if (index > 2) { rez.append(Monomial(4, 3, 0, 0));  rez.append(Monomial(4, 0, 3, 0));  rez.append(Monomial(4, 0, 0, 3)); rez.append(Monomial(1, 1, 1, 1)); }
-    if (index > 3) { rez.append(Monomial(5, 4, 0, 0));  rez.append(Monomial(5, 0, 4, 0));  rez.append(Monomial(5, 0, 0, 4)); rez.append(Monomial(1, 1, 1, 2)); }
-    if (index > 4) { rez.append(Monomial(6, 5, 0, 0));  rez.append(Monomial(6, 0, 5, 0));  rez.append(Monomial(6, 0, 0, 5)); rez.append(Monomial(1, 1, 1, 3)); }
+    if (index > 0) { rez += Monomial(2, 1, 0, 0);  rez += Monomial(2, 0, 1, 0);  rez += Monomial(2, 0, 0, 1); }
+    if (index > 1) { rez += Monomial(3, 2, 0, 0);  rez += Monomial(3, 0, 2, 0);  rez += Monomial(3, 0, 0, 2); rez += Monomial(1, 1, 1, 0); }
+    if (index > 2) { rez += Monomial(4, 3, 0, 0);  rez += Monomial(4, 0, 3, 0);  rez += Monomial(4, 0, 0, 3); rez += Monomial(1, 1, 1, 1); }
+    if (index > 3) { rez += Monomial(5, 4, 0, 0);  rez += Monomial(5, 0, 4, 0);  rez += Monomial(5, 0, 0, 4); rez += Monomial(1, 1, 1, 2); }
+    if (index > 4) { rez += Monomial(6, 5, 0, 0);  rez += Monomial(6, 0, 5, 0);  rez += Monomial(6, 0, 0, 5); rez += Monomial(1, 1, 1, 3); }
 
     return rez;
 }

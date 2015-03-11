@@ -28,20 +28,20 @@ int main ()
   std::cout << "*********************************************************************" << std::endl;
 
   Polynomial<double, 1> poly1D_test;
-  poly1D_test.append(Monomial(2, 0));
-  poly1D_test.append(Monomial(-3, 1));
-  poly1D_test.append(Monomial(4, 2));
+  poly1D_test += Monomial(2, 0);
+  poly1D_test += Monomial(-3, 1);
+  poly1D_test += Monomial(4, 2);
   poly1D_test.compactify();
 
   Polynomial<double, 1> poly1D_test2 = poly1D_test;
   Polynomial<double, 1> poly1D_test3 = poly1D_test.derivative(0);
   Polynomial<double, 1> poly1D_test4 = poly1D_test;
   Polynomial<double, 1> poly1D_test5 = poly1D_test;
-  poly1D_test2.multPoly(poly1D_test);
-  poly1D_test4.mergeTo(poly1D_test3);
-  poly1D_test5.multScalar(-5);
+  poly1D_test2 *= poly1D_test;
+  poly1D_test4 += poly1D_test3;
+  poly1D_test5 *= -5;
   Polynomial<double, 1> poly1D_test6;
-  poly1D_test6.append(Monomial(3,1));
+  poly1D_test6 += Monomial(3,1);
   poly1D_test6 = (poly1D_test6 * poly1D_test6 * poly1D_test6 + poly1D_test6 * poly1D_test6 * 2 - poly1D_test6 * 5 + 16.5) - 3;
 
 
@@ -65,12 +65,12 @@ int main ()
 
   Polynomial<double, 2> poly2D_test;
 
-  poly2D_test.append (Monomial(2.0, 0, 0));
-  poly2D_test.append (Monomial(-3.0, 1, 0));
-  poly2D_test.append (Monomial(5.0, 0, 1));
-  poly2D_test.append (Monomial(2.0, 1, 1));
-  poly2D_test.append (Monomial(-1.0, 2, 0));
-  poly2D_test.append (Monomial(3.0, 0, 2));
+  poly2D_test += Monomial(2.0, 0, 0);
+  poly2D_test += Monomial(-3.0, 1, 0);
+  poly2D_test += Monomial(5.0, 0, 1);
+  poly2D_test += Monomial(2.0, 1, 1);
+  poly2D_test += Monomial(-1.0, 2, 0);
+  poly2D_test += Monomial(3.0, 0, 2);
   poly2D_test.compactify();
 
   FieldVector< double, 2 > testEval2D; testEval2D[0] = 3; testEval2D[1] = 2;
@@ -79,11 +79,11 @@ int main ()
   Polynomial<double, 2> poly2D_test3_2 = poly2D_test.derivative(1);
   Polynomial<double, 2> poly2D_test4 = poly2D_test3_1;
   Polynomial<double, 2> poly2D_test5 = poly2D_test;
-  poly2D_test2.multPoly(poly2D_test);
-  poly2D_test4.mergeTo(poly2D_test3_2);
-  poly2D_test5.multScalar(-5);
+  poly2D_test2 *= poly2D_test;
+  poly2D_test4 += poly2D_test3_2;
+  poly2D_test5 *= -5;
   Polynomial<double, 2> poly2D_test6;
-  poly2D_test6.append(Monomial(3,1,2));
+  poly2D_test6 += Monomial(3,1,2);
   poly2D_test6 = (poly2D_test6 * poly2D_test6 * poly2D_test6 + poly2D_test6 * poly2D_test6 * 2 - poly2D_test6 * 5 + 16.5) - 3;
 
 
@@ -104,13 +104,13 @@ int main ()
 
   Polynomial<double, 3> poly3D_test;
 
-  poly3D_test.append (Monomial(2.0, 0, 0, 0));
-  poly3D_test.append (Monomial(-3.0, 1, 0, 0));
-  poly3D_test.append (Monomial(5.0, 0, 1, 0));
-  poly3D_test.append (Monomial(-4.0, 0, 0, 1));
-  poly3D_test.append (Monomial(2.0, 1, 1, 1));
-  poly3D_test.append (Monomial(-1.0, 2, 0, 1));
-  poly3D_test.append (Monomial(2.0, 0, 1, 2));
+  poly3D_test += Monomial(2.0, 0, 0, 0);
+  poly3D_test += Monomial(-3.0, 1, 0, 0);
+  poly3D_test += Monomial(5.0, 0, 1, 0);
+  poly3D_test += Monomial(-4.0, 0, 0, 1);
+  poly3D_test += Monomial(2.0, 1, 1, 1);
+  poly3D_test += Monomial(-1.0, 2, 0, 1);
+  poly3D_test += Monomial(2.0, 0, 1, 2);
   poly3D_test.compactify();
 
 
@@ -121,13 +121,13 @@ int main ()
   Polynomial<double, 3> poly3D_test3_3 = poly3D_test.derivative(2);
   Polynomial<double, 3> poly3D_test4 = poly3D_test3_1;
   Polynomial<double, 3> poly3D_test5 = poly3D_test;
-  poly3D_test2.multPoly(poly3D_test);
-  poly3D_test4.mergeTo(poly3D_test3_2);
-  poly3D_test4.mergeTo(poly3D_test3_3);
-  poly3D_test5.multScalar(-5);
+  poly3D_test2 *= poly3D_test;
+  poly3D_test4 += poly3D_test3_2;
+  poly3D_test4 += poly3D_test3_3;
+  poly3D_test5 *= -5;
 
   Polynomial<double, 3> poly3D_test6;
-  poly3D_test6.append(Monomial(3,1,2,3));
+  poly3D_test6 += Monomial(3,1,2,3);
   poly3D_test6 = (poly3D_test6 * poly3D_test6 * poly3D_test6 + poly3D_test6 * poly3D_test6 * 2 - poly3D_test6 * 5 + 16.5) - 3;
 
 

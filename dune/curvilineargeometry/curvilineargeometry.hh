@@ -247,9 +247,8 @@ namespace Dune
      *        It is only required that the internal corner storage can be
      *        constructed from this object.
      */
-    template< class Vertices>
     CurvilinearGeometry ( const ReferenceElement &refElement,
-                          const Vertices &vertices,
+                          const std::vector<GlobalCoordinate> &vertices,
                           InterpolatoryOrderType order)
     {
         elementInterpolator_ = ElementInterpolator( refElement, vertices, order);
@@ -265,9 +264,8 @@ namespace Dune
      *        It is only required that the internal corner storage can be
      *        constructed from this object.
      */
-    template< class Vertices>
     CurvilinearGeometry ( Dune::GeometryType gt,
-                          const Vertices &vertices,
+                          const std::vector<GlobalCoordinate> &vertices,
                           InterpolatoryOrderType order)
     {
         elementInterpolator_ = ElementInterpolator( gt, vertices, order);
@@ -279,7 +277,6 @@ namespace Dune
      *
      *  \note Construct a geometry from an existing interpolator
      */
-    //template< class Vertices>
     CurvilinearGeometry ( const ElementInterpolator & elemInterp) : elementInterpolator_(elemInterp)  {  }
 
 
@@ -338,7 +335,7 @@ namespace Dune
      */
     GlobalCoordinate global ( const LocalCoordinate &local ) const
     {
-    	std::cout << " requested global from local " << local << " of dim " << local.size() << " for global size " << coorddimension << "at interpvert size " << vertexSet().size()  << std::endl;
+    	//std::cout << " requested global from local " << local << " of dim " << local.size() << " for global size " << coorddimension << "at interpvert size " << vertexSet().size()  << std::endl;
         return elementInterpolator_.realCoordinate(local);
     }
 
@@ -450,9 +447,7 @@ namespace Dune
      */
     bool local ( const GlobalCoordinate &globalC, LocalCoordinate & localC ) const
     {
-    	std::cout << " 0_o" << std::endl;
-
-    	std::cout << " requested local from global " << globalC << " of dim " << globalC.size() << std::endl;
+    	//std::cout << " requested local from global " << globalC << " of dim " << globalC.size() << std::endl;
     	if (mydim == 0)  { return true; }
 
         if (!type().isSimplex()) { DUNE_THROW(Dune::IOError, "__ERROR: curvilinear local() method only available for Simplex geometries at the moment :("); }
@@ -646,6 +641,11 @@ namespace Dune
 
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
+    	std::cout << "started calc JT  dim=" << coorddimension << " mydim="<< mydimension << " mapSize=" << analyticalMap.size() << std::endl;
+
+    	std::cout << "using analytical map:" << std::endl;
+    	for (int i = 0; i < analyticalMap.size(); i++)  { std::cout << "  ++++++ vec=" << analyticalMap[i].to_string() << std::endl; }
+
         JacobianTransposed jt;
 
         for (int i = 0; i < coorddimension; i++)
@@ -655,6 +655,8 @@ namespace Dune
                 jt[j][i] = (analyticalMap[i].derivative(j)).evaluate(local);
             }
         }
+
+        std::cout << "done calc JT" << std::endl;
 
       return jt;
     }
@@ -844,15 +846,33 @@ namespace Dune
     // Finds the normal in local coordinates using referenceElement, then maps it to global using inverse Jacobi transform
     GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local, bool is_normalized, bool is_integrationelement, const PolynomialVector & analyticalMap ) const
     {
+    	std::cout << "started computing subentity normal ";
+    	std::cout << "indexInInside=" << indexInInside;
+    	std::cout << "local=" << local;
+    	std::cout << "is_normalized=" << is_normalized;
+    	std::cout << "is_integrationelement=" << is_integrationelement << std::endl;
+
+
+
+    	std::cout << "gets JTransp " << std::endl;
         JacobianInverseTransposed jit = jacobianInverseTransposed(local, analyticalMap);
+
+        std::cout << "gets ref.normal " << std::endl;
         LocalCoordinate refNormal = refElement().integrationOuterNormal(indexInInside);
 
+        std::cout << "multiplies " << std::endl;
         GlobalCoordinate normal;
         jit.mv( refNormal, normal );
 
+        std::cout << "normalises " << std::endl;
         if (is_normalized) { normal *= (ctype( 1 ) / normal.two_norm()); }
         // Constructs normal integration element. detInv(x) is exactly integrationElement(x), but faster
-        else if (is_integrationelement) { normal *= jit.detInv(); }
+        else if (is_integrationelement) {
+        	std::cout << "gets detinv " << std::endl;
+
+        	normal *= jit.detInv(); }
+
+        std::cout << "finished computing subentity normal " << std::endl;
 
         return normal;
     }
@@ -936,6 +956,12 @@ namespace Dune
 
     LocalPolynomial JacobianDeterminantAnalytical(const PolynomialVector & analyticalMap) const
     {
+    	std::cout << "starting JacobianDeterminantAnalytical with size=" << analyticalMap.size() << std::endl;
+
+    	std::cout << "using analytical map:" << std::endl;
+    	for (int i = 0; i < analyticalMap.size(); i++)  { std::cout << "  ++++++ vec=" << analyticalMap[i].to_string() << std::endl; }
+
+
         LocalPolynomial rez;
 
         switch(coorddimension)
@@ -945,13 +971,26 @@ namespace Dune
         case 2:  rez = analyticalMap[0].derivative(0) * analyticalMap[1].derivative(1) - analyticalMap[0].derivative(1) * analyticalMap[1].derivative(0);
             break;
         case 3:
-            rez.mergeTo( analyticalMap[0].derivative(0) * ( analyticalMap[1].derivative(1) * analyticalMap[2].derivative(2) - analyticalMap[1].derivative(2) * analyticalMap[2].derivative(1) ) );
-            rez.mergeTo( analyticalMap[0].derivative(1) * ( analyticalMap[1].derivative(2) * analyticalMap[2].derivative(0) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(2) ) );
-            rez.mergeTo( analyticalMap[0].derivative(2) * ( analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[1].derivative(1) * analyticalMap[2].derivative(0) ) );
+        	std::cout << " 24p957294308759347953089450934 tralalal" << std::endl;
+            rez += analyticalMap[0].derivative(0) * ( analyticalMap[1].derivative(1) * analyticalMap[2].derivative(2) - analyticalMap[1].derivative(2) * analyticalMap[2].derivative(1) );
+            rez += analyticalMap[0].derivative(1) * ( analyticalMap[1].derivative(2) * analyticalMap[2].derivative(0) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(2) );
+            rez += analyticalMap[0].derivative(2) * ( analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[1].derivative(1) * analyticalMap[2].derivative(0) );
+            std::cout << " slkfskhfkshfkshdkfhhsdf trololol" << std::endl;
+
             break;
         }
+
+        std::cout << "  === finished assembly, started cleanup" << std::endl;
+
+        // Clean-up in case some summands summed up to 0
+        rez.cleanUp();
+
+        std::cout << "  === finished cleanup, started mult" << std::endl;
+
         // Change sign if determinant is negative
-        if (rez.evaluate(refElement().position( 0, 0 )) < 0) { rez.multScalar(-1); }
+        if (rez.evaluate(refElement().position( 0, 0 )) < 0) { rez *= -1; }
+
+        std::cout << "finished JacobianDeterminantAnalytical poly=" << rez.to_string() << std::endl;
 
         return rez;
     }
@@ -985,13 +1024,13 @@ namespace Dune
         case 1:
             for (int i = 0; i < coorddimension; i++) {
                 LocalPolynomial tmp = analyticalMap[i].derivative(0);
-                rez.mergeTo(tmp * tmp);
+                rez += tmp * tmp;
             }
             break;
         case 2:
             PolynomialVector normalIntegrationElement = NormalIntegrationElementAnalytical(analyticalMap);
             for (int i = 0; i < coorddimension; i++) {
-                rez.mergeTo(normalIntegrationElement[i] * normalIntegrationElement[i]);
+                rez += normalIntegrationElement[i] * normalIntegrationElement[i];
             }
             break;
         }
@@ -1015,7 +1054,7 @@ namespace Dune
     {
         // Construct boundary integration element normal polynomial vector
         LocalPolynomial integrand;
-        for (int i = 0; i < coorddimension; i++) { integrand.mergeTo(PVec[i] * normalIntegrationElement[i]); }
+        for (int i = 0; i < coorddimension; i++) { integrand += PVec[i] * normalIntegrationElement[i]; }
         return integrand.integrateRefSimplex();
     }
 
@@ -1265,6 +1304,8 @@ namespace Dune
     // Initialization runs at the constructor
     void init()
     {
+    	std::cout << "CachedGEometry started init" << std::endl;
+
         analyticalMap_ = Base::interpolatoryVectorAnalytical();
 
         if (mydim == cdim) { JacobianDet_ = Base::JacobianDeterminantAnalytical(analyticalMap_); }
@@ -1272,6 +1313,8 @@ namespace Dune
 
         bool valid_dim = ((mydimension == 1) && (coorddimension == 2)) || ((mydimension == 2) && (coorddimension == 3));
         if (valid_dim)     { NormIntElem_ = Base::NormalIntegrationElementAnalytical(analyticalMap_); }
+
+        std::cout << "CachedGEometry finished init" << std::endl;
     }
 
 

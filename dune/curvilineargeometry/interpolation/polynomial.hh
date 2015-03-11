@@ -104,33 +104,40 @@ class Polynomial {
 public:
   SummandVector poly_;
 
-  // Constructor - creates Polynomial with 1 summand
-  Polynomial() { }
-  Polynomial(SummandVector polyNew) { poly_ = polyNew; }
-  Polynomial(Monomial polySM) { poly_.push_back(polySM); }
+  Polynomial()                      { poly_.push_back(Monomial(0, std::vector<int> (dim, 0))); }  // Empty polynomial
+  Polynomial(Monomial polySM)       { poly_.push_back(polySM); }                                  // Polynomial from a summand
+  Polynomial(SummandVector polyNew) { poly_ = polyNew; }                                          // Polynomial from a vector of summands
+
 
   /** \brief Add a summand to a Polynomial
-   *
    *  \param[in]  polySM  a summand
    */
-  void append(Monomial polySM) { poly_.push_back(polySM); }
+  LocalPolynomial & operator+=(const Monomial & polySM)
+  {
+	  poly_.push_back(polySM);
+	  return *this;
+  }
 
   /** \brief Adds another Polynomial to this one
-   *
    *  \param[in]  polyNew  a Polynomial to add
    */
-  void mergeTo(LocalPolynomial polyNew) {
+
+  LocalPolynomial & operator+=(const LocalPolynomial & polyNew)
+  {
     for (uint i = 0; i < polyNew.poly_.size(); i++) { poly_.push_back(polyNew.poly_[i]); }
 
     // Addition is likely to generate repeating powers, need to compactify
     compactify();
+
+    return *this;
   }
 
   /** \brief Multiplies this Polynomial by a scalar
    *
    *  \param[in]  c     scalar to multiply by
    */
-  void multScalar(double c) {
+  LocalPolynomial & operator*=(const double c)
+  {
     // If we multiply by zero, return zero Polynomial
     if (fabs(c) < 1.0e-25) {
         SummandVector zeroPoly;
@@ -140,6 +147,7 @@ public:
     {
         for (uint i = 0; i < poly_.size(); i++) { poly_[i].pref_ *= c; }
     }
+    return *this;
   }
 
   /** \brief Multiply incoming Polynomial by scalar, then add to this one
@@ -149,15 +157,16 @@ public:
    */
   void axpy(LocalPolynomial polyNew, double c) {
       LocalPolynomial polyTmp = polyNew;
-      polyTmp.multScalar(c);
-      mergeTo(polyTmp);
+      polyTmp *= c;
+      *this += polyTmp;
   }
 
   /** \brief Multiply this Polynomial by another one
    *
    *  \param[in]  polyNew     Polynomial to multiply by
    */
-  void multPoly(LocalPolynomial polyNew) {
+  LocalPolynomial & operator*=(const LocalPolynomial & polyNew)
+  {
     SummandVector rez;
 
     double magnTmp = magnitude() * polyNew.magnitude();
@@ -185,6 +194,8 @@ public:
         // The product is likely to have produced several summands with the same power. Need to compactify
         compactify();
     }
+
+    return *this;
   }
 
   /** \brief Addition for two polynomials
@@ -194,7 +205,7 @@ public:
    */
   LocalPolynomial operator+(const LocalPolynomial & a) const {
       LocalPolynomial rez = *this;
-      rez.mergeTo(a);
+      rez += a;
       return rez;
   }
 
@@ -205,7 +216,7 @@ public:
    */
   LocalPolynomial operator+(const ctype a) const {
       LocalPolynomial rez = *this;
-      rez.mergeTo(LocalPolynomial(Monomial(a, std::vector<int> (dim, 0))));
+      rez += Monomial(a, std::vector<int> (dim, 0));
       return rez;
   }
 
@@ -227,7 +238,7 @@ public:
    */
   LocalPolynomial operator-(const ctype a) const {
       LocalPolynomial rez = *this;
-      rez.mergeTo(LocalPolynomial(Monomial(-a, std::vector<int> (dim, 0))));
+      rez += Monomial(-a, std::vector<int> (dim, 0));
       return rez;
   }
 
@@ -238,7 +249,7 @@ public:
    */
   LocalPolynomial operator*(const ctype a) const {
       LocalPolynomial rez = *this;
-      rez.multScalar(a);
+      rez *= a;
       return rez;
   }
 
@@ -249,7 +260,7 @@ public:
    */
   LocalPolynomial operator*(const LocalPolynomial & a) const {
       LocalPolynomial rez = *this;
-      rez.multPoly(a);
+      rez *= a;
       return rez;
   }
 
@@ -406,13 +417,11 @@ public:
 
     std::stringstream out_str;
 
-    //std::cout << "Printing Polynomial: ";
     for (uint i = 0; i < poly_.size(); i++) {
       if (poly_[i].pref_ >= 0) { out_str << "+"; }
 
       out_str << poly_[i].pref_ << " ";
       for (int d = 0; d < dim; d++) { out_str << coordNames[d] << "^" << poly_[i].power_[d] << " "; }
-      std::cout << " ";
     }
     return out_str.str();
   }

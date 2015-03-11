@@ -224,6 +224,7 @@ class CurvilinearElementInterpolator {
         if (mydim == 0)  { assert(subdim == 0); }  // Vertex subentity can not be lower than a vertex itself
 
         std::vector<InternalIndexType> subentityIndex = Dune::CurvilinearGeometryHelper::subentityInternalCoordinateSet<ctype, mydim>(type(), order_, mydim - subdim, subentityNo);
+
         std::vector<GlobalVector> subentityPoint;
         for (int i = 0; i < subentityIndex.size(); i++)  { subentityPoint.push_back(point_[subentityIndex[i]]); }
 
