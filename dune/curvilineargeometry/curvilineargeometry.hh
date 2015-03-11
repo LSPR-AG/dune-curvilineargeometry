@@ -35,6 +35,8 @@
 #include <dune/curvilineargeometry/interpolation/curvilineargeometryhelper.hh>
 #include <dune/curvilineargeometry/interpolation/curvilinearelementinterpolator.hh>
 #include <dune/curvilineargeometry/integration/numericalrecursiveinterpolationintegrator.hh>
+#include <dune/curvilineargeometry/integration/quadratureintegrator.hh>
+
 
 namespace Dune
 {
@@ -139,21 +141,28 @@ namespace Dune
   };
 
 
-  // Function that calculates the total integrand, by multiplying the passed integrand and the square root of the squared integration element.
-  template<class ct, int mydim, typename Functor>
-  struct BoundaryFunctor {
+  // Wraps evaluation of another functor times the integration element.
+  // If the integral is over codim-0 element, the integration element is just the jacobian determinant
+  // Otherwise sqrt(det(J^T * J))
+  // [TODO] Template operator to avoid the unnecessary if-statement inside
+  // [TODO] Move functors into traits, so that they do not appear explicitly in namespace dune
+  template<class ct, int mydim, int cdim, typename Functor>
+  struct JacobianFunctor {
       typedef Polynomial<ct, mydim> LocalPolynomial;
       typedef FieldVector< ct, mydim > LocalCoordinate;
 
       Functor basis_function_;
-      LocalPolynomial integration_element_squared_;
+      LocalPolynomial integration_element_generalised_;
 
-      BoundaryFunctor(const Functor & basis_function, const LocalPolynomial & integration_element_squared) :
+      JacobianFunctor(const Functor & basis_function, const LocalPolynomial & integration_element_g) :
           basis_function_ (basis_function),
-          integration_element_squared_ (integration_element_squared)
+          integration_element_generalised_ (integration_element_g)
       {}
 
-      double operator()(const LocalCoordinate & x) const { return basis_function_(x) * sqrt(integration_element_squared_.evaluate(x)); }
+      double operator()(const LocalCoordinate & x) const {
+    	  if (mydim == cdim)  { return basis_function_(x) * integration_element_generalised_.evaluate(x); }
+    	  else                { return basis_function_(x) * sqrt(integration_element_generalised_.evaluate(x)); }
+      }
   };
 
   // Functor that evaluates a polynomial that it carries inside
@@ -539,8 +548,18 @@ namespace Dune
     template <typename Functor>
     ctype integrateNumerical(const Functor & f, double tolerance) const
     {
-        LocalPolynomial integrationElementSquared = IntegrationElementSquaredAnalytical();
-        return integrateNumerical(f, tolerance, integrationElementSquared);
+    	if (mydimension == coorddimension)
+    	{
+    		LocalPolynomial jDet = JacobianDeterminantAnalytical();
+            JacobianFunctor<ct, mydim, cdim, Functor> g(f, jDet);
+            return integrateNumericalReference(g, tolerance);
+    	}
+    	else
+    	{
+            LocalPolynomial integrationElementSquared = IntegrationElementSquaredAnalytical();
+            JacobianFunctor<ct, mydim, cdim, Functor> g(f, integrationElementSquared);
+            return integrateNumericalReference(g, tolerance);
+    	}
     }
 
     /** \brief Integrate given polynomial analytically over the element
@@ -641,10 +660,10 @@ namespace Dune
 
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
-    	std::cout << "started calc JT  dim=" << coorddimension << " mydim="<< mydimension << " mapSize=" << analyticalMap.size() << std::endl;
+    	//std::cout << "started calc JT  dim=" << coorddimension << " mydim="<< mydimension << " mapSize=" << analyticalMap.size() << std::endl;
 
-    	std::cout << "using analytical map:" << std::endl;
-    	for (int i = 0; i < analyticalMap.size(); i++)  { std::cout << "  ++++++ vec=" << analyticalMap[i].to_string() << std::endl; }
+    	//std::cout << "using analytical map:" << std::endl;
+    	//for (int i = 0; i < analyticalMap.size(); i++)  { std::cout << "  ++++++ vec=" << analyticalMap[i].to_string() << std::endl; }
 
         JacobianTransposed jt;
 
@@ -656,7 +675,7 @@ namespace Dune
             }
         }
 
-        std::cout << "done calc JT" << std::endl;
+        //std::cout << "done calc JT" << std::endl;
 
       return jt;
     }
@@ -846,33 +865,33 @@ namespace Dune
     // Finds the normal in local coordinates using referenceElement, then maps it to global using inverse Jacobi transform
     GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local, bool is_normalized, bool is_integrationelement, const PolynomialVector & analyticalMap ) const
     {
-    	std::cout << "started computing subentity normal ";
-    	std::cout << "indexInInside=" << indexInInside;
-    	std::cout << "local=" << local;
-    	std::cout << "is_normalized=" << is_normalized;
-    	std::cout << "is_integrationelement=" << is_integrationelement << std::endl;
+    	//std::cout << "started computing subentity normal ";
+    	//std::cout << "indexInInside=" << indexInInside;
+    	//std::cout << "local=" << local;
+    	//std::cout << "is_normalized=" << is_normalized;
+    	//std::cout << "is_integrationelement=" << is_integrationelement << std::endl;
 
 
 
-    	std::cout << "gets JTransp " << std::endl;
+    	//std::cout << "gets JTransp " << std::endl;
         JacobianInverseTransposed jit = jacobianInverseTransposed(local, analyticalMap);
 
-        std::cout << "gets ref.normal " << std::endl;
+        //std::cout << "gets ref.normal " << std::endl;
         LocalCoordinate refNormal = refElement().integrationOuterNormal(indexInInside);
 
-        std::cout << "multiplies " << std::endl;
+        //std::cout << "multiplies " << std::endl;
         GlobalCoordinate normal;
         jit.mv( refNormal, normal );
 
-        std::cout << "normalises " << std::endl;
+        //std::cout << "normalises " << std::endl;
         if (is_normalized) { normal *= (ctype( 1 ) / normal.two_norm()); }
         // Constructs normal integration element. detInv(x) is exactly integrationElement(x), but faster
         else if (is_integrationelement) {
-        	std::cout << "gets detinv " << std::endl;
+        	//std::cout << "gets detinv " << std::endl;
 
         	normal *= jit.detInv(); }
 
-        std::cout << "finished computing subentity normal " << std::endl;
+        //std::cout << "finished computing subentity normal " << std::endl;
 
         return normal;
     }
@@ -956,10 +975,10 @@ namespace Dune
 
     LocalPolynomial JacobianDeterminantAnalytical(const PolynomialVector & analyticalMap) const
     {
-    	std::cout << "starting JacobianDeterminantAnalytical with size=" << analyticalMap.size() << std::endl;
+    	//std::cout << "starting JacobianDeterminantAnalytical with size=" << analyticalMap.size() << std::endl;
 
-    	std::cout << "using analytical map:" << std::endl;
-    	for (int i = 0; i < analyticalMap.size(); i++)  { std::cout << "  ++++++ vec=" << analyticalMap[i].to_string() << std::endl; }
+    	//std::cout << "using analytical map:" << std::endl;
+    	//for (int i = 0; i < analyticalMap.size(); i++)  { std::cout << "  ++++++ vec=" << analyticalMap[i].to_string() << std::endl; }
 
 
         LocalPolynomial rez;
@@ -971,26 +990,26 @@ namespace Dune
         case 2:  rez = analyticalMap[0].derivative(0) * analyticalMap[1].derivative(1) - analyticalMap[0].derivative(1) * analyticalMap[1].derivative(0);
             break;
         case 3:
-        	std::cout << " 24p957294308759347953089450934 tralalal" << std::endl;
+        	//std::cout << " 24p957294308759347953089450934 tralalal" << std::endl;
             rez += analyticalMap[0].derivative(0) * ( analyticalMap[1].derivative(1) * analyticalMap[2].derivative(2) - analyticalMap[1].derivative(2) * analyticalMap[2].derivative(1) );
             rez += analyticalMap[0].derivative(1) * ( analyticalMap[1].derivative(2) * analyticalMap[2].derivative(0) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(2) );
             rez += analyticalMap[0].derivative(2) * ( analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[1].derivative(1) * analyticalMap[2].derivative(0) );
-            std::cout << " slkfskhfkshfkshdkfhhsdf trololol" << std::endl;
+            //std::cout << " slkfskhfkshfkshdkfhhsdf trololol" << std::endl;
 
             break;
         }
 
-        std::cout << "  === finished assembly, started cleanup" << std::endl;
+        //std::cout << "  === finished assembly, started cleanup" << std::endl;
 
         // Clean-up in case some summands summed up to 0
         rez.cleanUp();
 
-        std::cout << "  === finished cleanup, started mult" << std::endl;
+        //std::cout << "  === finished cleanup, started mult" << std::endl;
 
         // Change sign if determinant is negative
         if (rez.evaluate(refElement().position( 0, 0 )) < 0) { rez *= -1; }
 
-        std::cout << "finished JacobianDeterminantAnalytical poly=" << rez.to_string() << std::endl;
+        //std::cout << "finished JacobianDeterminantAnalytical poly=" << rez.to_string() << std::endl;
 
         return rez;
     }
@@ -1038,11 +1057,12 @@ namespace Dune
     }
 
     template <typename Functor>
-    ctype integrateNumerical(Functor f, double tolerance, const LocalPolynomial & integrationElementSquared) const
+    ctype integrateNumericalReference(Functor g, double tolerance) const
     {
-        BoundaryFunctor<ct, mydim, Functor> Integrand(f, integrationElementSquared);
-        NumericalRecursiveInterpolationIntegrator<ct, mydim> NInt( type() );
-        return NInt.integrate( Integrand, tolerance);
+    	return Dune::QuadratureIntegrator<ctype, mydim>::integrateRecursive( type(), g, tolerance).second;
+
+        //NumericalRecursiveInterpolationIntegrator<ct, mydim> NInt( type() );
+        //return NInt.integrate( g, tolerance);
     }
 
     ctype integrateAnalyticalScalar(const LocalPolynomial & P, const LocalPolynomial & jacobianDeterminant) const
@@ -1265,7 +1285,16 @@ namespace Dune
     template <typename Functor>
     ctype integrateNumerical(const Functor & f, double tolerance) const
     {
-        return Base::integrateNumerical(f, tolerance, IntElem2_);
+    	if (mydimension == coorddimension)
+    	{
+            JacobianFunctor<ct, mydim, cdim, Functor> g(f, JacobianDet_);
+            return Base::integrateNumericalReference(g, tolerance);
+    	}
+    	else
+    	{
+            JacobianFunctor<ct, mydim, cdim, Functor> g(f, IntElem2_);
+            return Base::integrateNumericalReference(g, tolerance);
+    	}
     }
 
     ctype integrateAnalyticalScalar(const LocalPolynomial & P) const
@@ -1304,7 +1333,7 @@ namespace Dune
     // Initialization runs at the constructor
     void init()
     {
-    	std::cout << "CachedGEometry started init" << std::endl;
+    	//std::cout << "CachedGEometry started init" << std::endl;
 
         analyticalMap_ = Base::interpolatoryVectorAnalytical();
 
@@ -1314,7 +1343,7 @@ namespace Dune
         bool valid_dim = ((mydimension == 1) && (coorddimension == 2)) || ((mydimension == 2) && (coorddimension == 3));
         if (valid_dim)     { NormIntElem_ = Base::NormalIntegrationElementAnalytical(analyticalMap_); }
 
-        std::cout << "CachedGEometry finished init" << std::endl;
+        //std::cout << "CachedGEometry finished init" << std::endl;
     }
 
 
