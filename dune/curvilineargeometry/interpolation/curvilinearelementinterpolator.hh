@@ -61,6 +61,7 @@ class CurvilinearElementInterpolator {
     typedef FieldVector< ctype, coorddimension > GlobalVector;
     typedef Polynomial<ctype, mydimension> LocalPolynomial;
     typedef std::vector<LocalPolynomial> PolynomialVector;
+    typedef typename Dune::PolynomialTraits<ctype>::Monomial Monomial;
 
     typedef Dune::ReferenceElement< ctype, mydimension > ReferenceElement;
     typedef Dune::ReferenceElements< ctype, mydimension > ReferenceElements;
@@ -130,7 +131,10 @@ class CurvilinearElementInterpolator {
     /** \brief Coordinate of the interpolatory point_
      *  \param[in]  i	interpolatory vertex internal index
      */
-    GlobalVector vertex(InternalIndexType vertexIndex) const { return point_[vertexIndex]; }
+    GlobalVector vertex(InternalIndexType vertexIndex) const {
+    	assert(vertexIndex < dofPerOrder());
+    	return point_[vertexIndex];
+    }
 
     /** \brief Coordinates of all interpolatory points */
     std::vector<GlobalVector> vertexSet() const { return point_; }
@@ -146,7 +150,7 @@ class CurvilinearElementInterpolator {
     /** \brief Coordinate of a corner, given corner index
      *  \param[in]  cornerLinearIndex	index of a corner wrt set of corners of the entity
      */
-    GlobalVector corner(InternalIndexType cornerLinearIndex) const { return vertex(cornerIndex(cornerLinearIndex)); }
+    GlobalVector corner(InternalIndexType cornerLinearIndex) const {return vertex(cornerIndex(cornerLinearIndex)); }
 
     /** \brief Number of corners of this element */
     int nCorner() const { return refElement_->size(mydim); }
@@ -163,6 +167,7 @@ class CurvilinearElementInterpolator {
      */
     double lagrangePolynomial(InternalIndexType vertexIndex, const LocalVector &local) const
     {
+    	assert(mydim > 0);
         if (!type().isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: lagrangePolynomial() only implemented for Simplex geometries at the moment"); }
 
         double rez = 0;
@@ -221,7 +226,11 @@ class CurvilinearElementInterpolator {
         	DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: SubentityInterpolator() - Unexpected subentity index");
         }
 
-        if (mydim == 0)  { assert(subdim == 0); }  // Vertex subentity can not be lower than a vertex itself
+        // Vertex subentity can not be lower than a vertex itself
+        if (mydim == 0)  {
+        	assert(subdim == 0);
+        	return CurvilinearElementInterpolator< ctype, subdim, cdim > (type(), point_, order_);
+        }
 
         std::vector<InternalIndexType> subentityIndex = Dune::CurvilinearGeometryHelper::subentityInternalCoordinateSet<ctype, mydim>(type(), order_, mydim - subdim, subentityNo);
 
@@ -590,7 +599,7 @@ class CurvilinearElementInterpolator {
     	if (mydim == 0) {
     		for (int d = 0; d < coorddimension; d++)
     		{
-    			rez.push_back(LocalPolynomial(Dune::PolynomialTraits::Monomial(point_[0][d], 0)));
+    			rez.push_back(LocalPolynomial(Monomial(point_[0][d], std::vector<int>())));
     		}
     		return rez;
     	}
@@ -606,7 +615,7 @@ class CurvilinearElementInterpolator {
         // Step 1. Construct monomial basis and set of local coordinates
         for (int i = 0; i < simplexPoints.size(); i++)
         {
-                monomial_basis.push_back(LocalPolynomial(PolynomialTraits::Monomial(1.0, simplexPoints[i])));
+                monomial_basis.push_back(LocalPolynomial(Monomial(1.0, simplexPoints[i])));
         }
 
         // Step 2. Evaluate monomial basis into matrix

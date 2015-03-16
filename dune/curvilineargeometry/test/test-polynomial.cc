@@ -21,7 +21,7 @@ using namespace Dune;
 
 int main ()
 {
-  typedef PolynomialTraits::Monomial  Monomial;
+  typedef PolynomialTraits<double>::Monomial  Monomial;
 
   std::cout << "*********************************************************************" << std::endl;
   std::cout << "Started testing 1D polynomials " << std::endl;
@@ -43,6 +43,7 @@ int main ()
   Polynomial<double, 1> poly1D_test6;
   poly1D_test6 += Monomial(3,1);
   poly1D_test6 = (poly1D_test6 * poly1D_test6 * poly1D_test6 + poly1D_test6 * poly1D_test6 * 2 - poly1D_test6 * 5 + 16.5) - 3;
+  poly1D_test6.compactify();
 
 
   FieldVector< double, 1 > testEval1D; testEval1D[0] = 5.0;
@@ -85,6 +86,7 @@ int main ()
   Polynomial<double, 2> poly2D_test6;
   poly2D_test6 += Monomial(3,1,2);
   poly2D_test6 = (poly2D_test6 * poly2D_test6 * poly2D_test6 + poly2D_test6 * poly2D_test6 * 2 - poly2D_test6 * 5 + 16.5) - 3;
+  poly2D_test6.compactify();
 
 
   std::cout << "expecting Polynomial +2 x^0 y^0  +5 x^0 y^1  +3 x^0 y^2  -3 x^1 y^0  +2 x^1 y^1  -1 x^2 y^0, result is: " << poly2D_test.to_string() << std::endl;
@@ -129,6 +131,7 @@ int main ()
   Polynomial<double, 3> poly3D_test6;
   poly3D_test6 += Monomial(3,1,2,3);
   poly3D_test6 = (poly3D_test6 * poly3D_test6 * poly3D_test6 + poly3D_test6 * poly3D_test6 * 2 - poly3D_test6 * 5 + 16.5) - 3;
+  poly3D_test6.compactify();
 
 
   std::cout << "expecting Polynomial +2 x^0 y^0 z^0  -4 x^0 y^0 z^1  +5 x^0 y^1 z^0  +2 x^0 y^1 z^2  -3 x^1 y^0 z^0  +2 x^1 y^1 z^1  -1 x^2 y^0 z^1, result is: "<< poly3D_test.to_string() << std::endl;

@@ -93,6 +93,7 @@ class CurvilinearGeometryHelper {
 
 
         switch (geomType.dim()) {
+        case 0:  rez = 1;                                              break;
         case 1:  rez = curvilinearDofPerOrderEdge_[order - 1];         break;
         case 2:  rez = curvilinearDofPerOrderTriangle_[order - 1];     break;
         case 3:  rez = curvilinearDofPerOrderTetrahedron_[order - 1];  break;
@@ -109,6 +110,7 @@ class CurvilinearGeometryHelper {
      */
     static InternalIndexType cornerIndex(Dune::GeometryType geomType, int order, InternalIndexType i)
     {
+    	assert(i <= geomType.dim());
         if (!geomType.isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: cornerIndex() only implemented for Simplex geometries at the moment"); }
 
         int ind = 0;

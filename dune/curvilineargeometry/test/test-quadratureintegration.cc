@@ -37,6 +37,7 @@ typedef Dune::Polynomial<double, 1>  Polynomial1D;
 typedef Dune::Polynomial<double, 2>  Polynomial2D;
 typedef Dune::Polynomial<double, 3>  Polynomial3D;
 
+typedef Dune::PolynomialTraits<double>::Monomial  Monomial;
 
 struct function1d1 {   double operator()(const GlobalVector1D & in) const  { return 1; }  };
 struct function1d2 {   double operator()(const GlobalVector1D & in) const  { return in[0]; }  };
@@ -62,12 +63,12 @@ Dune::Polynomial<ctype, dim> NewtonPolynomial(int power)
 
 	// Construct base polynomial (1 + x + y + z) or its analogues in other dimensions
 	std::vector<int> zeroVec(dim, 0);
-	Poly base(Dune::PolynomialTraits::Monomial(1.0, zeroVec));
+	Poly base(Monomial(1.0, zeroVec));
 	for (int i = 0; i < dim; i++)
 	{
 		std::vector<int> eigenVec(dim, 0);
 		eigenVec[i] = 1.0;
-		base += Dune::PolynomialTraits::Monomial(1.0, eigenVec);
+		base += Monomial(1.0, eigenVec);
 	}
 
 	// Multiply polynomial to required power

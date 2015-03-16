@@ -38,13 +38,15 @@
 
 namespace Dune {
 
-
+template<class ctype>
 struct PolynomialTraits
 {
 	class Monomial {
+
 	public:
-	  double pref_;
-	  std::vector<int> power_;
+	  ctype pref_;
+      std::vector<int> power_;
+
 
 	  Monomial(double prefNew, std::vector<int> powerNew)
 	  {
@@ -53,14 +55,14 @@ struct PolynomialTraits
 	  }
 
 	  // 1D initializer
-	  Monomial(double prefNew, int x)
+	  Monomial(ctype prefNew, int x)
 	  {
 	    pref_ = prefNew;
 	    power_.push_back(x);
 	  }
 
 	  // 2D initializer
-	  Monomial(double prefNew, int x, int y)
+	  Monomial(ctype prefNew, int x, int y)
 	  {
 	    pref_ = prefNew;
 	    power_.push_back(x);
@@ -68,13 +70,35 @@ struct PolynomialTraits
 	  }
 
 	  // 3D initializer
-	  Monomial(double prefNew, int x, int y, int z)
+	  Monomial(ctype prefNew, int x, int y, int z)
 	  {
 	    pref_ = prefNew;
 	    power_.push_back(x);
 	    power_.push_back(y);
 	    power_.push_back(z);
 	  }
+
+	  int dim() const { return power_.size(); }
+
+
+	  Monomial operator*(const Monomial & other) const {
+		  assert(dim() == other.dim());
+		  std::vector<int> newPower;
+		  for(int i = 0; i < dim(); i++)  { newPower.push_back(power_[i] + other.power_[i]); }
+		  return Monomial(pref_ * other.pref_, newPower);
+	  }
+
+	  Monomial derivative(int paramNo) const
+	  {
+		  assert((paramNo >=0 )&&(paramNo < dim()));
+		  if (power_[paramNo] <= 0)  { return Monomial(0.0, std::vector<int>(dim(), 0)); }
+
+		  Monomial monNew = *this;
+		  monNew.pref_ *= monNew.power_[paramNo];
+		  monNew.power_[paramNo]--;
+		  return monNew;
+	  }
+
 	};
 
 	// In order to compactify the Polynomial, we want to be able to sort its summands with respect
@@ -95,7 +119,7 @@ template<class ctype, int dim>
 class Polynomial {
 
   typedef Polynomial<ctype, dim> LocalPolynomial;
-  typedef PolynomialTraits::Monomial     Monomial;
+  typedef typename PolynomialTraits<ctype>::Monomial Monomial;
   typedef typename std::vector<Monomial> SummandVector;
   typedef FieldVector< ctype, dim > LocalCoordinate;
 
@@ -104,9 +128,19 @@ class Polynomial {
 public:
   SummandVector poly_;
 
-  Polynomial()                      { poly_.push_back(Monomial(0, std::vector<int> (dim, 0))); }  // Empty polynomial
-  Polynomial(Monomial polySM)       { poly_.push_back(polySM); }                                  // Polynomial from a summand
-  Polynomial(SummandVector polyNew) { poly_ = polyNew; }                                          // Polynomial from a vector of summands
+  Polynomial()                      { poly_.push_back(zeroMonomial()); }  // Empty polynomial
+
+  // Polynomial from a summand
+  Polynomial(Monomial polySM)  {
+	  if (dim != polySM.dim())  { std::cout << "attempting to push a " << polySM.dim() << " monomial to a poly " << dim << std::endl;  }
+	  assert(dim == polySM.dim());  // Must push polynomial of correct dimension
+	  poly_.push_back(polySM);
+  }
+  //Polynomial(SummandVector polyNew) { poly_ = polyNew; }                  // Polynomial from a vector of summands
+
+
+
+  Monomial zeroMonomial()  { return Monomial(0.0, std::vector<int> (dim, 0)); }
 
 
   /** \brief Add a summand to a Polynomial
@@ -114,100 +148,109 @@ public:
    */
   LocalPolynomial & operator+=(const Monomial & polySM)
   {
+	  assert(dim == polySM.dim());  // Must push monomial of correct dimension
 	  poly_.push_back(polySM);
 	  return *this;
   }
 
+
   /** \brief Adds another Polynomial to this one
    *  \param[in]  polyNew  a Polynomial to add
    */
-
-  LocalPolynomial & operator+=(const LocalPolynomial & polyNew)
+  LocalPolynomial & operator+=(const LocalPolynomial & other)
   {
-    for (uint i = 0; i < polyNew.poly_.size(); i++) { poly_.push_back(polyNew.poly_[i]); }
+	assert(other.size() > 0);   // Non-initialized polynomials should not exist
+	for (uint i = 0; i < other.size(); i++)  { poly_.push_back(other.poly_[i]); }
 
-    // Addition is likely to generate repeating powers, need to compactify
-    compactify();
-
-    return *this;
+	// Addition is likely to generate repeating powers, need to compactify
+	compactify();
+	return *this;
   }
+
+
+  /** \brief Adds another Polynomial to this one
+   *  \param[in]  polyNew  a Polynomial to add
+   */
+  LocalPolynomial & operator+=(const ctype c)
+  {
+	  poly_.push_back(Monomial(c, std::vector<int> (dim, 0)));
+	  return *this;
+  }
+
 
   /** \brief Multiplies this Polynomial by a scalar
    *
    *  \param[in]  c     scalar to multiply by
    */
-  LocalPolynomial & operator*=(const double c)
+  LocalPolynomial & operator*=(const ctype c)
   {
     // If we multiply by zero, return zero Polynomial
-    if (fabs(c) < 1.0e-25) {
-        SummandVector zeroPoly;
-        zeroPoly.push_back(Monomial(0, std::vector<int> (dim, 0)));
-        poly_ = zeroPoly;
-    } else
+    if (fabs(c) < 1.0e-25)  { poly_ = SummandVector(1, zeroMonomial()); }
+    else
     {
         for (uint i = 0; i < poly_.size(); i++) { poly_[i].pref_ *= c; }
     }
     return *this;
   }
 
+
   /** \brief Multiply incoming Polynomial by scalar, then add to this one
    *
    *  \param[in]  polyNew  Polynomial to scale
    *  \param[in]  c        scalar to multiply the summand by
    */
-  void axpy(LocalPolynomial polyNew, double c) {
-      LocalPolynomial polyTmp = polyNew;
-      polyTmp *= c;
-      *this += polyTmp;
+  void axpy(const LocalPolynomial & other, ctype c) {
+	  assert(other.size() > 0);   // Non-initialized polynomials should not exist
+      *this += other * c;
   }
+
 
   /** \brief Multiply this Polynomial by another one
    *
    *  \param[in]  polyNew     Polynomial to multiply by
    */
-  LocalPolynomial & operator*=(const LocalPolynomial & polyNew)
+  LocalPolynomial & operator*=(const LocalPolynomial & other)
   {
+	assert(other.size() > 0);   // Non-initialized polynomials should not exist
     SummandVector rez;
 
-    double magnTmp = magnitude() * polyNew.magnitude();
+    ctype magnTmp = magnitude() * other.magnitude();
 
     for (uint i = 0; i < poly_.size(); i++) {
-      for (uint j = 0; j < polyNew.poly_.size(); j++) {
-          double prefTmp = poly_[i].pref_ * polyNew.poly_[j].pref_;
+      for (uint j = 0; j < other.size(); j++) {
+    	Monomial mult = poly_[i] * other.poly_[j];
 
-          // Only add a summand if it is not too small
-          if (fabs(prefTmp) > magnTmp * 1.0e-10)
-          {
-              std::vector<int> powerRez;
-              for (int d = 0; d < dim; d++) { powerRez.push_back(poly_[i].power_[d] + polyNew.poly_[j].power_[d]); }
-              rez.push_back(Monomial(prefTmp , powerRez));
-          }
+        // Only add a summand if it is not too small
+        if (fabs(mult.pref_) > magnTmp * 1.0e-10)  { rez.push_back(mult); }
       }
     }
-    poly_ = rez;
 
-    if (poly_.size() == 0)
-    {
-        poly_.push_back(Monomial(0, std::vector<int> (dim, 0)));
-    } else
-    {
-        // The product is likely to have produced several summands with the same power. Need to compactify
-        compactify();
+    // If by some magic polynomial has no entries, make it zero
+    if (rez.size() == 0)  {
+    	//std::cout << "--- Warining: Polynomial Multiplication resulted in empty polynomial when multiplying " << to_string() << " and " << other.to_string() << std::endl;
+    	poly_ = SummandVector(1, zeroMonomial());
+    }
+    // The product is likely to have produced several summands with the same power. Need to compactify
+    else  {
+    	poly_ = rez;
+    	compactify();
     }
 
     return *this;
   }
+
 
   /** \brief Addition for two polynomials
    *
    *  \param[in]  a     Polynomial to add
    *  \returns    sum of polynomials
    */
-  LocalPolynomial operator+(const LocalPolynomial & a) const {
+  LocalPolynomial operator+(const LocalPolynomial & other) const {
       LocalPolynomial rez = *this;
-      rez += a;
+      rez += other;
       return rez;
   }
+
 
   /** \brief Addition of a scalar
    *
@@ -264,11 +307,14 @@ public:
       return rez;
   }
 
-  // Returns the total summand power (order) maximized over summands
+
+  /** \brief Number of monomials */
+  uint size() const { return poly_.size(); }
+
 
   /** \brief Order of Polynomial
    *
-   *  \returns    Highest total poly_ of a summand of a Polynomial
+   *  \returns    Returns the total summand power (order) maximized over summands
    */
   uint order() const {
     int rez = 0;
@@ -286,12 +332,12 @@ public:
    *
    *  \returns    Highest absolute value of a prefactor of a summand of a Polynomial
    */
-  double magnitude() const {
-        double rez = 0;
+  ctype magnitude() const {
+	ctype rez = 0;
 
-        for (uint i = 0; i < poly_.size(); i++) { rez = std::max(rez, fabs(poly_[i].pref_)); }
+    for (uint i = 0; i < poly_.size(); i++) { rez = std::max(rez, fabs(poly_[i].pref_)); }
 
-        return rez;
+    return rez;
   }
 
 
@@ -301,16 +347,15 @@ public:
    *  \returns    Polynomial - derivative of this Polynomial
    */
   LocalPolynomial derivative(int paramNo) const {
-    LocalPolynomial rez (poly_);
+	assert((paramNo>=0)&&(paramNo < dim));
 
-    for (uint i = 0; i < rez.poly_.size(); i++) {
-      rez.poly_[i].pref_ *= poly_[i].power_[paramNo];
-      rez.poly_[i].power_[paramNo] -= 1;
+	LocalPolynomial newPoly;
+
+    for (uint i = 0; i < poly_.size(); i++) {
+      // Only add this monomial if it does not differentiate to 0
+      if (poly_[i].power_[paramNo] > 0)  { newPoly += poly_[i].derivative(paramNo); }
     }
-
-    // Delete all summands that are now 0
-    rez.cleanUp();
-    return rez;
+    return newPoly;
   }
 
   /** \brief Evaluate the Polynomial at given coordinates
@@ -318,11 +363,11 @@ public:
    *  \param[in]  point     Local coordinate to evaluate at
    *  \returns    value of the polynoimal at the given point
    */
-  double evaluate(const LocalCoordinate & point) const {
-    double rez = 0;
+  ctype evaluate(const LocalCoordinate & point) const {
+	ctype rez = 0;
 
     for (uint i = 0; i < poly_.size(); i++) {
-      double powTmp = 1;
+      ctype powTmp = 1.0;
       for (int d = 0; d < dim; d++) { powTmp *= pow(point[d], poly_[i].power_[d]); }
       rez += poly_[i].pref_ * powTmp;
     }
@@ -333,12 +378,14 @@ public:
    *
    *  \returns    Returns the value of the analytical integral of the Polynomial
    */
-  double integrateRefSimplex() const {
-    double rez = 0;
+  ctype integrateRefSimplex() const {
+	assert((dim > 0) && (dim <= 3));
+
+	ctype rez = 0;
 
     // Generate factorial list up to the needed order
     uint polyorder = order();
-    std::vector<double> factorial(2, 1.0);
+    std::vector<ctype> factorial(2, 1.0);
     for (uint i = 2; i <= polyorder + dim; i++) { factorial.push_back( i * factorial[i - 1] ); }
 
     // Compute the analytical integral
@@ -360,18 +407,14 @@ public:
     SummandVector poly_cleaned;
 
     // Everything that is 10^10 less than the principal term is insignificant
-    double tolerance = magnitude() * 1.0e-10;
+    ctype tolerance = magnitude() * 1.0e-10;
 
     for (uint i = 0; i < poly_.size(); i++) {
-      bool isZero = fabs(poly_[i].pref_) < tolerance;
-
-      for (int d = 0; d < dim; d++) { isZero = isZero || (poly_[i].power_[d] < 0); }
-
-      if (!isZero) { poly_cleaned.push_back(poly_[i]); }
+      if (fabs(poly_[i].pref_) > tolerance) { poly_cleaned.push_back(poly_[i]); }
     }
 
     // If the Polynomial has no non-zero terms, it must have 1 zero-term not to have zero length
-    if (poly_cleaned.size() == 0) { poly_cleaned.push_back(Monomial(0, std::vector<int> (dim, 0))); }
+    if (poly_cleaned.size() == 0) { poly_cleaned.push_back(zeroMonomial()); }
 
     poly_ = poly_cleaned;
   }
@@ -384,8 +427,10 @@ public:
    */
 
   void compactify() {
+	assert(size() > 0);
+
     // This way we make sure that the identical powers are consecutive
-    std::sort(poly_.begin(), poly_.end(), PolynomialTraits::polySortOrder);
+    std::sort(poly_.begin(), poly_.end(), PolynomialTraits<ctype>::polySortOrder);
 
     SummandVector polyNew;
     polyNew.push_back(poly_[0]);
@@ -428,12 +473,18 @@ public:
 
 };
 
-/** \brief Generate an identity Polynomial
- *
- */
+
+/** \brief Generate an identity Polynomial*/
+template<class ctype, int dim>
+Polynomial<ctype, dim> zeroPolynomial() {
+    return Polynomial<ctype, dim> ( typename PolynomialTraits<ctype>::Monomial(0.0, std::vector<int>(dim, 0)) );
+}
+
+
+/** \brief Generate an identity Polynomial*/
 template<class ctype, int dim>
 Polynomial<ctype, dim> identityPolynomial() {
-    return Polynomial<ctype, dim> ( PolynomialTraits::Monomial(1.0, std::vector<int>(dim, 0)) );
+    return Polynomial<ctype, dim> ( typename PolynomialTraits<ctype>::Monomial(1.0, std::vector<int>(dim, 0)) );
 }
 
 

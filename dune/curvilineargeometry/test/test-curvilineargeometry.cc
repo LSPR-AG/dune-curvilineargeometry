@@ -43,7 +43,7 @@ typedef std::vector<FieldVector1D> FieldVectorVector1D;
 typedef std::vector<FieldVector2D> FieldVectorVector2D;
 typedef std::vector<FieldVector3D> FieldVectorVector3D;
 
-typedef PolynomialTraits::Monomial  Monomial;
+typedef PolynomialTraits<double>::Monomial  Monomial;
 
 
 // ************************************************************************************************

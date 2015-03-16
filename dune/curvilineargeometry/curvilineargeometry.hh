@@ -231,7 +231,9 @@ namespace Dune
     //! type of element interpolator
     typedef CurvilinearElementInterpolator <ct, mydim, cdim> ElementInterpolator;
 
+
     typedef Polynomial<ctype, mydimension> LocalPolynomial;
+    typedef typename PolynomialTraits<ctype>::Monomial Monomial;
     typedef std::vector<LocalPolynomial> PolynomialVector;
 
 
@@ -627,7 +629,8 @@ namespace Dune
      */
     ctype volume (double tolerance) const
     {
-      return integrateScalar(identityPolynomial<ctype, mydim>(), tolerance);
+    	if (mydim == 0)  { return 0; }
+        return integrateScalar(identityPolynomial<ctype, mydim>(), tolerance);
     }
 
     /** \brief obtain the transposed of the Jacobian
@@ -660,6 +663,7 @@ namespace Dune
 
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
+    	//assert(mydim > 0);
     	//std::cout << "started calc JT  dim=" << coorddimension << " mydim="<< mydimension << " mapSize=" << analyticalMap.size() << std::endl;
 
     	//std::cout << "using analytical map:" << std::endl;
@@ -970,11 +974,14 @@ namespace Dune
 
     ctype integrationElement ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
+      //assert(mydim > 0);
       return MatrixHelper::template sqrtDetAAT< mydimension, coorddimension >( jacobianTransposed( local, analyticalMap ) );
     }
 
     LocalPolynomial JacobianDeterminantAnalytical(const PolynomialVector & analyticalMap) const
     {
+    	if (mydim == 0) { return LocalPolynomial(Monomial(0.0, std::vector<int>())); }
+
     	//std::cout << "starting JacobianDeterminantAnalytical with size=" << analyticalMap.size() << std::endl;
 
     	//std::cout << "using analytical map:" << std::endl;
@@ -1016,6 +1023,7 @@ namespace Dune
 
     PolynomialVector NormalIntegrationElementAnalytical(const PolynomialVector & analyticalMap) const
     {
+    	assert(mydim > 0);
         PolynomialVector rez;
 
         // Case of edge in 2D
@@ -1037,6 +1045,7 @@ namespace Dune
 
     LocalPolynomial IntegrationElementSquaredAnalytical(const PolynomialVector & analyticalMap) const
     {
+    	assert(mydim > 0);
         LocalPolynomial rez;
         switch (mydimension)
         {
@@ -1059,6 +1068,7 @@ namespace Dune
     template <typename Functor>
     ctype integrateNumericalReference(Functor g, double tolerance) const
     {
+    	assert(mydim > 0);
     	return Dune::QuadratureIntegrator<ctype, mydim>::integrateRecursive( type(), g, tolerance).second;
 
         //NumericalRecursiveInterpolationIntegrator<ct, mydim> NInt( type() );
@@ -1067,11 +1077,13 @@ namespace Dune
 
     ctype integrateAnalyticalScalar(const LocalPolynomial & P, const LocalPolynomial & jacobianDeterminant) const
     {
+    	assert(mydim > 0);
         return (P * jacobianDeterminant).integrateRefSimplex();
     }
 
     ctype integrateAnalyticalDot(const PolynomialVector & PVec, const PolynomialVector & normalIntegrationElement ) const
     {
+    	assert(mydim > 0);
         // Construct boundary integration element normal polynomial vector
         LocalPolynomial integrand;
         for (int i = 0; i < coorddimension; i++) { integrand += PVec[i] * normalIntegrationElement[i]; }
@@ -1253,6 +1265,7 @@ namespace Dune
 
     bool local ( const GlobalCoordinate &global, LocalCoordinate & local ) const
     {
+    	if (mydim == 0)  { return true; }
         return Base::local(global, local, analyticalMap_);
     }
 
@@ -1315,7 +1328,8 @@ namespace Dune
 
     ctype volume (double tolerance) const
     {
-      return integrateScalar(identityPolynomial<ctype, mydim>(), tolerance);
+    	if (mydim == 0) { return 0; }
+        return integrateScalar(identityPolynomial<ctype, mydim>(), tolerance);
     }
 
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local ) const
@@ -1337,11 +1351,14 @@ namespace Dune
 
         analyticalMap_ = Base::interpolatoryVectorAnalytical();
 
-        if (mydim == cdim) { JacobianDet_ = Base::JacobianDeterminantAnalytical(analyticalMap_); }
-        else               { IntElem2_ = Base::IntegrationElementSquaredAnalytical(analyticalMap_); }
+        if (mydim > 0)
+        {
+          if (mydim == cdim) { JacobianDet_ = Base::JacobianDeterminantAnalytical(analyticalMap_); }
+          else               { IntElem2_ = Base::IntegrationElementSquaredAnalytical(analyticalMap_); }
 
-        bool valid_dim = ((mydimension == 1) && (coorddimension == 2)) || ((mydimension == 2) && (coorddimension == 3));
-        if (valid_dim)     { NormIntElem_ = Base::NormalIntegrationElementAnalytical(analyticalMap_); }
+          bool valid_dim = ((mydimension == 1) && (coorddimension == 2)) || ((mydimension == 2) && (coorddimension == 3));
+          if (valid_dim)     { NormIntElem_ = Base::NormalIntegrationElementAnalytical(analyticalMap_); }
+        }
 
         //std::cout << "CachedGEometry finished init" << std::endl;
     }
