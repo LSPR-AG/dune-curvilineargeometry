@@ -111,7 +111,10 @@ class CurvilinearGeometryHelper {
     static InternalIndexType cornerIndex(Dune::GeometryType geomType, int order, InternalIndexType i)
     {
     	assert(i <= geomType.dim());
-        if (!geomType.isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: cornerIndex() only implemented for Simplex geometries at the moment"); }
+        if (!geomType.isSimplex())  {
+        	std::cout << "CurvilinearGeometryHelper: Received non-simplex geometry" << std::endl;
+        	DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: cornerIndex() only implemented for Simplex geometries at the moment");
+        }
 
         int ind = 0;
         int dofperorder = dofPerOrder(geomType, order);

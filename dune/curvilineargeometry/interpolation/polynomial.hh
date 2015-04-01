@@ -78,6 +78,15 @@ struct PolynomialTraits
 	    power_.push_back(z);
 	  }
 
+	  Monomial(const Monomial& other) :
+		  pref_(other.pref_),
+		  power_(other.power_)
+	  {
+
+	  }
+
+
+
 	  int dim() const { return power_.size(); }
 
 
@@ -105,10 +114,14 @@ struct PolynomialTraits
 	// to the powers of each of the parameters
 	static bool polySortOrder( Monomial A, Monomial B )
 	{
+		//assert(A.dim() == B.dim());
 		int i = 0;
 		int thisDim = A.power_.size();
-		while ( (i + 1 < thisDim) && (A.power_[i] == B.power_[i]) )  { i++; }
 
+		//while ( (i + 1 < thisDim) && (A.power_[i] == B.power_[i]) )  { i++; }
+		//return (i < thisDim) ? A.power_[i] < B.power_[i] : 0;
+
+		while ( (i < thisDim) && (A.power_[i] == B.power_[i]) )  { i++; }
 		return (i < thisDim) ? A.power_[i] < B.power_[i] : 0;
 	}
 };
@@ -138,7 +151,11 @@ public:
   }
   //Polynomial(SummandVector polyNew) { poly_ = polyNew; }                  // Polynomial from a vector of summands
 
+  Polynomial(const Polynomial & other) :
+    poly_(other.poly_)
+  {
 
+  }
 
   Monomial zeroMonomial()  { return Monomial(0.0, std::vector<int> (dim, 0)); }
 

@@ -83,11 +83,13 @@ struct PolynomialFunctor
 {
     typedef Polynomial<ct, mydim> LocalPolynomial;
     typedef FieldVector< ct, mydim > LocalCoordinate;
+    typedef FieldVector< ct, 1 >     ResultType;
+
     LocalPolynomial p_;
 
     PolynomialFunctor(const LocalPolynomial & p) : p_(p) {}
 
-    double operator()(const LocalCoordinate & x) const { return p_.evaluate(x); }
+    ResultType operator()(const LocalCoordinate & x) const { return ResultType(p_.evaluate(x)); }
 };
 
 
@@ -111,11 +113,12 @@ void statWrite(StatInfoVec statInfoVec)
 template <int dim>
 void depthTest(int maxdim, double rec_tol)
 {
-	typedef typename Dune::QuadratureIntegrator<double, dim>::StatInfo  StatInfo;
+	typedef Dune::QuadratureIntegrator<double, dim, 1> Integrator;
+	typedef typename Integrator::StatInfo              StatInfo;
 
 	std::cout << "-----------Started " << dim << "D depth check-------------" << std::endl;
 	Dune::GeometryType entityGeometry;   entityGeometry.makeSimplex(dim);
-	Dune::QuadratureIntegrator<double, dim> funIntegrator;
+	Integrator funIntegrator;
 
 	for (int i = 1; i <= maxdim; i++)
 	{
@@ -124,7 +127,7 @@ void depthTest(int maxdim, double rec_tol)
 		double rez_poly = thisPoly.integrateRefSimplex();
 		StatInfo rez_quad = funIntegrator.integrateRecursive(entityGeometry, PolynomialFunctor<double, dim>(thisPoly), rec_tol);
 
-		double err = fabs(rez_poly - rez_quad.second);
+		double err = fabs(rez_poly - rez_quad.second[0]);
 		if (fabs(rez_poly) > 1.0e-15)  { err /= rez_poly; }
 
 		//std::cout << "Integrating polynomial " << thisPoly.to_string() << std::endl;
@@ -138,7 +141,6 @@ void depthTest(int maxdim, double rec_tol)
 
 int main ()
 {
-  typedef Dune::QuadratureIntegrator<double, 1> ::StatInfoVec  StatInfoVec;
 
   std::cout << "initialized" << std::endl;
 
@@ -146,25 +148,25 @@ int main ()
   Dune::GeometryType faceGeometry;   faceGeometry.makeSimplex(2);
   Dune::GeometryType elemGeometry;   elemGeometry.makeSimplex(3);
 
-  Dune::QuadratureIntegrator<double, 1> funIntegrator1D;
-  Dune::QuadratureIntegrator<double, 2> funIntegrator2D;
-  Dune::QuadratureIntegrator<double, 3> funIntegrator3D;
+  Dune::QuadratureIntegrator<double, 1, 1> funIntegrator1DScalar;
+  Dune::QuadratureIntegrator<double, 2, 1> funIntegrator2DScalar;
+  Dune::QuadratureIntegrator<double, 3, 1> funIntegrator3DScalar;
 
   double rec_tol = 1.0e-5;
 
-  recursiveWrite(funIntegrator1D.integrateRecursive(edgeGeometry, function1d1(), rec_tol));
-  recursiveWrite(funIntegrator1D.integrateRecursive(edgeGeometry, function1d2(), rec_tol));
-  recursiveWrite(funIntegrator1D.integrateRecursive(edgeGeometry, function1d3(), rec_tol));
-  recursiveWrite(funIntegrator1D.integrateRecursive(edgeGeometry, function1d4(), rec_tol));
+  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d1(), rec_tol));
+  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d2(), rec_tol));
+  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d3(), rec_tol));
+  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d4(), rec_tol));
 
-  recursiveWrite(funIntegrator2D.integrateRecursive(faceGeometry, function2d1(), rec_tol));
-  recursiveWrite(funIntegrator2D.integrateRecursive(faceGeometry, function2d2(), rec_tol));
-  recursiveWrite(funIntegrator2D.integrateRecursive(faceGeometry, function2d3(), rec_tol));
-  recursiveWrite(funIntegrator2D.integrateRecursive(faceGeometry, function2d4(), rec_tol));
-  recursiveWrite(funIntegrator2D.integrateRecursive(faceGeometry, function2d5(), rec_tol));
-  recursiveWrite(funIntegrator2D.integrateRecursive(faceGeometry, function2d6(), rec_tol));
-  recursiveWrite(funIntegrator2D.integrateRecursive(faceGeometry, function2d7(), rec_tol));
-  recursiveWrite(funIntegrator2D.integrateRecursive(faceGeometry, function2d8(), rec_tol));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d1(), rec_tol));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d2(), rec_tol));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d3(), rec_tol));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d4(), rec_tol));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d5(), rec_tol));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d6(), rec_tol));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d7(), rec_tol));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d8(), rec_tol));
 
   depthTest<1>(25, rec_tol);
   depthTest<2>(25, rec_tol);

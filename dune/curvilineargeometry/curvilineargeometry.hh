@@ -146,10 +146,13 @@ namespace Dune
   // Otherwise sqrt(det(J^T * J))
   // [TODO] Template operator to avoid the unnecessary if-statement inside
   // [TODO] Move functors into traits, so that they do not appear explicitly in namespace dune
-  template<class ct, int mydim, int cdim, typename Functor>
+  template<class ctype, int mydim, int cdim, typename Functor>
   struct JacobianFunctor {
-      typedef Polynomial<ct, mydim> LocalPolynomial;
-      typedef FieldVector< ct, mydim > LocalCoordinate;
+	  static const int DIM_SCALAR = 1;
+
+      typedef Polynomial<ctype, mydim> LocalPolynomial;
+      typedef FieldVector< ctype, mydim > LocalCoordinate;
+      typedef FieldVector< ctype, DIM_SCALAR> ResultType;
 
       Functor basis_function_;
       LocalPolynomial integration_element_generalised_;
@@ -159,9 +162,13 @@ namespace Dune
           integration_element_generalised_ (integration_element_g)
       {}
 
-      double operator()(const LocalCoordinate & x) const {
-    	  if (mydim == cdim)  { return basis_function_(x) * integration_element_generalised_.evaluate(x); }
-    	  else                { return basis_function_(x) * sqrt(integration_element_generalised_.evaluate(x)); }
+      ResultType	 operator()(const LocalCoordinate & x) const {
+    	  ctype rez;
+
+    	  if (mydim == cdim)  { rez = basis_function_(x) * integration_element_generalised_.evaluate(x); }
+    	  else                { rez = basis_function_(x) * sqrt(integration_element_generalised_.evaluate(x)); }
+
+    	  return ResultType(rez);
       }
   };
 
@@ -464,7 +471,7 @@ namespace Dune
         if (!type().isSimplex()) { DUNE_THROW(Dune::IOError, "__ERROR: curvilinear local() method only available for Simplex geometries at the moment :("); }
 
         if (mydimension != coorddimension) {
-            std::cout << "ERROR_LOCAL" <<std::endl;
+            std::cout << "ERROR: CURVGEOMETRY: local() requested for mydim=" << mydim << " cdim=" << cdim << std::endl;
             DUNE_THROW(Dune::IOError, "__ERROR: local() method is only defined if dimension of the element and world match :(");
         }
 
@@ -1069,7 +1076,8 @@ namespace Dune
     ctype integrateNumericalReference(Functor g, double tolerance) const
     {
     	assert(mydim > 0);
-    	return Dune::QuadratureIntegrator<ctype, mydim>::integrateRecursive( type(), g, tolerance).second;
+    	const int DIM_SCALAR = 1;
+    	return Dune::QuadratureIntegrator<ctype, mydim, DIM_SCALAR>::integrateRecursive( type(), g, tolerance).second;
 
         //NumericalRecursiveInterpolationIntegrator<ct, mydim> NInt( type() );
         //return NInt.integrate( g, tolerance);

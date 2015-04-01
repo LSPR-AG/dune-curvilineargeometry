@@ -604,7 +604,6 @@ class CurvilinearElementInterpolator {
     		return rez;
     	}
 
-
         PolynomialVector monomial_basis;
         PolynomialVector lagrange_basis;
 

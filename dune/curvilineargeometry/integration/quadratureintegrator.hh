@@ -46,7 +46,7 @@ namespace Dune {
 
 
 
-template<class ctype, int dim>
+template<class ctype, int dim, int mydim>
 class QuadratureIntegrator {
 	typedef Dune::QuadratureRule<ctype, dim>    QRule;
 	typedef Dune::QuadratureRules<ctype, dim>   QRules;
@@ -55,7 +55,8 @@ class QuadratureIntegrator {
 
 public:
 
-	typedef std::pair<int, ctype> StatInfo;  // To store pair (integrOrder, result)
+	typedef Dune::FieldVector<ctype, mydim> IntegrandType;
+	typedef std::pair<int, IntegrandType>   StatInfo;       // To store pair (integrOrder, result)
 	typedef typename std::vector<StatInfo>  StatInfoVec;
 
 	QuadratureIntegrator()  {}
@@ -63,17 +64,18 @@ public:
 
 	// Integrates functor over reference element using quadrature of a given order
 	template<class Functor>
-	static ctype integrate(Dune::GeometryType gt, Functor f, int integrOrder)
+	static IntegrandType integrate(Dune::GeometryType gt, const Functor & f, int integrOrder)
 	{
 		  const QRule & rule = QRules::rule(gt, integrOrder);
 		  if (rule.order() < integrOrder)  { DUNE_THROW(Dune::Exception,"order not available"); }
 
-		  ctype result = 0;
+		  IntegrandType result(0.0);  // Assume automatic init by zero
 		  for (typename QRule::const_iterator i=rule.begin(); i!=rule.end(); ++i)
 		  {
-		    double fval = f(i->position());
-		    double weight = i->weight();
-		    result += fval * weight;
+			IntegrandType fval = f(i->position());
+		    ctype weight = i->weight();
+		    fval *= weight;
+		    result += fval;
 		  }
 
 		  return result;
@@ -81,13 +83,13 @@ public:
 
 	// Integrates using gradually increasing quadrature order until estimated smooth relative tolerance achieved
 	template<class Functor>
-	static StatInfo integrateRecursive(Dune::GeometryType gt, Functor f, ctype rel_tol)
+	static StatInfo integrateRecursive(Dune::GeometryType gt, const Functor & f, ctype rel_tol)
 	{
 		ctype SMOOTH_FACTOR = 0.15;
 
 		ctype error = 1.0;
-		ctype rez_prev = 0.0;
-		ctype rez_this = 0.0;
+		IntegrandType rez_prev(0.0);
+		IntegrandType rez_this(0.0);
 		int order = 0;
 
 		while (error > rel_tol)
@@ -106,15 +108,24 @@ public:
 			}
 
 			// Integrate
-			ctype rez_new = integrate(gt, f, order);
-			ctype rez_smooth = SMOOTH_FACTOR * (rez_prev + rez_new) + (1 - 2 * SMOOTH_FACTOR) * rez_this;
+			IntegrandType rez_new = integrate(gt, f, order);
+
+			IntegrandType rez_smooth;
+			{
+				IntegrandType rez_smooth_part1 = rez_prev + rez_new;
+				IntegrandType rez_smooth_part2 = rez_this;
+				rez_smooth_part1 *= SMOOTH_FACTOR;
+				rez_smooth_part2 *= (1 - 2 * SMOOTH_FACTOR);
+				rez_smooth = rez_smooth_part1 + rez_smooth_part2;
+			}
 			rez_prev = rez_this;
 			rez_this = rez_new;
 
 			// Compute error - compute smoothened error to avoid cases when two consecutive samplings give same wrong answer
 			// Compute relative error unless result is close to zero, otherwise compute absolute error
-			error = fabs(rez_this - rez_smooth);
-			if (fabs(rez_this) > 1.0e-15)  { error /= fabs(rez_this); }
+			ctype abs_val = rez_this.one_norm();
+			error = (rez_this - rez_smooth).one_norm();
+			if (abs_val > 1.0e-15)  { error /= abs_val; }
 		}
 		return StatInfo(order, rez_this);
 	}
@@ -122,7 +133,7 @@ public:
 
 	// Integrates functor using all specified quadrature orders, returns vector of values
 	template<class Functor>
-	static StatInfoVec integrateStat(Dune::GeometryType gt, Functor f, int integrOrderMax)
+	static StatInfoVec integrateStat(Dune::GeometryType gt, const Functor & f, int integrOrderMax)
 	{
 		StatInfoVec rez;
 
