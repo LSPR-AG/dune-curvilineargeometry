@@ -46,7 +46,7 @@ namespace Dune {
 
 
 
-template<class ctype, int dim, int integranddim>
+template<class ctype, int dim, class IntegrandFunctor>
 class QuadratureIntegrator {
     typedef Dune::QuadratureRule<ctype, dim>    QRule;
     typedef Dune::QuadratureRules<ctype, dim>   QRules;
@@ -61,9 +61,13 @@ class QuadratureIntegrator {
 
     	typedef FieldVector< ctype, mydimension > LocalCoordinate;
 
+        static const unsigned int RETURN_SIZE = 1;
+        typedef typename std::vector<ctype>  ResultType;
+
+
         IntegrationElementFunctor(const Geometry & geom) : geom_(geom) {}
 
-        double operator()(const LocalCoordinate & x) const { return geom_.integrationElement(x); }
+        ResultType operator()(const LocalCoordinate & x) const { return ResultType(1, geom_.integrationElement(x)); }
 
         const Geometry & geom_;
     };
@@ -77,18 +81,26 @@ class QuadratureIntegrator {
 
 public:
 
-    typedef Dune::FieldVector<ctype, integranddim>  IntegrandType;
-    typedef std::pair<int, IntegrandType>           StatInfo;       // To store pair (integrOrder, result)
+    static const unsigned int nResult = IntegrandFunctor::RETURN_SIZE;
+	typedef typename IntegrandFunctor::ResultType   ResultType;
+	typedef typename ResultType::value_type         ResultValue;
+
+    typedef std::pair<int, ResultType>              StatInfo;       // To store pair (integrOrder, result)
     typedef typename std::vector<StatInfo>          StatInfoVec;
+
+
+
+
+
 
     QuadratureIntegrator()  {}
 
 
     // Computes integral of a functor over an element using the provided Geometry to calculate integration elements
-    template<class Geometry, class Functor>
-    static IntegrandType integrate(
+    template<class Geometry>
+    static ResultType integrate(
         const Geometry & geometry,
-        const Functor & f,
+        const IntegrandFunctor & f,
         int integrOrder
     )
     {
@@ -98,10 +110,10 @@ public:
 
 
     // Computes integral of a functor over an element using the provided JacobianFunctor to calculate integration elements
-    template<class Functor, class JacobiFunctor>
-    static IntegrandType integrate(
+    template<class JacobiFunctor>
+    static ResultType integrate(
         Dune::GeometryType gt,
-        const Functor & f,
+        const IntegrandFunctor & f,
         int integrOrder,
         const JacobiFunctor detJ
     )
@@ -111,10 +123,10 @@ public:
 
 
     // Computes integral of a functor over an element recursively using the provided Geometry to calculate integration elements
-    template<class Geometry, class Functor>
+    template<class Geometry>
     static StatInfo integrateRecursive(
         const Geometry & geometry,
-        const Functor & f,
+        const IntegrandFunctor & f,
         ctype rel_tol,
         unsigned int suggestedOrder = 1
     )
@@ -125,10 +137,10 @@ public:
 
 
     // Computes integral of a functor over an element recursively using the provided JacobianFunctor to calculate integration elements
-    template<class Functor, class JacobiFunctor>
+    template<class JacobiFunctor>
     static StatInfo integrateRecursive(
         Dune::GeometryType gt,
-        const Functor & f,
+        const IntegrandFunctor & f,
         ctype rel_tol,
         const JacobiFunctor & detJ,
         unsigned int suggestedOrder = 1
@@ -139,8 +151,8 @@ public:
 
 
     // Integrates functor using all specified quadrature orders, returns vector of values
-    template<class Geometry, class Functor>
-    static StatInfoVec integrateStat(const Geometry & geometry, const Functor & f, int integrOrderMax)
+    template<class Geometry>
+    static StatInfoVec integrateStat(const Geometry & geometry, const IntegrandFunctor & f, int integrOrderMax)
     {
         StatInfoVec rez;
 
@@ -160,45 +172,53 @@ protected:
 
 
     // Integrates functor over reference element using quadrature of a given order
-    template<class Functor, class JacobiFunctor>
-    static IntegrandType integrateImpl(
+    template<class JacobiFunctor>
+    static ResultType integrateImpl(
         Dune::GeometryType gt,
-        const Functor & f,
+        const IntegrandFunctor & f,
         int integrOrder,
         const JacobiFunctor & detJ
     )
     {
-          const QRule & rule = QRules::rule(gt, integrOrder);
-          if (rule.order() < integrOrder)  { DUNE_THROW(Dune::Exception,"order not available"); }
+        const QRule & rule = QRules::rule(gt, integrOrder);
+        if (rule.order() < integrOrder)  { DUNE_THROW(Dune::Exception,"order not available"); }
 
-          IntegrandType result(0.0);  // Assume automatic init by zero
-          for (typename QRule::const_iterator i=rule.begin(); i!=rule.end(); ++i)
-          {
-            IntegrandType fval = f(i->position());
+        ResultType result(nResult, 0.0);  // Assume automatic init by zero
+        for (typename QRule::const_iterator i=rule.begin(); i!=rule.end(); ++i)
+        {
+            ResultType fval = f(i->position());
+
             ctype weight = i->weight();
-            ctype detjac = detJ(i->position());
-            fval *= weight * detjac;
-            result += fval;
-          }
+            ctype detjac = detJ(i->position())[0];
 
-          return result;
+            for (int iResult = 0; iResult < nResult; iResult++)
+            {
+                fval[iResult] *= weight * detjac;
+                result[iResult] += fval[iResult];
+            }
+        }
+
+        return result;
     }
 
 
     // Integrates using gradually increasing quadrature order until estimated smooth relative tolerance achieved
-    template<class Functor, class JacobiFunctor>
+    template<class JacobiFunctor>
     static StatInfo integrateRecursiveImpl(
             Dune::GeometryType gt,
-            const Functor & f,
+            const IntegrandFunctor & f,
             ctype rel_tol,
             unsigned int suggestedOrder,
             const JacobiFunctor & jacobiFunctor)
     {
+    	std::cout << "Started recursive integral over geometry " << gt << "with relative tolerance "<< rel_tol << " suggester order " << suggestedOrder << std::endl;
+
+
         ctype SMOOTH_FACTOR = 0.15;
 
         ctype error = 1.0;
-        IntegrandType rez_prev(0.0);
-        IntegrandType rez_this(0.0);
+        ResultType rez_prev(nResult, ResultValue(0.0));
+        ResultType rez_this(nResult, ResultValue(0.0));
         unsigned int order = suggestedOrder - 1;
 
         while (error > rel_tol)
@@ -217,29 +237,56 @@ protected:
             }
 
             // Integrate
-            IntegrandType rez_new = integrate(gt, f, order, jacobiFunctor);
+            ResultType rez_new = integrate(gt, f, order, jacobiFunctor);
 
-            IntegrandType rez_smooth;
+            ResultType rez_smooth(nResult, ResultValue(0.0));
+            ResultType rez_delta(nResult, ResultValue(0.0));
+
+            for (int iResult = 0; iResult < nResult; iResult++)
             {
-                IntegrandType rez_smooth_part1 = rez_prev + rez_new;
-                IntegrandType rez_smooth_part2 = rez_this;
+                ResultValue rez_smooth_part1 = rez_prev[iResult] + rez_new[iResult];
+                ResultValue rez_smooth_part2 = rez_this[iResult];
                 rez_smooth_part1 *= SMOOTH_FACTOR;
                 rez_smooth_part2 *= (1 - 2 * SMOOTH_FACTOR);
-                rez_smooth = rez_smooth_part1 + rez_smooth_part2;
+                rez_smooth[iResult] = rez_smooth_part1 + rez_smooth_part2;
+                rez_delta[iResult] = rez_new[iResult] - rez_smooth[iResult];
             }
             rez_prev = rez_this;
             rez_this = rez_new;
 
             // Compute error - compute smoothened error to avoid cases when two consecutive samplings give same wrong answer
             // Compute relative error unless result is close to zero, otherwise compute absolute error
-            ctype abs_val = rez_this.one_norm();
-            error = (rez_this - rez_smooth).one_norm();
+            ctype abs_val = absoluteValueResult(rez_this);
+            error = absoluteValueResult(rez_delta);
             if (abs_val > 1.0e-15)  { error /= abs_val; }
         }
+
+        std::cout << "Finished recursive integral over geometry " << gt << std::endl;
+
         return StatInfo(order, rez_this);
     }
 
 
+    template<typename ResultType>
+    static ctype absoluteValueResult(ResultType & v)  {
+    	ctype rez = 0;
+    	for (int i = 0; i < v.size(); i++)  { rez += absoluteValue(v[i]); }
+    	return rez;
+    }
+
+
+    template<class ValueType>
+    static ctype absoluteValue(ValueType & v)
+    {
+    	return std::abs(v);
+    }
+
+
+    template<class ValueType, int RESULT_DIM>
+    static ctype absoluteValue(Dune::FieldVector<ValueType, RESULT_DIM> & v)
+    {
+    	return v.two_norm();
+    }
 
 
 

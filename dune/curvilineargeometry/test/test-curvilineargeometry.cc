@@ -190,31 +190,46 @@ Dune::FieldVector< ctype, mydim > localCorner(int i)
 // IMPLEMENTING FUNCTORS - EXAMPLE LOCAL-TO-GLOBAL MAPS
 // ************************************************************************************************
 
-template<class ctype, int mydim, int cdim> struct myFunctorIdentity { };
-template<class ctype, int mydim, int cdim> struct myFunctorLinear { };
-template<class ctype, int mydim, int cdim> struct myFunctorNonlinear1 { };
-template<class ctype, int mydim, int cdim> struct myFunctorNonlinear2 { };
+template<class ctype, int mydim, int cdim> struct myFieldVectorFunctor
+{
+	typedef Dune::FieldVector<ctype, mydim>  InputValue;
+	typedef Dune::FieldVector<ctype, cdim>   ResultValue;
+	typedef std::vector<ResultValue>         ResultType;
+	static const int RETURN_SIZE = 1;
+};
 
-template<> struct myFunctorIdentity<double, 1, 1> { FieldVector1D operator()(const FieldVector1D & in) { return initFieldVector(in[0]); }  };
-template<> struct myFunctorIdentity<double, 1, 2> { FieldVector2D operator()(const FieldVector1D & in) { return initFieldVector(in[0], 0); }  };
-template<> struct myFunctorIdentity<double, 1, 3> { FieldVector3D operator()(const FieldVector1D & in) { return initFieldVector(in[0], 0, 0); }  };
-template<> struct myFunctorIdentity<double, 2, 2> { FieldVector2D operator()(const FieldVector2D & in) { return initFieldVector(in[0], in[1]); }  };
-template<> struct myFunctorIdentity<double, 2, 3> { FieldVector3D operator()(const FieldVector2D & in) { return initFieldVector(in[0], in[1], 0); }  };
-template<> struct myFunctorIdentity<double, 3, 3> { FieldVector3D operator()(const FieldVector3D & in) { return initFieldVector(in[0], in[1], in[2]); }  };
+typedef myFieldVectorFunctor<double, 1, 1>  Base11;
+typedef myFieldVectorFunctor<double, 1, 2>  Base12;
+typedef myFieldVectorFunctor<double, 1, 3>  Base13;
+typedef myFieldVectorFunctor<double, 2, 2>  Base22;
+typedef myFieldVectorFunctor<double, 2, 3>  Base23;
+typedef myFieldVectorFunctor<double, 3, 3>  Base33;
 
-template<> struct myFunctorLinear<double, 1, 1> { FieldVector1D operator()(const FieldVector1D & in) { return initFieldVector(1.0 + 2.0 * in[0]); }  };
-template<> struct myFunctorLinear<double, 1, 2> { FieldVector2D operator()(const FieldVector1D & in) { return initFieldVector(2.0 * in[0], 3.0 * in[0]); }  };
-template<> struct myFunctorLinear<double, 1, 3> { FieldVector3D operator()(const FieldVector1D & in) { return initFieldVector(2.0 * in[0], 0.5 + 3.0 * in[0], 5.0 * in[0]); }  };
-template<> struct myFunctorLinear<double, 2, 2> { FieldVector2D operator()(const FieldVector2D & in) { return initFieldVector(1.0 + in[0], in[0] + in[1]); }  };
-template<> struct myFunctorLinear<double, 2, 3> { FieldVector3D operator()(const FieldVector2D & in) { return initFieldVector(in[1], 3.0 * in[0], in[0] + in[1]); }  };
-template<> struct myFunctorLinear<double, 3, 3> { FieldVector3D operator()(const FieldVector3D & in) { return initFieldVector(in[0] + in[1], in[1] + in[2], in[2] + in[0]); }  };
+template<class ctype, int mydim, int cdim> struct myFunctorIdentity    : public myFieldVectorFunctor<ctype, mydim, cdim> { };
+template<class ctype, int mydim, int cdim> struct myFunctorLinear      : public myFieldVectorFunctor<ctype, mydim, cdim> { };
+template<class ctype, int mydim, int cdim> struct myFunctorNonlinear1  : public myFieldVectorFunctor<ctype, mydim, cdim> { };
+template<class ctype, int mydim, int cdim> struct myFunctorNonlinear2  : public myFieldVectorFunctor<ctype, mydim, cdim> { };
 
-template<> struct myFunctorNonlinear1<double, 1, 1> { FieldVector1D operator()(const FieldVector1D & in) { return initFieldVector(in[0] * in[0]); }  };
-template<> struct myFunctorNonlinear1<double, 1, 2> { FieldVector2D operator()(const FieldVector1D & in) { return initFieldVector(in[0], in[0] * in[0]); }  };
-template<> struct myFunctorNonlinear1<double, 1, 3> { FieldVector3D operator()(const FieldVector1D & in) { return initFieldVector(in[0], in[0] * in[0], 2.0); }  };
-template<> struct myFunctorNonlinear1<double, 2, 2> { FieldVector2D operator()(const FieldVector2D & in) { return initFieldVector(in[0]*in[0], in[1] * in[1]); }  };
-template<> struct myFunctorNonlinear1<double, 2, 3> { FieldVector3D operator()(const FieldVector2D & in) { return initFieldVector(in[1] * in[1], in[0] * in[0], in[0] * in[1]); }  };
-template<> struct myFunctorNonlinear1<double, 3, 3> { FieldVector3D operator()(const FieldVector3D & in) { return initFieldVector(in[0] * in[0], in[1] * in[1], in[2] * in[2]); }  };
+template<> struct myFunctorIdentity<double, 1, 1> : public Base11  { Base11::ResultType operator()(const Base11::InputValue & in) { return Base11::ResultType(1, initFieldVector(in[0])); }  };
+template<> struct myFunctorIdentity<double, 1, 2> : public Base12  { Base12::ResultType operator()(const Base12::InputValue & in) { return Base12::ResultType(1, initFieldVector(in[0], 0)); }  };
+template<> struct myFunctorIdentity<double, 1, 3> : public Base13  { Base13::ResultType operator()(const Base13::InputValue & in) { return Base13::ResultType(1, initFieldVector(in[0], 0, 0)); }  };
+template<> struct myFunctorIdentity<double, 2, 2> : public Base22  { Base22::ResultType operator()(const Base22::InputValue & in) { return Base22::ResultType(1, initFieldVector(in[0], in[1])); }  };
+template<> struct myFunctorIdentity<double, 2, 3> : public Base23  { Base23::ResultType operator()(const Base23::InputValue & in) { return Base23::ResultType(1, initFieldVector(in[0], in[1], 0)); }  };
+template<> struct myFunctorIdentity<double, 3, 3> : public Base33  { Base33::ResultType operator()(const Base33::InputValue & in) { return Base33::ResultType(1, initFieldVector(in[0], in[1], in[2])); }  };
+
+template<> struct myFunctorLinear<double, 1, 1> : public Base11  { Base11::ResultType operator()(const Base11::InputValue & in) { return Base11::ResultType(1, initFieldVector(1.0 + 2.0 * in[0])); }  };
+template<> struct myFunctorLinear<double, 1, 2> : public Base12  { Base12::ResultType operator()(const Base12::InputValue & in) { return Base12::ResultType(1, initFieldVector(2.0 * in[0], 3.0 * in[0])); }  };
+template<> struct myFunctorLinear<double, 1, 3> : public Base13  { Base13::ResultType operator()(const Base13::InputValue & in) { return Base13::ResultType(1, initFieldVector(2.0 * in[0], 0.5 + 3.0 * in[0], 5.0 * in[0])); }  };
+template<> struct myFunctorLinear<double, 2, 2> : public Base22  { Base22::ResultType operator()(const Base22::InputValue & in) { return Base22::ResultType(1, initFieldVector(1.0 + in[0], in[0] + in[1])); }  };
+template<> struct myFunctorLinear<double, 2, 3> : public Base23  { Base23::ResultType operator()(const Base23::InputValue & in) { return Base23::ResultType(1, initFieldVector(in[1], 3.0 * in[0], in[0] + in[1])); }  };
+template<> struct myFunctorLinear<double, 3, 3> : public Base33  { Base33::ResultType operator()(const Base33::InputValue & in) { return Base33::ResultType(1, initFieldVector(in[0] + in[1], in[1] + in[2], in[2] + in[0])); }  };
+
+template<> struct myFunctorNonlinear1<double, 1, 1> : public Base11  { Base11::ResultType operator()(const Base11::InputValue & in) { return Base11::ResultType(1, initFieldVector(in[0] * in[0])); }  };
+template<> struct myFunctorNonlinear1<double, 1, 2> : public Base12  { Base12::ResultType operator()(const Base12::InputValue & in) { return Base12::ResultType(1, initFieldVector(in[0], in[0] * in[0])); }  };
+template<> struct myFunctorNonlinear1<double, 1, 3> : public Base13  { Base13::ResultType operator()(const Base13::InputValue & in) { return Base13::ResultType(1, initFieldVector(in[0], in[0] * in[0], 2.0)); }  };
+template<> struct myFunctorNonlinear1<double, 2, 2> : public Base22  { Base22::ResultType operator()(const Base22::InputValue & in) { return Base22::ResultType(1, initFieldVector(in[0]*in[0], in[1] * in[1])); }  };
+template<> struct myFunctorNonlinear1<double, 2, 3> : public Base23  { Base23::ResultType operator()(const Base23::InputValue & in) { return Base23::ResultType(1, initFieldVector(in[1] * in[1], in[0] * in[0], in[0] * in[1])); }  };
+template<> struct myFunctorNonlinear1<double, 3, 3> : public Base33  { Base33::ResultType operator()(const Base33::InputValue & in) { return Base33::ResultType(1, initFieldVector(in[0] * in[0], in[1] * in[1], in[2] * in[2])); }  };
 
 
 
@@ -423,7 +438,7 @@ bool SimplexTest(Functor f, int ord, int f_type, int f_order, std::string f_name
 
     LocalVectorVector local_vertices = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, mydim>(ord);
     GlobalVectorVector global_vertices;
-    for (int i = 0; i < local_vertices.size(); i++) {global_vertices.push_back(f(local_vertices[i])); }
+    for (int i = 0; i < local_vertices.size(); i++) {global_vertices.push_back(f(local_vertices[i])[0]); }
 
     // ************************************************************
     // Produce a Curvilinear Geometry
@@ -460,7 +475,7 @@ bool SimplexTest(Functor f, int ord, int f_type, int f_order, std::string f_name
     // ---------------------------------------------------------------------------------------------------------------------------
     for (int i = 0; i < mydim+1; i++) {
         double tmpTolerance = 1.0e-15;
-        GlobalVector tmpCorner = f(localCorner<double, mydim>(i));
+        GlobalVector tmpCorner = f(localCorner<double, mydim>(i))[0];
 
         test1_pass &= (SimplexGeom.corner(i) - tmpCorner).two_norm() < tmpTolerance;
         test1_cached_pass &= (SimplexGeomCached.corner(i) - tmpCorner).two_norm() < tmpTolerance;
@@ -483,8 +498,8 @@ bool SimplexTest(Functor f, int ord, int f_type, int f_order, std::string f_name
 
         for (int i = 0; i < randomLocalSample.size(); i++)
         {
-            double errTmp = (SimplexGeom.global(randomLocalSample[i]) - f(randomLocalSample[i])).two_norm();
-            double errTmpCached = (SimplexGeomCached.global(randomLocalSample[i]) - f(randomLocalSample[i])).two_norm();
+            double errTmp = (SimplexGeom.global(randomLocalSample[i]) - f(randomLocalSample[i])[0]).two_norm();
+            double errTmpCached = (SimplexGeomCached.global(randomLocalSample[i]) - f(randomLocalSample[i])[0]).two_norm();
 
             test2_pass &= errTmp < tmpTolerance;
             test2_cached_pass &= errTmpCached < tmpTolerance;
@@ -701,8 +716,8 @@ bool SimplexTestWrapper()
 
     for (int ord = 1; ord <= 5; ord++)
     {
-        SimplexTest<ctype, mydim, cdim>(myFunctorIdentity<double, mydim, cdim>(), ord, 1, 1, "identity map");
-        SimplexTest<ctype, mydim, cdim>(myFunctorLinear<double, mydim, cdim>(), ord, 2, 1, "linear map");
+        SimplexTest<ctype, mydim, cdim>(myFunctorIdentity  <double, mydim, cdim>(), ord, 1, 1, "identity map");
+        SimplexTest<ctype, mydim, cdim>(myFunctorLinear    <double, mydim, cdim>(), ord, 2, 1, "linear map");
         SimplexTest<ctype, mydim, cdim>(myFunctorNonlinear1<double, mydim, cdim>(), ord, 3, 2, "quadratic map");
     }
     return true;
