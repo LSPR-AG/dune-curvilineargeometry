@@ -93,6 +93,13 @@ struct PolynomialFunctor
 };
 
 
+struct unityJacobianFunctor
+{
+	template <typename Coordinate>
+	double operator()(const Coordinate & in) const  { return 1.0; }
+};
+
+
 template <class StatInfo>
 void recursiveWrite(StatInfo statInfo)
 {
@@ -125,7 +132,7 @@ void depthTest(int maxdim, double rec_tol)
 		Dune::Polynomial<double, dim> thisPoly = NewtonPolynomial<double, dim>(i);
 
 		double rez_poly = thisPoly.integrateRefSimplex();
-		StatInfo rez_quad = funIntegrator.integrateRecursive(entityGeometry, PolynomialFunctor<double, dim>(thisPoly), rec_tol);
+		StatInfo rez_quad = funIntegrator.integrateRecursive(entityGeometry, PolynomialFunctor<double, dim>(thisPoly), rec_tol, unityJacobianFunctor());
 
 		double err = fabs(rez_poly - rez_quad.second[0]);
 		if (fabs(rez_poly) > 1.0e-15)  { err /= rez_poly; }
@@ -154,19 +161,19 @@ int main ()
 
   double rec_tol = 1.0e-5;
 
-  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d1(), rec_tol));
-  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d2(), rec_tol));
-  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d3(), rec_tol));
-  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d4(), rec_tol));
+  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d1(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d2(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d3(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(funIntegrator1DScalar.integrateRecursive(edgeGeometry, function1d4(), rec_tol, unityJacobianFunctor()));
 
-  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d1(), rec_tol));
-  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d2(), rec_tol));
-  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d3(), rec_tol));
-  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d4(), rec_tol));
-  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d5(), rec_tol));
-  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d6(), rec_tol));
-  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d7(), rec_tol));
-  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d8(), rec_tol));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d1(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d2(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d3(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d4(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d5(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d6(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d7(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(funIntegrator2DScalar.integrateRecursive(faceGeometry, function2d8(), rec_tol, unityJacobianFunctor()));
 
   depthTest<1>(25, rec_tol);
   depthTest<2>(25, rec_tol);

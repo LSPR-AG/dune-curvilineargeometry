@@ -141,7 +141,7 @@ namespace Dune
   };
 
 
-  // Wraps evaluation of another functor times the integration element.
+  // Evaluates the generalized Jacobian determinant using pre-computed polynomial integration elements
   // If the integral is over codim-0 element, the integration element is just the jacobian determinant
   // Otherwise sqrt(det(J^T * J))
   // [TODO] Template operator to avoid the unnecessary if-statement inside
@@ -154,23 +154,23 @@ namespace Dune
       typedef FieldVector< ctype, mydim > LocalCoordinate;
       typedef FieldVector< ctype, DIM_SCALAR> ResultType;
 
-      Functor basis_function_;
       LocalPolynomial integration_element_generalised_;
 
-      JacobianFunctor(const Functor & basis_function, const LocalPolynomial & integration_element_g) :
-          basis_function_ (basis_function),
+      JacobianFunctor(const LocalPolynomial & integration_element_g) :
           integration_element_generalised_ (integration_element_g)
       {}
 
       ResultType	 operator()(const LocalCoordinate & x) const {
     	  ctype rez;
 
-    	  if (mydim == cdim)  { rez = basis_function_(x) * integration_element_generalised_.evaluate(x); }
-    	  else                { rez = basis_function_(x) * sqrt(integration_element_generalised_.evaluate(x)); }
+    	  if (mydim == cdim)  { rez = integration_element_generalised_.evaluate(x); }
+    	  else                { rez = sqrt(integration_element_generalised_.evaluate(x)); }
 
     	  return ResultType(rez);
       }
   };
+
+
 
   // Functor that evaluates a polynomial that it carries inside
   template<class ct, int mydim>
@@ -560,14 +560,14 @@ namespace Dune
     	if (mydimension == coorddimension)
     	{
     		LocalPolynomial jDet = JacobianDeterminantAnalytical();
-            JacobianFunctor<ct, mydim, cdim, Functor> g(f, jDet);
-            return integrateNumericalReference(g, tolerance);
+            JacobianFunctor<ct, mydim, cdim, Functor> g(jDet);
+            return integrateNumericalRecursive(f, g, tolerance);
     	}
     	else
     	{
             LocalPolynomial integrationElementSquared = IntegrationElementSquaredAnalytical();
-            JacobianFunctor<ct, mydim, cdim, Functor> g(f, integrationElementSquared);
-            return integrateNumericalReference(g, tolerance);
+            JacobianFunctor<ct, mydim, cdim, Functor> g(integrationElementSquared);
+            return integrateNumericalRecursive(f, g, tolerance);
     	}
     }
 
@@ -1072,12 +1072,16 @@ namespace Dune
         return rez;
     }
 
-    template <typename Functor>
-    ctype integrateNumericalReference(Functor g, double tolerance) const
+    template <typename Functor, typename JacobiFunctor>
+    ctype integrateNumericalRecursive(const Functor & f, const JacobiFunctor & jacobiDet, double tolerance) const
     {
     	assert(mydim > 0);
     	const int DIM_SCALAR = 1;
-    	return Dune::QuadratureIntegrator<ctype, mydim, DIM_SCALAR>::integrateRecursive( type(), g, tolerance).second;
+    	const int suggestedOrder = 1;
+
+    	typedef Dune::QuadratureIntegrator<ctype, mydim, DIM_SCALAR>  QuadratureIntegrator;
+
+    	return QuadratureIntegrator::integrateRecursive(type(), f, tolerance, jacobiDet, suggestedOrder).second;
 
         //NumericalRecursiveInterpolationIntegrator<ct, mydim> NInt( type() );
         //return NInt.integrate( g, tolerance);
@@ -1308,13 +1312,13 @@ namespace Dune
     {
     	if (mydimension == coorddimension)
     	{
-            JacobianFunctor<ct, mydim, cdim, Functor> g(f, JacobianDet_);
-            return Base::integrateNumericalReference(g, tolerance);
+            JacobianFunctor<ct, mydim, cdim, Functor> g(JacobianDet_);
+            return Base::integrateNumericalRecursive(f, g, tolerance);
     	}
     	else
     	{
-            JacobianFunctor<ct, mydim, cdim, Functor> g(f, IntElem2_);
-            return Base::integrateNumericalReference(g, tolerance);
+            JacobianFunctor<ct, mydim, cdim, Functor> g(IntElem2_);
+            return Base::integrateNumericalRecursive(f, g, tolerance);
     	}
     }
 
