@@ -46,10 +46,10 @@ namespace Dune {
 
 
 
-template<class ctype, int dim, class IntegrandFunctor>
+template<class ctype, int mydim, class IntegrandFunctor>
 class QuadratureIntegrator {
-    typedef Dune::QuadratureRule<ctype, dim>    QRule;
-    typedef Dune::QuadratureRules<ctype, dim>   QRules;
+    typedef Dune::QuadratureRule<ctype, mydim>    QRule;
+    typedef Dune::QuadratureRules<ctype, mydim>   QRules;
 
     static const int MAX_INT_ORDER = 60;
 
@@ -183,7 +183,7 @@ protected:
         const QRule & rule = QRules::rule(gt, integrOrder);
         if (rule.order() < integrOrder)  { DUNE_THROW(Dune::Exception,"order not available"); }
 
-        ResultType result(nResult, 0.0);  // Assume automatic init by zero
+        ResultType result(nResult, ResultValue(0.0));  // Assume automatic init by zero
         for (typename QRule::const_iterator i=rule.begin(); i!=rule.end(); ++i)
         {
             ResultType fval = f(i->position());
@@ -255,10 +255,9 @@ protected:
             rez_this = rez_new;
 
             // Compute error - compute smoothened error to avoid cases when two consecutive samplings give same wrong answer
-            // Compute relative error unless result is close to zero, otherwise compute absolute error
-            ctype abs_val = absoluteValueResult(rez_this);
-            error = absoluteValueResult(rez_delta);
-            if (abs_val > 1.0e-15)  { error /= abs_val; }
+            // If a vector of several quantities is integrated simultaneously, compare the relative error of the largest component
+            //  with the requested relative tolerance
+            error = absoluteValueResult(rez_delta, rez_this);
         }
 
         std::cout << "Finished recursive integral over geometry " << gt << std::endl;
@@ -268,9 +267,18 @@ protected:
 
 
     template<typename ResultType>
-    static ctype absoluteValueResult(ResultType & v)  {
+    static ctype maxAbsoluteValueResult(ResultType & v, ResultType vmag)  {
     	ctype rez = 0;
-    	for (int i = 0; i < v.size(); i++)  { rez += absoluteValue(v[i]); }
+    	for (int i = 0; i < v.size(); i++)  {
+    		ctype abs_val = absoluteValue(vmag[i]);
+    		ctype abs_err = absoluteValue(v[i]);
+
+    		// Only calculate relative error if the absolute value of the error is large enough
+    		// Otherwise just return absolute error
+    		ctype rel_err = (abs_val > 1.0e-15) ? abs_err / abs_val : abs_err;
+
+    		rez = std::max(rez, rel_err);
+    	}
     	return rez;
     }
 
@@ -286,6 +294,13 @@ protected:
     static ctype absoluteValue(Dune::FieldVector<ValueType, RESULT_DIM> & v)
     {
     	return v.two_norm();
+    }
+
+
+    template<class ValueType>
+    static ctype absoluteValue(Dune::DynamicMatrix<ValueType> & v)
+    {
+    	return v.frobenius_norm();
     }
 
 

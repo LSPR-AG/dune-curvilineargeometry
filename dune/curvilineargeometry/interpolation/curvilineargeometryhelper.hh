@@ -51,7 +51,8 @@ class CurvilinearGeometryHelper {
     typedef  int     InternalIndexType;
     typedef  int     InterpolatoryOrderType;
 
-    typedef std::vector<std::vector<int>> IntegerCoordinateVector;
+    typedef std::vector<int>                IntegerCoordinate;
+    typedef std::vector<std::vector<int>>   IntegerCoordinateVector;
 
 
 
