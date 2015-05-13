@@ -190,14 +190,20 @@ Dune::FieldVector< ctype, mydim > localCorner(int i)
 // IMPLEMENTING FUNCTORS - EXAMPLE LOCAL-TO-GLOBAL MAPS
 // ************************************************************************************************
 
+
+// Generic Functor
 template<class ctype, int mydim, int cdim> struct myFieldVectorFunctor
 {
 	typedef Dune::FieldVector<ctype, mydim>  InputValue;
 	typedef Dune::FieldVector<ctype, cdim>   ResultValue;
 	typedef std::vector<ResultValue>         ResultType;
 	static const int RETURN_SIZE = 1;
+
+	ResultValue zeroValue(unsigned int rezIndex) const { return ResultValue(0.0); }
 };
 
+
+// Generic Functors of different dimensions
 typedef myFieldVectorFunctor<double, 1, 1>  Base11;
 typedef myFieldVectorFunctor<double, 1, 2>  Base12;
 typedef myFieldVectorFunctor<double, 1, 3>  Base13;
@@ -210,6 +216,7 @@ template<class ctype, int mydim, int cdim> struct myFunctorLinear      : public 
 template<class ctype, int mydim, int cdim> struct myFunctorNonlinear1  : public myFieldVectorFunctor<ctype, mydim, cdim> { };
 template<class ctype, int mydim, int cdim> struct myFunctorNonlinear2  : public myFieldVectorFunctor<ctype, mydim, cdim> { };
 
+// Actual functors that evaluate some Local-To-Global transform
 template<> struct myFunctorIdentity<double, 1, 1> : public Base11  { Base11::ResultType operator()(const Base11::InputValue & in) { return Base11::ResultType(1, initFieldVector(in[0])); }  };
 template<> struct myFunctorIdentity<double, 1, 2> : public Base12  { Base12::ResultType operator()(const Base12::InputValue & in) { return Base12::ResultType(1, initFieldVector(in[0], 0)); }  };
 template<> struct myFunctorIdentity<double, 1, 3> : public Base13  { Base13::ResultType operator()(const Base13::InputValue & in) { return Base13::ResultType(1, initFieldVector(in[0], 0, 0)); }  };

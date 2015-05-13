@@ -146,13 +146,14 @@ namespace Dune
   // Otherwise sqrt(det(J^T * J))
   // [TODO] Template operator to avoid the unnecessary if-statement inside
   // [TODO] Move functors into traits, so that they do not appear explicitly in namespace dune
-  template<class ctype, int mydim, int cdim, typename Functor>
+  template<class ctype, int mydim, int cdim>
   struct JacobianFunctor
   {
       typedef Polynomial<ctype, mydim> LocalPolynomial;
       typedef FieldVector< ctype, mydim > LocalCoordinate;
 
       static const unsigned int RETURN_SIZE = 1;
+      typedef ctype                        ResultValue;
       typedef typename std::vector<ctype>  ResultType;
 
       LocalPolynomial integration_element_generalised_;
@@ -169,6 +170,14 @@ namespace Dune
 
           return ResultType(1, rez);
       }
+
+      bool isPolynomial()  { return (mydim == cdim)||(integration_element_generalised_.order() == 0); }
+
+      unsigned int expectedOrder()  {
+    	  return (mydim == cdim) ? integration_element_generalised_.order() : sqrt(integration_element_generalised_.order());
+      }
+
+      ResultValue zeroValue(unsigned int rezIndex) const { return 0.0; }
   };
 
 
@@ -181,12 +190,19 @@ namespace Dune
       typedef FieldVector< ctype, mydim > LocalCoordinate;
 
       static const unsigned int RETURN_SIZE = 1;
+      typedef ctype                        ResultValue;
       typedef typename std::vector<ctype>  ResultType;
 
 
       PolynomialFunctor(const LocalPolynomial & p) : p_(p) {}
 
       ResultType operator()(const LocalCoordinate & x) const { return ResultType(1, p_.evaluate(x)); }
+
+      bool isPolynomial()  { return true; }
+
+      unsigned int expectedOrder()  { return p_.order(); }
+
+      ResultValue zeroValue(unsigned int rezIndex) const { return 0.0; }
 
       LocalPolynomial p_;
   };
@@ -566,13 +582,13 @@ namespace Dune
         if (mydimension == coorddimension)
         {
             LocalPolynomial jDet = JacobianDeterminantAnalytical();
-            JacobianFunctor<ct, mydim, cdim, Functor> g(jDet);
+            JacobianFunctor<ct, mydim, cdim> g(jDet);
             return integrateNumericalRecursive(f, g, tolerance)[0];
         }
         else
         {
             LocalPolynomial integrationElementSquared = IntegrationElementSquaredAnalytical();
-            JacobianFunctor<ct, mydim, cdim, Functor> g(integrationElementSquared);
+            JacobianFunctor<ct, mydim, cdim> g(integrationElementSquared);
             return integrateNumericalRecursive(f, g, tolerance)[0];
         }
     }
@@ -1321,12 +1337,12 @@ namespace Dune
     {
         if (mydimension == coorddimension)
         {
-            JacobianFunctor<ct, mydim, cdim, Functor> g(JacobianDet_);
+            JacobianFunctor<ct, mydim, cdim> g(JacobianDet_);
             return Base::integrateNumericalRecursive(f, g, tolerance)[0];
         }
         else
         {
-            JacobianFunctor<ct, mydim, cdim, Functor> g(IntElem2_);
+            JacobianFunctor<ct, mydim, cdim> g(IntElem2_);
             return Base::integrateNumericalRecursive(f, g, tolerance)[0];
         }
     }

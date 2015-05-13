@@ -248,7 +248,7 @@ class CurvilinearGeometryHelper {
         typedef Dune::FieldVector<ct, mydim>  LocalVector;
     	std::vector<LocalVector > rez;
 
-        for (int i = 0; i < integerGrid.size(); i++)
+        for (unsigned int i = 0; i < integerGrid.size(); i++)
         {
                 LocalVector tmpLocalCoordinate;
                 for (int j = 0; j < mydim; j++) { tmpLocalCoordinate[j] = double(integerGrid[i][j]) / n; }
@@ -366,7 +366,7 @@ class CurvilinearGeometryHelper {
         // Build a 3D matrix consisting of coordinate numbers in the point_ vector in the shape of reference simplex
         int coord_map [order + 1][order + 1][order + 1];
         IntegerCoordinateVector simplexGrid = simplexGridEnumerate<3>(order);
-        for (int i = 0; i < simplexGrid.size(); i++) { coord_map[simplexGrid[i][0]][simplexGrid[i][1]][simplexGrid[i][2]] = i; }
+        for (unsigned int i = 0; i < simplexGrid.size(); i++) { coord_map[simplexGrid[i][0]][simplexGrid[i][1]][simplexGrid[i][2]] = i; }
 
         // Find the direction vectors
         IntFieldVector v1 = cornerInternalCoord[1] - cornerInternalCoord[0];
@@ -410,7 +410,7 @@ class CurvilinearGeometryHelper {
         // Build a 3D matrix consisting of coordinate numbers in the point_ vector in the shape of reference simplex
         int coord_map [order + 1][order + 1][order + 1];
         IntegerCoordinateVector simplexGrid = simplexGridEnumerate<3>(order);
-        for (int i = 0; i < simplexGrid.size(); i++) { coord_map[simplexGrid[i][0]][simplexGrid[i][1]][simplexGrid[i][2]] = i; }
+        for (unsigned int i = 0; i < simplexGrid.size(); i++) { coord_map[simplexGrid[i][0]][simplexGrid[i][1]][simplexGrid[i][2]] = i; }
 
         // Find the direction vectors
         IntFieldVector v = cornerInternalCoord[1] - cornerInternalCoord[0];
@@ -448,7 +448,7 @@ class CurvilinearGeometryHelper {
         // Build a 2D matrix consisting of coordinate numbers in the point_ vector in the shape of reference simplex
         int coord_map [order + 1][order + 1];
         IntegerCoordinateVector simplexGrid = simplexGridEnumerate<2>(order);
-        for (int i = 0; i < simplexGrid.size(); i++) { coord_map[simplexGrid[i][0]][simplexGrid[i][1]] = i; }
+        for (unsigned int i = 0; i < simplexGrid.size(); i++) { coord_map[simplexGrid[i][0]][simplexGrid[i][1]] = i; }
 
         // Find the direction vector
         IntFieldVector v = cornerInternalCoord[1] - cornerInternalCoord[0];

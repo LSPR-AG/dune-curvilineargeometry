@@ -43,8 +43,11 @@ typedef Dune::PolynomialTraits<double>::Monomial  Monomial;
 
 struct functionDouble
 {
-	typedef std::vector<double>  ResultType;
+	typedef double                ResultValue;
+	typedef std::vector<double>   ResultType;
 	static const int RETURN_SIZE = 1;
+
+	ResultValue zeroValue(unsigned int rezIndex) const { return 0.0; }
 };
 
 struct function1d1 : public functionDouble {  functionDouble::ResultType operator()(const GlobalVector1D & in) const  { return functionDouble::ResultType(1, 1.0); }  };
@@ -93,6 +96,7 @@ struct PolynomialFunctor
     typedef FieldVector< ctype, mydim > LocalCoordinate;
 
     static const unsigned int RETURN_SIZE = 1;
+    typedef ctype                        ResultValue;
     typedef typename std::vector<ctype>  ResultType;
 
     LocalPolynomial p_;
@@ -100,15 +104,20 @@ struct PolynomialFunctor
     PolynomialFunctor(const LocalPolynomial & p) : p_(p) {}
 
     ResultType operator()(const LocalCoordinate & x) const { return ResultType(1, p_.evaluate(x)); }
+
+    ResultValue zeroValue(unsigned int rezIndex) const { return 0.0; }
 };
 
 
 struct unityJacobianFunctor
 {
+	typedef double               ResultValue;
 	typedef std::vector<double>  ResultType;
 
 	template <typename Coordinate>
 	ResultType operator()(const Coordinate & in) const  { return ResultType(1, 1.0); }
+
+	ResultValue zeroValue(unsigned int rezIndex) const { return 0.0; }
 };
 
 

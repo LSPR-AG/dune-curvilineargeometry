@@ -35,9 +35,14 @@
 #include <dune/common/exceptions.hh>
 #include <dune/common/function.hh>
 #include <dune/common/fvector.hh>
+#include <dune/common/dynvector.hh>
+#include <dune/common/dynmatrix.hh>
+
 #include <dune/geometry/referenceelements.hh>
 #include <dune/geometry/type.hh>
 #include <dune/geometry/quadraturerules.hh>
+
+
 
 
 
@@ -62,12 +67,16 @@ class QuadratureIntegrator {
     	typedef FieldVector< ctype, mydimension > LocalCoordinate;
 
         static const unsigned int RETURN_SIZE = 1;
+        typedef ctype                        ResultValue;
         typedef typename std::vector<ctype>  ResultType;
 
 
         IntegrationElementFunctor(const Geometry & geom) : geom_(geom) {}
 
         ResultType operator()(const LocalCoordinate & x) const { return ResultType(1, geom_.integrationElement(x)); }
+
+        ResultValue zeroValue(unsigned int rezIndex) const { return 0.0; }
+
 
         const Geometry & geom_;
     };
@@ -85,7 +94,7 @@ public:
 	typedef typename IntegrandFunctor::ResultType   ResultType;
 	typedef typename ResultType::value_type         ResultValue;
 
-    typedef std::pair<int, ResultType>              StatInfo;       // To store pair (integrOrder, result)
+    typedef std::pair<unsigned int, ResultType>     StatInfo;       // To store pair (integrOrder, result)
     typedef typename std::vector<StatInfo>          StatInfoVec;
 
 
@@ -101,7 +110,7 @@ public:
     static ResultType integrate(
         const Geometry & geometry,
         const IntegrandFunctor & f,
-        int integrOrder
+        unsigned int integrOrder
     )
     {
         IntegrationElementFunctor<Geometry> detJ(geometry);
@@ -114,7 +123,7 @@ public:
     static ResultType integrate(
         Dune::GeometryType gt,
         const IntegrandFunctor & f,
-        int integrOrder,
+        unsigned int integrOrder,
         const JacobiFunctor detJ
     )
     {
@@ -152,11 +161,11 @@ public:
 
     // Integrates functor using all specified quadrature orders, returns vector of values
     template<class Geometry>
-    static StatInfoVec integrateStat(const Geometry & geometry, const IntegrandFunctor & f, int integrOrderMax)
+    static StatInfoVec integrateStat(const Geometry & geometry, const IntegrandFunctor & f, unsigned int integrOrderMax)
     {
         StatInfoVec rez;
 
-        for (int i = 1; i <= integrOrderMax; i++)
+        for (unsigned int i = 1; i <= integrOrderMax; i++)
         {
             rez.push_back(StatInfo(
                 QRules::rule(geometry.type(), i).size(),
@@ -176,14 +185,18 @@ protected:
     static ResultType integrateImpl(
         Dune::GeometryType gt,
         const IntegrandFunctor & f,
-        int integrOrder,
+        unsigned int integrOrder,
         const JacobiFunctor & detJ
     )
     {
         const QRule & rule = QRules::rule(gt, integrOrder);
         if (rule.order() < integrOrder)  { DUNE_THROW(Dune::Exception,"order not available"); }
 
-        ResultType result(nResult, ResultValue(0.0));  // Assume automatic init by zero
+        // Initialise a zero result vector
+        // In dynamic case, different parts of the result could be of different size
+        ResultType result;
+        for (unsigned int i = 0; i < nResult; i++)  { result.push_back( f.zeroValue(i) ); }
+
         for (typename QRule::const_iterator i=rule.begin(); i!=rule.end(); ++i)
         {
             ResultType fval = f(i->position());
@@ -191,7 +204,7 @@ protected:
             ctype weight = i->weight();
             ctype detjac = detJ(i->position())[0];
 
-            for (int iResult = 0; iResult < nResult; iResult++)
+            for (unsigned int iResult = 0; iResult < nResult; iResult++)
             {
                 fval[iResult] *= weight * detjac;
                 result[iResult] += fval[iResult];
@@ -214,12 +227,18 @@ protected:
     	std::cout << "Started recursive integral over geometry " << gt << "with relative tolerance "<< rel_tol << " suggester order " << suggestedOrder << std::endl;
 
 
+        // Initialise a zero result vector
+        // In dynamic case, different parts of the result could be of different size
+        ResultType zeroresult;
+        for (unsigned int i = 0; i < nResult; i++)  { zeroresult.push_back( f.zeroValue(i) ); }
+
+
         ctype SMOOTH_FACTOR = 0.15;
 
         ctype error = 1.0;
-        ResultType rez_prev(nResult, ResultValue(0.0));
-        ResultType rez_this(nResult, ResultValue(0.0));
-        unsigned int order = suggestedOrder - 1;
+        ResultType rez_prev(zeroresult);
+        ResultType rez_this(zeroresult);
+        unsigned int order = (suggestedOrder > 0) ? suggestedOrder - 1 : 0;
 
         while (error > rel_tol)
         {
@@ -239,17 +258,20 @@ protected:
             // Integrate
             ResultType rez_new = integrate(gt, f, order, jacobiFunctor);
 
-            ResultType rez_smooth(nResult, ResultValue(0.0));
-            ResultType rez_delta(nResult, ResultValue(0.0));
+            ResultType rez_smooth(zeroresult);
+            ResultType rez_delta(zeroresult);
 
-            for (int iResult = 0; iResult < nResult; iResult++)
+            for (unsigned int iResult = 0; iResult < nResult; iResult++)
             {
-                ResultValue rez_smooth_part1 = rez_prev[iResult] + rez_new[iResult];
+                ResultValue rez_smooth_part1 = rez_prev[iResult];
+                            rez_smooth_part1 += rez_new[iResult];
                 ResultValue rez_smooth_part2 = rez_this[iResult];
                 rez_smooth_part1 *= SMOOTH_FACTOR;
                 rez_smooth_part2 *= (1 - 2 * SMOOTH_FACTOR);
-                rez_smooth[iResult] = rez_smooth_part1 + rez_smooth_part2;
-                rez_delta[iResult] = rez_new[iResult] - rez_smooth[iResult];
+                rez_smooth[iResult] =  rez_smooth_part1;
+                rez_smooth[iResult] += rez_smooth_part2;
+                rez_delta[iResult] =  rez_new[iResult];
+                rez_delta[iResult] -= rez_smooth[iResult];
             }
             rez_prev = rez_this;
             rez_this = rez_new;
@@ -257,7 +279,7 @@ protected:
             // Compute error - compute smoothened error to avoid cases when two consecutive samplings give same wrong answer
             // If a vector of several quantities is integrated simultaneously, compare the relative error of the largest component
             //  with the requested relative tolerance
-            error = absoluteValueResult(rez_delta, rez_this);
+            error = maxAbsoluteValueResult(rez_delta, rez_this);
         }
 
         std::cout << "Finished recursive integral over geometry " << gt << std::endl;
@@ -292,6 +314,13 @@ protected:
 
     template<class ValueType, int RESULT_DIM>
     static ctype absoluteValue(Dune::FieldVector<ValueType, RESULT_DIM> & v)
+    {
+    	return v.two_norm();
+    }
+
+
+    template<class ValueType>
+    static ctype absoluteValue(Dune::DynamicVector<ValueType> & v)
     {
     	return v.two_norm();
     }
