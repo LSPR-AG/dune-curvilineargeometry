@@ -200,7 +200,6 @@ protected:
         for (typename QRule::const_iterator i=rule.begin(); i!=rule.end(); ++i)
         {
             ResultType fval = f(i->position());
-
             ctype weight = i->weight();
             ctype detjac = detJ(i->position())[0];
 
