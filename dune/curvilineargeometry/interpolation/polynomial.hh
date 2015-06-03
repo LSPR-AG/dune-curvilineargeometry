@@ -48,7 +48,7 @@ struct PolynomialTraits
       std::vector<int> power_;
 
 
-	  Monomial(double prefNew, std::vector<int> powerNew)
+	  Monomial(ctype prefNew, std::vector<int> powerNew)
 	  {
 	    pref_ = prefNew;
 	    power_ = powerNew;
@@ -398,18 +398,18 @@ public:
   ctype integrateRefSimplex() const {
 	assert((dim > 0) && (dim <= 3));
 
-	ctype rez = 0;
+	ctype rez = 0.0;
 
     // Generate factorial list up to the needed order
     uint polyorder = order();
-    std::vector<ctype> factorial(2, 1.0);
+    std::vector<double> factorial(2, 1.0);  // NOTE: !!! factorial should be a Real variable, do not use ctype here
     for (uint i = 2; i <= polyorder + dim; i++) { factorial.push_back( i * factorial[i - 1] ); }
 
     // Compute the analytical integral
     for (uint i = 0; i < poly_.size(); i++) {
       switch (dim)
       {
-          case 1 : rez += poly_[i].pref_ / (poly_[i].power_[0] + 1);  break;
+          case 1 : rez += poly_[i].pref_ / double(poly_[i].power_[0] + 1);  break;
           case 2 : rez += poly_[i].pref_ * factorial[poly_[i].power_[0]] * factorial[poly_[i].power_[1]] / factorial[poly_[i].power_[0] + poly_[i].power_[1] + 2];  break;
           case 3 : rez += poly_[i].pref_ * factorial[poly_[i].power_[0]] * factorial[poly_[i].power_[1]] * factorial[poly_[i].power_[2]] / factorial[poly_[i].power_[0] + poly_[i].power_[1] + poly_[i].power_[2] + 3];  break;
       }

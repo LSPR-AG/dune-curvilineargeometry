@@ -178,6 +178,8 @@ class CurvilinearGeometryHelper {
 
     /** \brief Generates a vector of integer vectors which label the positions of a regular grid over a simplex
      *  \param[in]  n 		the number of linear intervals
+     *
+     *  TODO: Extend to arbitrary dimension by writing a recursive implementation, it is much tidier
      */
     template <int mydim>
     static IntegerCoordinateVector simplexGridEnumerate(int n)
