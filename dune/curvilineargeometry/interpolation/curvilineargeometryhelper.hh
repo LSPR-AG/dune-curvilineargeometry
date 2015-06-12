@@ -105,6 +105,7 @@ class CurvilinearGeometryHelper {
 
 
     /** \brief Maps from internal corner index to internal vertex index of an element
+     * Vertices of an element consist of corner and interior interpolatory vertices, all stacked together in a single vector
      *  \param[in]  geomType	GeometryType of the element of interest
      *  \param[in]  order	Interpolation Order of the element of interest
      *  \param[in]  i		Internal corner index of the corner of interest
@@ -380,7 +381,7 @@ class CurvilinearGeometryHelper {
             for (int j = 0; j <= order - i; j++)
             {
             	IntFieldVector mapIndex;
-            	mapIndex.axpy(order, cornerInternalCoord[0]);
+            	mapIndex.axpy(order, cornerInternalCoord[0]);    // The equation we are trying to achieve is order (p0 + a(p1 - p0) + b(p2 - p0)), s.t. a+b = 1
             	mapIndex.axpy(j, v1);  // Order matters, because the inner loop must loop over
             	mapIndex.axpy(i, v2);  // the first vector
             	rez.push_back(coord_map[mapIndex[0]][mapIndex[1]][mapIndex[2]]);

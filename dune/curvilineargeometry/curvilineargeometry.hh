@@ -692,12 +692,6 @@ namespace Dune
 
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
-        //assert(mydim > 0);
-        //std::cout << "started calc JT  dim=" << coorddimension << " mydim="<< mydimension << " mapSize=" << analyticalMap.size() << std::endl;
-
-        //std::cout << "using analytical map:" << std::endl;
-        //for (int i = 0; i < analyticalMap.size(); i++)  { std::cout << "  ++++++ vec=" << analyticalMap[i].to_string() << std::endl; }
-
         JacobianTransposed jt;
 
         for (int i = 0; i < coorddimension; i++)
@@ -707,8 +701,6 @@ namespace Dune
                 jt[j][i] = (analyticalMap[i].derivative(j)).evaluate(local);
             }
         }
-
-        //std::cout << "done calc JT" << std::endl;
 
       return jt;
     }
@@ -898,33 +890,25 @@ namespace Dune
     // Finds the normal in local coordinates using referenceElement, then maps it to global using inverse Jacobi transform
     GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local, bool is_normalized, bool is_integrationelement, const PolynomialVector & analyticalMap ) const
     {
-        //std::cout << "started computing subentity normal ";
-        //std::cout << "indexInInside=" << indexInInside;
-        //std::cout << "local=" << local;
-        //std::cout << "is_normalized=" << is_normalized;
-        //std::cout << "is_integrationelement=" << is_integrationelement << std::endl;
-
-
-
-        //std::cout << "gets JTransp " << std::endl;
         JacobianInverseTransposed jit = jacobianInverseTransposed(local, analyticalMap);
-
-        //std::cout << "gets ref.normal " << std::endl;
         LocalCoordinate refNormal = refElement().integrationOuterNormal(indexInInside);
 
-        //std::cout << "multiplies " << std::endl;
         GlobalCoordinate normal;
         jit.mv( refNormal, normal );
 
-        //std::cout << "normalises " << std::endl;
-        if (is_normalized) { normal *= (ctype( 1 ) / normal.two_norm()); }
-        // Constructs normal integration element. detInv(x) is exactly integrationElement(x), but faster
-        else if (is_integrationelement) {
-            //std::cout << "gets detinv " << std::endl;
+        if (is_normalized)               { normal *= 1.0 / normal.two_norm(); }
+        else if (is_integrationelement)  { normal *= jit.detInv(); }
 
-            normal *= jit.detInv(); }
 
-        //std::cout << "finished computing subentity normal " << std::endl;
+    	/*
+    	CurvilinearGeometry< ctype, mydim-1, cdim>  triGeom = subentityGeometry<mydim-1>(indexInInside);
+    	GlobalCoordinate normal = triGeom.normalTriangle(local, triGeom.interpolatoryVectorAnalytical());
+        if (is_normalized)               { normal *= 1.0 / normal.two_norm(); }
+        else if (is_integrationelement)  {
+        	normal *= 1.0 / normal.two_norm();
+        	normal *= triGeom.integrationElement(local); }
+
+        */
 
         return normal;
     }
@@ -1384,8 +1368,6 @@ namespace Dune
     // Initialization runs at the constructor
     void init()
     {
-        //std::cout << "CachedGEometry started init" << std::endl;
-
         analyticalMap_ = Base::interpolatoryVectorAnalytical();
 
         if (mydim > 0)
@@ -1396,8 +1378,6 @@ namespace Dune
           bool valid_dim = ((mydimension == 1) && (coorddimension == 2)) || ((mydimension == 2) && (coorddimension == 3));
           if (valid_dim)     { NormIntElem_ = Base::NormalIntegrationElementAnalytical(analyticalMap_); }
         }
-
-        //std::cout << "CachedGEometry finished init" << std::endl;
     }
 
 

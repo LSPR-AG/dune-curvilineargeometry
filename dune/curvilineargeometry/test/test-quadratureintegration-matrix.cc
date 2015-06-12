@@ -56,13 +56,14 @@ Dune::Polynomial<ctype, dim>  randomPolynomial(int power)
 template <class ctype, int dim>
 class matrixPolyRandomFunctor
 {
+protected:
 	typedef Dune::Polynomial<ctype, dim>  Polynomial;
-	typedef std::vector< Polynomial >         PolyVec;
-	typedef std::vector< PolyVec >            PolyVecVec;
-
-	typedef Dune::FieldVector<ctype, dim> GlobalCoordinate;
+	typedef std::vector< Polynomial >     PolyVec;
+	typedef std::vector< PolyVec >        PolyVecVec;
 
 public:
+
+	typedef Dune::FieldVector<ctype, dim> GlobalCoordinate;
 
 	typedef Dune::DynamicMatrix<ctype>   ResultValue;
 	typedef std::vector<ResultValue>     ResultType;
@@ -123,7 +124,7 @@ public:
 
 
 
-private:
+protected:
 
 	int nRow_;
 	int nCol_;
@@ -132,6 +133,59 @@ private:
 	std::vector<std::vector< Polynomial > >  polyMat_;
 };
 
+
+template <class ctype, int dim>
+class matrixPolySqrtRandomFunctor
+{
+	typedef matrixPolyRandomFunctor<ctype, dim>    PolyFunctor;
+
+
+	typedef typename PolyFunctor::GlobalCoordinate  GlobalCoordinate;
+
+public:
+
+	typedef typename PolyFunctor::ResultType        ResultType;
+	typedef typename PolyFunctor::ResultValue       ResultValue;
+	static const int RETURN_SIZE = 6;
+
+
+	matrixPolySqrtRandomFunctor(int nRow, int nCol, int power) :
+		nRow_(nRow),
+		nCol_(nCol)
+	{
+		for (int i = 0; i < RETURN_SIZE; i++)  { A.push_back(PolyFunctor(nRow, nCol, power)); }
+	}
+
+
+	ResultValue zeroValue(unsigned int rezIndex) const { return A[0].zeroValue(rezIndex); }
+
+
+	ResultType operator()(const GlobalCoordinate & in) const  {
+
+		ResultType rez;
+
+		for (int iSize = 0; iSize < RETURN_SIZE; iSize++)
+		{
+			rez.push_back(A[iSize](in)[0]);
+
+			for (int i = 0; i < nRow_; i++)
+			{
+				for (int j = 0; j < nCol_; j++)
+				{
+					rez[iSize][i][j] = sqrt(rez[iSize][i][j]);
+				}
+			}
+		}
+
+		return rez;
+	}
+
+protected:
+	std::vector<PolyFunctor> A;
+
+	int nRow_;
+	int nCol_;
+};
 
 struct unityJacobianFunctor
 {
@@ -191,7 +245,6 @@ void powerTest(unsigned int N_TEST)
 }
 
 
-
 template<class ctype, int dim>
 void powerTestRecursive(unsigned int N_TEST)
 {
@@ -230,6 +283,39 @@ void powerTestRecursive(unsigned int N_TEST)
 }
 
 
+template<class ctype, int dim>
+void powerTestRootRecursive(unsigned int N_TEST)
+{
+	const unsigned int MAX_MATRIX_DIM = 30;
+	const double   REL_TOL = 1.0e-5;          // For non-polynomial integrals use higher tolerance
+
+	Dune::GeometryType simplexGeometry;   simplexGeometry.makeSimplex(dim);
+
+	typedef matrixPolySqrtRandomFunctor<ctype, dim>                   PolySqrtFunctor;
+	typedef Dune::QuadratureIntegrator<ctype, dim, PolySqrtFunctor>   PolyQuadIntegrator;
+	typedef typename PolySqrtFunctor::ResultValue                     Matrix;
+
+	std::cout << "Performing test for dimension = " << dim << std::endl;
+
+	for (int iPower = 1; iPower < 10; iPower++)
+	{
+		double err_max = 0;
+
+		for (int iTest = 0; iTest < N_TEST; iTest++)
+		{
+			unsigned int nRow = 20; //1 + (rand() % MAX_MATRIX_DIM);
+			unsigned int nCol = 20; //1 + (rand() % MAX_MATRIX_DIM);
+
+			PolySqrtFunctor     polySqrtFunctor(nRow, nCol, iPower);
+			PolyQuadIntegrator  integrator;
+
+			integrator.integrateRecursive(simplexGeometry, polySqrtFunctor, REL_TOL, unityJacobianFunctor(), 1);  // Simply ignore the result for now
+		}
+	}
+}
+
+
+
 
 
 int main ()
@@ -242,13 +328,17 @@ int main ()
 	std::cout << "initialized" << std::endl;
 	const unsigned int N_TEST = 10;
 
-	//powerTest<double, 1>(N_TEST);
-	//powerTest<double, 2>(N_TEST);
-	//powerTest<double, 3>(N_TEST);
+	powerTest<double, 1>(N_TEST);
+	powerTest<double, 2>(N_TEST);
+	powerTest<double, 3>(N_TEST);
 
-	powerTestRecursive<double, 1>(N_TEST);
-	powerTestRecursive<double, 2>(N_TEST);
-	powerTestRecursive<double, 3>(N_TEST);
+	//powerTestRecursive<double, 1>(N_TEST);
+	//powerTestRecursive<double, 2>(N_TEST);
+	//powerTestRecursive<double, 3>(N_TEST);
+
+	//powerTestRootRecursive<double, 1>(1);
+	//powerTestRootRecursive<double, 2>(1);
+	//powerTestRootRecursive<double, 3>(1);
 
 	// Still some trickery is needed to make the complex tests compile
 	//powerTest<Complex, 1>(N_TEST);

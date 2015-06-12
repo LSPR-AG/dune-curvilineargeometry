@@ -23,6 +23,7 @@
 
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <queue>          // std::queue
 #include <algorithm>
@@ -228,79 +229,108 @@ protected:
 
         // Initialise a zero result vector
         // In dynamic case, different parts of the result could be of different size
-        ResultType zeroresult;
-        for (unsigned int i = 0; i < nResult; i++)  { zeroresult.push_back( f.zeroValue(i) ); }
-
+        ResultType zeroresult(nResult);
+        for (unsigned int i = 0; i < nResult; i++)  { zeroresult[i] = f.zeroValue(i); }
 
         ctype SMOOTH_FACTOR = 0.15;
 
-        ctype error = 1.0;
-        ResultType rez_prev(zeroresult);
-        ResultType rez_this(zeroresult);
-        unsigned int order = (suggestedOrder > 0) ? suggestedOrder - 1 : 0;
+        // Setting the initial estimated error of the integration to a reasonable value basically forces the routine to at least make two iterations
+        // This avoids the case where the first guess for the integral is wrongly estimated as 0 due to unlucky symmetry of the integrand
+        std::vector<ctype> deltaThis(nResult, 1.0);
 
-        while (error > rel_tol)
+        ctype relError = 1.0;                  // Set the initial relative error to non-zero such that there is at least one iteration
+        ResultType         resultThis(zeroresult);  // Initialize the integral result to 0. This is purely conventional, it could be anything
+
+        // Start at an order slightly earlier than the suggested one, to use it as an error reference
+        unsigned int order = (suggestedOrder > 1) ? suggestedOrder - 2 : 0;
+
+        // Initialize the the current size of quadrature set to zero
+        int prevQuadSize = 0;
+        int thisQuadSize = 0;
+
+        while (relError > rel_tol)
         {
-            // Increase order.
-            // Keep increasing the order if the number of quadrature points did not increase
-            int size_this = QRules::rule(gt, order).size();
-            int size_next = size_this;
-
-            while (size_this == size_next)
+            // Increase quadrature order. In Dune for some magical reason consecutive orders sometimes have the same quadrature
+            // Keep increasing the order if the number of quadrature points did not change
+            do
             {
                 order++;
                 if (order >= MAX_INT_ORDER)  { DUNE_THROW(Dune::IOError, "QUAD_INTEGRATOR failed to converge to required accuracy"); }
-                size_this = size_next;
-                size_next = QRules::rule(gt, order).size();
-            }
+                prevQuadSize = thisQuadSize;
+                thisQuadSize = QRules::rule(gt, order).size();
+            } while (prevQuadSize == thisQuadSize);
 
             // Integrate
-            ResultType rez_new = integrate(gt, f, order, jacobiFunctor);
+            ResultType resultNew = integrate(gt, f, order, jacobiFunctor);
 
-            ResultType rez_smooth(zeroresult);
-            ResultType rez_delta(zeroresult);
+            // Refresh the relative error to calculate it anew
+            relError = 0;
 
             for (unsigned int iResult = 0; iResult < nResult; iResult++)
             {
-                ResultValue rez_smooth_part1 = rez_prev[iResult];
-                            rez_smooth_part1 += rez_new[iResult];
-                ResultValue rez_smooth_part2 = rez_this[iResult];
-                rez_smooth_part1 *= SMOOTH_FACTOR;
-                rez_smooth_part2 *= (1 - 2 * SMOOTH_FACTOR);
-                rez_smooth[iResult] =  rez_smooth_part1;
-                rez_smooth[iResult] += rez_smooth_part2;
-                rez_delta[iResult] =  rez_new[iResult];
-                rez_delta[iResult] -= rez_smooth[iResult];
-            }
-            rez_prev = rez_this;
-            rez_this = rez_new;
+            	// The effective absolute error is defined as the difference between integrals at this and previous quadrature
+            	ResultValue deltaNewVec  = resultNew[iResult];
+                            deltaNewVec -= resultThis[iResult];
+                ctype deltaNew      = absoluteValue(deltaNewVec);
 
-            // Compute error - compute smoothened error to avoid cases when two consecutive samplings give same wrong answer
-            // If a vector of several quantities is integrated simultaneously, compare the relative error of the largest component
-            //  with the requested relative tolerance
-            error = maxAbsoluteValueResult(rez_delta, rez_this);
+                // Define smoothened absolute error as a linear combination between this and previous errors
+                // This avoids the case when two consecutive samplings give same wrong answer due to unlucky symmetry of the integrand wrt quadrature points
+                ctype deltaSmooth   = SMOOTH_FACTOR * deltaThis[iResult] +  (1 - SMOOTH_FACTOR) * deltaNew;
+
+
+            	// [TODO] If the previous error is small enough, re-computing the magnitude is unnecessary computational effort
+            	ctype magnitudeThis = absoluteValue(resultNew[iResult]);       // Find the magnitude of this result
+                ctype errorThis = relativeError(deltaSmooth, magnitudeThis);   // Calculate the relative error
+
+                // If several quantities are integrated at the same time, only consider the worst error among them
+                // This is because we want all of the quantities to integrate to at least the requested precision
+                relError = std::max(relError, errorThis);
+
+                // Update values of result and error with new ones
+                resultThis[iResult] = resultNew[iResult];
+                deltaThis[iResult] = deltaNew;
+            }
+
+            if (nResult == 6)  { //std::cout << resultThis[5] << std::endl;
+            	writeMatrix(resultThis[5], "/home/fomins/Documents/test/duneMatrix" + std::to_string(order) + ".txt");
+            }
+
+            std::cout << "--- processed order=" << order << " quadrature size=" << thisQuadSize << " estimated relative error=" << relError << " desired error=" << rel_tol << std::endl;
         }
 
         std::cout << "Finished recursive integral over geometry " << gt << std::endl;
 
-        return StatInfo(order, rez_this);
+        return StatInfo(order, resultThis);
     }
 
 
-    template<typename ResultType>
-    static ctype maxAbsoluteValueResult(ResultType & v, ResultType vmag)  {
-    	ctype rez = 0;
-    	for (int i = 0; i < v.size(); i++)  {
-    		ctype abs_val = absoluteValue(vmag[i]);
-    		ctype abs_err = absoluteValue(v[i]);
+    template <class VT>           static void writeMatrix(VT & mat, std::string filename) {}
+    template <class VT, int dim>  static void writeMatrix(Dune::FieldVector<VT, dim> & mat, std::string filename) {}
+    template <class VT>           static void writeMatrix(Dune::DynamicVector<VT> & mat,    std::string filename) {}
 
-    		// Only calculate relative error if the absolute value of the error is large enough
-    		// Otherwise just return absolute error
-    		ctype rel_err = (abs_val > 1.0e-15) ? abs_err / abs_val : abs_err;
-
-    		rez = std::max(rez, rel_err);
+    template <class VT>
+    static void writeMatrix (Dune::DynamicMatrix<VT> & mat, std::string filename)
+    {
+    	std::ofstream myfile (filename);
+    	if (myfile.is_open())
+    	{
+    		for (int i = 0; i < mat.N(); i++)
+    		{
+        		for (int j = 0; j < mat.M(); j++)
+        		{
+        			myfile << mat[i][j] << std::endl;
+        		}
+    		}
+    		myfile.close();
     	}
-    	return rez;
+    }
+
+
+    static ctype relativeError(ctype abs_err, ctype abs_mag)
+    {
+		// Only calculate relative error if the absolute value of the error is large enough
+		// Otherwise just return absolute error
+    	return (abs_err > 1.0e-15) ? abs_err / abs_mag : abs_err;
     }
 
 
