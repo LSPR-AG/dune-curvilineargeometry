@@ -64,6 +64,7 @@ struct function2d6 : public functionDouble {  functionDouble::ResultType operato
 struct function2d7 : public functionDouble {  functionDouble::ResultType operator()(const GlobalVector2D & in) const  { return functionDouble::ResultType(1, 3628800 * pow(in[0], 7) * pow(in[1], 10)); }  };
 struct function2d8 : public functionDouble {  functionDouble::ResultType operator()(const GlobalVector2D & in) const  { return functionDouble::ResultType(1, sqrt(pow(in[0], 7) * pow(in[1], 10) + 0.5)); }  };
 
+
 template<class ctype, int dim>
 Dune::Polynomial<ctype, dim> NewtonPolynomial(int power)
 {
@@ -88,6 +89,7 @@ Dune::Polynomial<ctype, dim> NewtonPolynomial(int power)
 
 	return rez;
 }
+
 
 template<class ctype, int mydim>
 struct PolynomialFunctor
@@ -141,9 +143,9 @@ void statWrite(StatInfoVec statInfoVec)
 template <int dim>
 void depthTest(int maxdim, double rec_tol)
 {
-	typedef PolynomialFunctor<double, dim>                          PolyFunctor;
-	typedef Dune::QuadratureIntegrator<double, dim, PolyFunctor >   Integrator;
-	typedef typename Integrator::StatInfo                           StatInfo;
+	typedef PolynomialFunctor<double, dim>                               PolyFunctor;
+	typedef Dune::QuadratureIntegrator<double, dim>                      Integrator;
+	typedef typename Integrator::template Traits<PolyFunctor>::StatInfo  StatInfo;
 
 	std::cout << "-----------Started " << dim << "D depth check-------------" << std::endl;
 	Dune::GeometryType gt;   gt.makeSimplex(dim);
@@ -176,25 +178,25 @@ int main ()
   Dune::GeometryType faceGeometry;   faceGeometry.makeSimplex(2);
   Dune::GeometryType elemGeometry;   elemGeometry.makeSimplex(3);
 
-  //Dune::QuadratureIntegrator<double, 1, 1> funIntegrator1DScalar;
-  //Dune::QuadratureIntegrator<double, 2, 1> funIntegrator2DScalar;
+  typedef Dune::QuadratureIntegrator<double, 1> QuadIntegrator1D;
+  typedef Dune::QuadratureIntegrator<double, 2> QuadIntegrator2D;
   //Dune::QuadratureIntegrator<double, 3, 1> funIntegrator3DScalar;
 
   double rec_tol = 1.0e-5;
 
-  recursiveWrite(Dune::QuadratureIntegrator<double, 1, function1d1>::integrateRecursive(edgeGeometry, function1d1(), rec_tol, unityJacobianFunctor()));
-  recursiveWrite(Dune::QuadratureIntegrator<double, 1, function1d2>::integrateRecursive(edgeGeometry, function1d2(), rec_tol, unityJacobianFunctor()));
-  recursiveWrite(Dune::QuadratureIntegrator<double, 1, function1d3>::integrateRecursive(edgeGeometry, function1d3(), rec_tol, unityJacobianFunctor()));
-  recursiveWrite(Dune::QuadratureIntegrator<double, 1, function1d4>::integrateRecursive(edgeGeometry, function1d4(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator1D::integrateRecursive(edgeGeometry, function1d1(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator1D::integrateRecursive(edgeGeometry, function1d2(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator1D::integrateRecursive(edgeGeometry, function1d3(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator1D::integrateRecursive(edgeGeometry, function1d4(), rec_tol, unityJacobianFunctor()));
 
-  recursiveWrite(Dune::QuadratureIntegrator<double, 2, function2d1>::integrateRecursive(faceGeometry, function2d1(), rec_tol, unityJacobianFunctor()));
-  recursiveWrite(Dune::QuadratureIntegrator<double, 2, function2d2>::integrateRecursive(faceGeometry, function2d2(), rec_tol, unityJacobianFunctor()));
-  recursiveWrite(Dune::QuadratureIntegrator<double, 2, function2d3>::integrateRecursive(faceGeometry, function2d3(), rec_tol, unityJacobianFunctor()));
-  recursiveWrite(Dune::QuadratureIntegrator<double, 2, function2d4>::integrateRecursive(faceGeometry, function2d4(), rec_tol, unityJacobianFunctor()));
-  recursiveWrite(Dune::QuadratureIntegrator<double, 2, function2d5>::integrateRecursive(faceGeometry, function2d5(), rec_tol, unityJacobianFunctor()));
-  recursiveWrite(Dune::QuadratureIntegrator<double, 2, function2d6>::integrateRecursive(faceGeometry, function2d6(), rec_tol, unityJacobianFunctor()));
-  recursiveWrite(Dune::QuadratureIntegrator<double, 2, function2d7>::integrateRecursive(faceGeometry, function2d7(), rec_tol, unityJacobianFunctor()));
-  recursiveWrite(Dune::QuadratureIntegrator<double, 2, function2d8>::integrateRecursive(faceGeometry, function2d8(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator2D::integrateRecursive(faceGeometry, function2d1(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator2D::integrateRecursive(faceGeometry, function2d2(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator2D::integrateRecursive(faceGeometry, function2d3(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator2D::integrateRecursive(faceGeometry, function2d4(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator2D::integrateRecursive(faceGeometry, function2d5(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator2D::integrateRecursive(faceGeometry, function2d6(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator2D::integrateRecursive(faceGeometry, function2d7(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator2D::integrateRecursive(faceGeometry, function2d8(), rec_tol, unityJacobianFunctor()));
 
   depthTest<1>(25, rec_tol);
   depthTest<2>(25, rec_tol);

@@ -187,6 +187,7 @@ protected:
 	int nCol_;
 };
 
+
 struct unityJacobianFunctor
 {
 	typedef double               ResultValue;
@@ -215,9 +216,9 @@ void powerTest(unsigned int N_TEST)
 	const unsigned int MAX_MATRIX_DIM = 30;
 	Dune::GeometryType simplexGeometry;   simplexGeometry.makeSimplex(dim);
 
-	typedef matrixPolyRandomFunctor<ctype, dim>                   PolyFunctor;
-	typedef Dune::QuadratureIntegrator<ctype, dim, PolyFunctor>   PolyQuadIntegrator;
-	typedef typename PolyFunctor::ResultValue                     Matrix;
+	typedef matrixPolyRandomFunctor<ctype, dim>      PolyFunctor;
+	typedef Dune::QuadratureIntegrator<ctype, dim>   PolyQuadIntegrator;
+	typedef typename PolyFunctor::ResultValue        Matrix;
 
 	std::cout << "Performing test for dimension = " << dim << std::endl;
 
@@ -253,9 +254,9 @@ void powerTestRecursive(unsigned int N_TEST)
 
 	Dune::GeometryType simplexGeometry;   simplexGeometry.makeSimplex(dim);
 
-	typedef matrixPolyRandomFunctor<ctype, dim>                   PolyFunctor;
-	typedef Dune::QuadratureIntegrator<ctype, dim, PolyFunctor>   PolyQuadIntegrator;
-	typedef typename PolyFunctor::ResultValue                     Matrix;
+	typedef matrixPolyRandomFunctor<ctype, dim>      PolyFunctor;
+	typedef Dune::QuadratureIntegrator<ctype, dim>   PolyQuadIntegrator;
+	typedef typename PolyFunctor::ResultValue        Matrix;
 
 	std::cout << "Performing test for dimension = " << dim << std::endl;
 
@@ -291,9 +292,9 @@ void powerTestRootRecursive(unsigned int N_TEST)
 
 	Dune::GeometryType simplexGeometry;   simplexGeometry.makeSimplex(dim);
 
-	typedef matrixPolySqrtRandomFunctor<ctype, dim>                   PolySqrtFunctor;
-	typedef Dune::QuadratureIntegrator<ctype, dim, PolySqrtFunctor>   PolyQuadIntegrator;
-	typedef typename PolySqrtFunctor::ResultValue                     Matrix;
+	typedef matrixPolySqrtRandomFunctor<ctype, dim>  PolySqrtFunctor;
+	typedef Dune::QuadratureIntegrator<ctype, dim>   PolyQuadIntegrator;
+	typedef typename PolySqrtFunctor::ResultValue    Matrix;
 
 	std::cout << "Performing test for dimension = " << dim << std::endl;
 

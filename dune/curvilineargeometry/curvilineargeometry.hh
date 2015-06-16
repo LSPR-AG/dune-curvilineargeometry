@@ -34,6 +34,8 @@
 #include <dune/curvilineargeometry/interpolation/polynomial.hh>
 #include <dune/curvilineargeometry/interpolation/curvilineargeometryhelper.hh>
 #include <dune/curvilineargeometry/interpolation/curvilinearelementinterpolator.hh>
+#include <dune/curvilineargeometry/interpolation/differentialhelper.hh>
+#include <dune/curvilineargeometry/interpolation/pointlocation.hh>
 #include <dune/curvilineargeometry/integration/numericalrecursiveinterpolationintegrator.hh>
 #include <dune/curvilineargeometry/integration/quadratureintegrator.hh>
 
@@ -67,71 +69,17 @@ namespace Dune
   template< class ct >
   struct CurvilinearGeometryTraits
   {
-    /** \brief helper structure containing some matrix routines
-     *
-     *  This helper allows exchanging the matrix inversion algorithms.
-     *  It must provide the following static methods:
-     *  \code
-     *  template< int m, int n >
-     *  static ctype sqrtDetAAT ( const FieldMatrix< ctype, m, n > &A );
-     *
-     *  template< int m, int n >
-     *  static ctype rightInvA ( const FieldMatrix< ctype, m, n > &A,
-     *                           FieldMatrix< ctype, n, m > &ret );
-     *
-     *  template< int m, int n >
-     *  static void xTRightInvA ( const FieldMatrix< ctype, m, n > &A,
-     *                            const FieldVector< ctype, n > &x,
-     *                            FieldVector< ctype, m > &y );
-     *  \endcode
-     */
     typedef GenericGeometry::MatrixHelper< GenericGeometry::DuneCoordTraits< ct > > MatrixHelper;
 
     /** \brief tolerance to numerical algorithms */
     static ct tolerance () { return ct( 16 ) * std::numeric_limits< ct >::epsilon(); }
 
-    /** \brief template specifying the storage for the corners
-     *
-     *  Internally, the CurvilinearGeometry needs to store the corners of the
-     *  geometry.
-     *
-     *  The corner storage may be chosen depending on geometry dimension and
-     *  coordinate dimension. It is required to contain a type named Type, e.g.,
-     *  \code
-     *  template< int mydim, int cdim >
-     *  struct CornerStorage
-     *  {
-     *    typedef std::vector< FieldVector< ctype, cdim > > Type;
-     *  };
-     *  \endcode
-     *  By default, a std::vector of FieldVector is used.
-     *
-     *  Apart from being copy constructable and assignable, the corner storage
-     *  must provide a constant input iterator, i.e., it must define a type
-     *  const_iterator and a pair of constant begin / end methods.
-     *
-     *  \tparam  mydim  geometry dimension
-     *  \tparam  cdim   coordinate dimension
-     */
     template< int mydim, int cdim >
     struct VertexStorage
     {
       typedef std::vector< FieldVector< ct, cdim > > Type;
     };
 
-    /** \brief will there be only one geometry type for a dimension?
-     *
-     *  If there is only a single geometry type for a certain dimension,
-     *  <em>hasSingleGeometryType::v</em> can be set to true.
-     *  Supporting only one geometry type might yield a gain in performance.
-     *
-     *  If <em>hasSingleGeometryType::v</em> is set to true, an additional
-     *  parameter <em>topologyId</em> is required.
-     *  Here's an example:
-     *  \code
-     *  static const unsigned int topologyId = SimplexTopology< dim >::type::id;
-     *  \endcode
-     */
     template< int dim >
     struct hasSingleGeometryType
     {
@@ -174,7 +122,7 @@ namespace Dune
       bool isPolynomial()  { return (mydim == cdim)||(integration_element_generalised_.order() == 0); }
 
       unsigned int expectedOrder()  {
-    	  return (mydim == cdim) ? integration_element_generalised_.order() : sqrt(integration_element_generalised_.order());
+          return (mydim == cdim) ? integration_element_generalised_.order() : sqrt(integration_element_generalised_.order());
       }
 
       ResultValue zeroValue(unsigned int rezIndex) const { return 0.0; }
@@ -242,6 +190,7 @@ namespace Dune
     static const int coorddimension = cdim;     //! coordinate dimension
 
     // Plain data types used
+    // [TODO] Move to traits
     typedef typename Dune::CurvilinearGeometryHelper::InternalIndexType         InternalIndexType;
     typedef typename Dune::CurvilinearGeometryHelper::InterpolatoryOrderType    InterpolatoryOrderType;
 
@@ -261,9 +210,19 @@ namespace Dune
     typedef CurvilinearElementInterpolator <ct, mydim, cdim> ElementInterpolator;
 
 
-    typedef Polynomial<ctype, mydimension> LocalPolynomial;
-    typedef typename PolynomialTraits<ctype>::Monomial Monomial;
-    typedef std::vector<LocalPolynomial> PolynomialVector;
+    // Define Polynomial and associated classes
+    typedef typename PolynomialTraits<ctype>::Monomial  Monomial;
+    typedef Polynomial<ctype, mydimension>              LocalPolynomial;
+    typedef std::vector<LocalPolynomial>                PolynomialVector;
+
+    // Define analytic differential operators over this geometry
+    typedef typename Dune::DifferentialHelper::JacobianDeterminantAnalytical<This, cdim, mydim>         JacDetAnalytical;
+    typedef typename Dune::DifferentialHelper::NormalIntegrationElementAnalytical<This, cdim, mydim>    IntElemNormalAnalytical;
+    typedef typename Dune::DifferentialHelper::IntegrationElementSquaredAnalytical <This, cdim, mydim>  IntElemSquaredAnalytical;
+
+    // Define tests that help to determine if a point is inside an entity
+    typedef typename Dune::CurvilinearPointLocation::FarPointTest<This, cdim, mydim>      FarPointTest;
+    typedef typename Dune::CurvilinearPointLocation::BarycentricTest<This, cdim, mydim>   BarycentricTest;
 
 
   private:
@@ -327,7 +286,7 @@ namespace Dune
         return false;
     }
 
-    ElementInterpolator interpolator() { return elementInterpolator_; }
+    const ElementInterpolator & interpolator() const { return elementInterpolator_; }
 
     InterpolatoryOrderType order() const { return elementInterpolator_.order(); }
 
@@ -399,6 +358,7 @@ namespace Dune
      *  \note: Sign of the normal is determined entirely by the order of the corners
      *
      */
+    // [TODO] Specialize only for mydim = cdim - 1
     GlobalCoordinate normal(const LocalCoordinate &local ) const
     {
         PolynomialVector analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
@@ -425,6 +385,7 @@ namespace Dune
      *  TODO: Try understand if normal to 2D curved face in 3D is meaningful
      *
      */
+    // [TODO] Specialize only for cdim==mydim
     GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
         PolynomialVector analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
@@ -439,6 +400,7 @@ namespace Dune
      *  \return unit vector normal to the subentity
      *
      */
+    // [TODO] Specialize only for cdim==mydim
     GlobalCoordinate subentityUnitNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
         PolynomialVector analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
@@ -453,6 +415,7 @@ namespace Dune
      *  \return unit vector normal to the subentity
      *
      */
+    // [TODO] Specialize only for cdim==mydim
     GlobalCoordinate subentityIntegrationNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
         PolynomialVector analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
@@ -521,6 +484,7 @@ namespace Dune
         return integrationElement ( local, analyticalMap );
     }
 
+
     /** \brief Constructs polynomial Jacobian determinant.
      * \note (!) Only to be used for mydim == codim
      * \note It is an important observation that det(J) is not allowed to change sign within the element,
@@ -530,9 +494,11 @@ namespace Dune
      */
     LocalPolynomial JacobianDeterminantAnalytical() const
     {
-        PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
-        return JacobianDeterminantAnalytical(analyticalMap);
+        //PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
+        //return JacobianDeterminantAnalytical(analyticalMap);
+    	return JacDetAnalytical::eval(*this);
     }
+
 
     /** \brief Constructs polynomial vector = integration element * element normal
      * \note Since element interpolation is polynomial, this quantity is also polynomial and thus is given analytically
@@ -540,15 +506,18 @@ namespace Dune
      */
     PolynomialVector NormalIntegrationElementAnalytical() const
     {
-        PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
-        return NormalIntegrationElementAnalytical(analyticalMap);
+        //PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
+        //return NormalIntegrationElementAnalytical(analyticalMap);
+        return IntElemNormalAnalytical::eval(*this);
     }
 
-    // Calculates analytically det|JJ^T|, without taking the square root. Re-uses NormalIntegrationElementAnalytical
+
+    /** \brief Calculates analytically det|JJ^T|, without taking the square root. Re-uses NormalIntegrationElementAnalytical */
     LocalPolynomial IntegrationElementSquaredAnalytical() const
     {
-        PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
-        return IntegrationElementSquaredAnalytical(analyticalMap);
+        //PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
+        //return IntegrationElementSquaredAnalytical(analyticalMap);
+    	return IntElemSquaredAnalytical::eval(*this);
     }
 
 
@@ -562,6 +531,7 @@ namespace Dune
      *
      *  \returns the result of the integral
      */
+    // [TODO]  Move integration to tutorial
     ctype integrateScalar(const LocalPolynomial & P, double tolerance) const
     {
         if (mydimension == coorddimension) { return integrateAnalyticalScalar(P); }
@@ -602,6 +572,7 @@ namespace Dune
      *
      *  TODO: Need to throw error if called with mydim != cdim
      */
+    // [TODO]  Move integration to tutorial
     ctype integrateAnalyticalScalar(const LocalPolynomial & P) const
     {
         LocalPolynomial JDet = JacobianDeterminantAnalytical();
@@ -617,6 +588,7 @@ namespace Dune
      *
      *  TODO: Need to throw error if invalid mydim-cdim pair
      */
+    // [TODO]  Move integration to tutorial
     ctype integrateAnalyticalDot(const PolynomialVector & PVec) const
     {
         // If the dimensionality makes sense for this integral
@@ -636,6 +608,8 @@ namespace Dune
      *
      *  TODO: NOT IMPLEMENTED YET
      */
+
+    // [TODO]  Move integration to tutorial
     GlobalCoordinate integrateAnalyticalTimes(const PolynomialVector & PVec) const
     {
         GlobalCoordinate rez;
@@ -685,11 +659,14 @@ namespace Dune
      */
     JacobianInverseTransposed jacobianInverseTransposed ( const LocalCoordinate &local ) const;
 
-  protected:
 
+    /** \brief Returns reference element  */
     const ReferenceElement &refElement () const { return elementInterpolator_.refElement(); }
 
+  protected:
 
+    /** \brief Computes JT by differentiating the analytical map  */
+    // [TODO][Optimization] Compare performance with numerical derivatives. For that, need to hard-code numerical derivatives into interpolator. For now too much effort
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
         JacobianTransposed jt;
@@ -706,142 +683,13 @@ namespace Dune
     }
 
 
+    /** \brief Forwards-declaration of Jit constructing function */
     JacobianInverseTransposed jacobianInverseTransposed ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const;
 
 
-    // If the global point is too far away from the global centre of the element
-    // return false. Then it can not be inside, because elements with surface curvature
-    // more than the internal radius are unexpected
-    bool isInsideTestFarPoint( const GlobalCoordinate &globalC, ctype tolerance) const
-    {
-        // For 1D this test is much simpler - just check if globalC is inbetween the two corners of the edge
-        if (cdim == 1) { return (corner(0)[0] - globalC[0] < tolerance)&&(globalC[0] - corner(1)[0] < tolerance); }
-
-
-        GlobalCoordinate c = center();
-
-        // Find distance from center of element to the point
-        ctype d1 = (c - globalC).two_norm();
-
-        // Find largest distance from center to corner
-        ctype d2 = 0;
-        for (int i = 0; i < nCorner(); i++) { d2 = std::max(d2, (c - corner(i)).two_norm()); }
-
-        return (d1 < 2 * d2);
-    }
-
-    /** \brief Checks if a global coordinate is inside the element or not (!imperfect!)
-     *
-     *  The current algorithm for Simplices computes the global barycentric coordinates and checks if they sum up to 1
-     *
-     *  For linear elements, normalized sum > 1 implies that element is outside and sum = 1 implies that it is inside
-     *
-     *  For nonlinear nonconvex elements, normalized sum > 1 does not imply anything, because the total barycentric
-     *  area may be larger than the area of the element even with the sample point inside.
-     *
-     */
-    bool isInsideTestBarycentric(const GlobalCoordinate &globalC, ctype tolerance) const
-    {
-        switch (mydim)
-        {
-            case 1:  return(isInsideTestBarycentricEdge(globalC, tolerance));         break;
-            case 2:  return(isInsideTestBarycentricTriangle(globalC, tolerance));     break;
-            case 3:  return(isInsideTestBarycentricTetrahedron(globalC, tolerance));  break;
-       }
-    }
-
-
-    // Checking if a point is inside an edge by simply verifying it lies between its two corners. Only for edges in 1D
-    bool isInsideTestBarycentricEdge( const GlobalCoordinate &globalC, ctype tolerance) const
-    {
-        return ((corner(0)[0] - globalC[0] <= tolerance) && (globalC[0]- corner(1)[0] <= tolerance));
-    }
-
-
-    // Checking if a point is inside a triangle by calculating global simplex coordinates. Only for triangles in 2D
-    bool isInsideTestBarycentricTriangle( const GlobalCoordinate &globalC, ctype tolerance) const
-    {
-        typedef CurvilinearElementInterpolator< ctype, mydim - 1, cdim > SubentityInterpolator;
-        typedef std::vector< SubentityInterpolator > SubentityInterpolatorVector;
-        typedef Polynomial<ctype, mydimension - 1> SubentityPolynomial;
-        typedef std::vector<SubentityPolynomial> SubentityPolynomialVector;
-
-        SubentityInterpolatorVector edgeInterpolatorSet;
-        edgeInterpolatorSet.push_back(elementInterpolator_.Subentity<1>(0));
-        edgeInterpolatorSet.push_back(elementInterpolator_.Subentity<1>(1));
-        edgeInterpolatorSet.push_back(elementInterpolator_.Subentity<1>(2));
-
-
-        ctype tri_area = volume(tolerance);
-        ctype barycentric_sum = 0;
-
-        //std::cout << "    # total area " << tri_area << std::endl;
-
-        for (int i = 0; i < edgeInterpolatorSet.size(); i++)
-        {
-            // Obtains analytical vector function describing the global coordinate of the edge
-            SubentityPolynomialVector pv = edgeInterpolatorSet[i].interpolatoryVectorAnalytical();
-
-            // Calculates the area of barycentric triangle created by the corners of the curved edge and the point globalC
-            // In this calculation the only the curved edge is curved, the other two edges of this barycentric triangle are straight-sided
-            // We integrate over the generalized surface area, which is the cross product between the sweeping point and its derivative
-            ctype barycentric_area = 0.5 * ((pv[0] - globalC[0]) * pv[1].derivative(0) - (pv[1] - globalC[1]) * pv[0].derivative(0)).integrateRefSimplex();
-
-            //std::cout << "    # barycentric area " << barycentric_area << std::endl;
-
-            barycentric_sum += barycentric_area;
-        }
-        return (barycentric_sum / tri_area - 1 < tolerance);
-    }
-
-
-    // Checking if a point is inside a triangle by calculating global simplex coordinates. Only for triangles in 3D
-    bool isInsideTestBarycentricTetrahedron( const GlobalCoordinate &globalC, ctype tolerance) const
-    {
-        typedef CurvilinearElementInterpolator< ctype, mydim - 1, cdim > SubentityInterpolator;
-        typedef std::vector< SubentityInterpolator > SubentityInterpolatorVector;
-        typedef Polynomial<ctype, mydimension - 1> SubentityPolynomial;
-        typedef std::vector<SubentityPolynomial> SubentityPolynomialVector;
-
-        SubentityInterpolatorVector faceInterpolatorSet;
-        faceInterpolatorSet.push_back(elementInterpolator_.Subentity<2>(0));
-        faceInterpolatorSet.push_back(elementInterpolator_.Subentity<2>(1));
-        faceInterpolatorSet.push_back(elementInterpolator_.Subentity<2>(2));
-        faceInterpolatorSet.push_back(elementInterpolator_.Subentity<2>(3));
-
-        ctype tet_vol = volume(tolerance);
-        ctype barycentric_sum = 0;
-
-        //std::cout << "    # total volume " << tet_vol << std::endl;
-
-        for (int i = 0; i < faceInterpolatorSet.size(); i++)
-        {
-            // Obtains analytical vector function describing the global coordinate of the face
-            SubentityPolynomialVector pv = faceInterpolatorSet[i].interpolatoryVectorAnalytical();
-
-            //for (int piter = 0; piter < 3; piter++) { pv[piter].print(); }
-
-            // Calculates the volume of barycentric tetrahedron created by the corners of the curved face and the point globalC
-            // In this calculation the only the curved face is curved, the other three faces of this barycentric tetrahedron are straight-sided
-            // We integrate over the generalized volume, which is the dot-cross product between the sweeping point and its two derivatives
-            ctype barycentric_volume = 0;
-            barycentric_volume += ((pv[0] - globalC[0]) * (pv[1].derivative(0) * pv[2].derivative(1) - pv[1].derivative(1) * pv[2].derivative(0))).integrateRefSimplex();
-            barycentric_volume += ((pv[1] - globalC[1]) * (pv[2].derivative(0) * pv[0].derivative(1) - pv[2].derivative(1) * pv[0].derivative(0))).integrateRefSimplex();
-            barycentric_volume += ((pv[2] - globalC[2]) * (pv[0].derivative(0) * pv[1].derivative(1) - pv[0].derivative(1) * pv[1].derivative(0))).integrateRefSimplex();
-
-
-            //std::cout << "    # barycentric volume " << barycentric_volume << std::endl;
-
-            barycentric_sum += -barycentric_volume / 3.0;
-        }
-
-        //std::cout << "    # barycentric sum : " << barycentric_sum / tet_vol - 1 << std::endl;
-
-        return (barycentric_sum / tet_vol - 1 < tolerance);
-    }
-
-
-    // Calculate edge normal by rotating the tangential vector by pi/2 clockwise
+    /** \brief Calculate 1D unit normal by rotating the tangential vector by pi/2 clockwise */
+    // [TODO] Rename to intrinsic direction.
+    // [TODO] Implement normal sign-correction by providing this routine with the 3rd point.
     GlobalCoordinate normalEdge(const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
         GlobalCoordinate rez;
@@ -872,7 +720,12 @@ namespace Dune
     }
 
 
-    // Calculate triangle normal by computing the negative left cross product of the tangential vectors
+    /** \brief Calculate 2D unit normal by computing the negative left cross product of tangential surface vectors
+     * Advantage:    Does not use Jit, so is not sensitive to det(J) = 0
+     * Disadvantage: Currently does not implement correct normal direction */
+    // [TODO] Rename to intrinsic direction.
+    // [TODO] Implement normal sign-correction by providing this routine with the 4th point.
+    // [TODO] Specialize only for the 2D case
     GlobalCoordinate normalTriangle(const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
         GlobalCoordinate rez;
@@ -887,7 +740,10 @@ namespace Dune
     }
 
 
-    // Finds the normal in local coordinates using referenceElement, then maps it to global using inverse Jacobi transform
+    /** \brief Finds the normal of a (codim=1) subentity of a volume. Defined for cdim == mydim
+     * Constructs normal in local coordinates using referenceElement, then maps it to global using inverse Jacobi transform  */
+    // [TODO] Specialize only for the volume case
+    // [FIXME] Defend against the case of det(jit) == 0
     GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local, bool is_normalized, bool is_integrationelement, const PolynomialVector & analyticalMap ) const
     {
         JacobianInverseTransposed jit = jacobianInverseTransposed(local, analyticalMap);
@@ -900,13 +756,13 @@ namespace Dune
         else if (is_integrationelement)  { normal *= jit.detInv(); }
 
 
-    	/*
-    	CurvilinearGeometry< ctype, mydim-1, cdim>  triGeom = subentityGeometry<mydim-1>(indexInInside);
-    	GlobalCoordinate normal = triGeom.normalTriangle(local, triGeom.interpolatoryVectorAnalytical());
+        /*
+        CurvilinearGeometry< ctype, mydim-1, cdim>  triGeom = subentityGeometry<mydim-1>(indexInInside);
+        GlobalCoordinate normal = triGeom.normalTriangle(local, triGeom.interpolatoryVectorAnalytical());
         if (is_normalized)               { normal *= 1.0 / normal.two_norm(); }
         else if (is_integrationelement)  {
-        	normal *= 1.0 / normal.two_norm();
-        	normal *= triGeom.integrationElement(local); }
+            normal *= 1.0 / normal.two_norm();
+            normal *= triGeom.integrationElement(local); }
 
         */
 
@@ -914,13 +770,16 @@ namespace Dune
     }
 
 
+    /** \brief Implements global->local mapping using amortized Newton's algorithm.
+     * Returns false if the global coordinate is not inside the element. In this case the resulting local coordinate is not defined,
+     * because Lagrange Polynomials are only bijective inside of the element. */
     // TODO: refElement.checkInside returns false if point very close to boundary, but outside, which is undesirable behaviour
     bool local ( const GlobalCoordinate &globalC, LocalCoordinate & localC, const PolynomialVector & analyticalMap ) const
     {
         const ctype tolerance = Traits::tolerance();
 
-        // Check if the point is too far away to be inside
-        if (!isInsideTestFarPoint(globalC, tolerance)) { return false; }
+        // Check if the point is too far away from the element to be inside it
+        if (!FarPointTest::isInside(*this, globalC, tolerance)) { return false; }
         else
         {
             // May calculate barycentric coordinate to have a chance of guessing if the point is inside
@@ -932,8 +791,6 @@ namespace Dune
             LocalCoordinate x = c;
             LocalCoordinate dx;
 
-            //std::cout << "       @ Coordinate (" << x << std::endl;
-
             // If the algorithm has low convergence, it must be stuck in some weird geometry,
             // which can only happen outside the element, because inside geometry is nice
             bool low_convergence = false;
@@ -942,8 +799,6 @@ namespace Dune
 
             // If the local point is very far outside of the element, it is likely that the point is not inside
             bool far_point_local = false;
-
-            //std::cout << "searching for " << globalC << std::endl;
 
             do
             {
@@ -962,20 +817,9 @@ namespace Dune
                     if ((x - c).two_norm() > 4) { far_point_local = true; }
                 }
 
-                //std::cout << "       @ Coordinate (" << x << "), using J^T = " << jacobianTransposed( x, analyticalMap) << std::endl;
-
                 MatrixHelper::template xTRightInvA< mydimension, coorddimension >( jacobianTransposed( x, analyticalMap), dglobal, dx );
                 x -= dx;
-
-                //std::cout << "       @ Coordinate (" << x << std::endl;
             } while ((dx.two_norm2() > tolerance)&&(!low_convergence)&&(!far_point_local));
-
-
-            //double sum_diff = 1;
-            //for (int i = 0; i < mydim; i++) { sum_diff -= x[i]; }
-
-            //std::cout << "   ===end tolerance " << dx.two_norm() << " of " << tolerance << " with total sum-1 " << sum_diff << " result " << x << " is " << refElement().checkInside(x) << std::endl;
-
 
             // Return the value of the local coordinate found
             localC = x;
@@ -985,110 +829,27 @@ namespace Dune
         }
     }
 
+
+    /** \brief Implements generalized integration element I = sqrt(det(J^T J))  */
     ctype integrationElement ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
     {
       //assert(mydim > 0);
       return MatrixHelper::template sqrtDetAAT< mydimension, coorddimension >( jacobianTransposed( local, analyticalMap ) );
     }
 
-    LocalPolynomial JacobianDeterminantAnalytical(const PolynomialVector & analyticalMap) const
-    {
-        if (mydim == 0) { return LocalPolynomial(Monomial(0.0, std::vector<int>())); }
 
-        //std::cout << "starting JacobianDeterminantAnalytical with size=" << analyticalMap.size() << std::endl;
-
-        //std::cout << "using analytical map:" << std::endl;
-        //for (int i = 0; i < analyticalMap.size(); i++)  { std::cout << "  ++++++ vec=" << analyticalMap[i].to_string() << std::endl; }
-
-
-        LocalPolynomial rez;
-
-        switch(coorddimension)
-        {
-        case 1:  rez = analyticalMap[0].derivative(0);
-            break;
-        case 2:  rez = analyticalMap[0].derivative(0) * analyticalMap[1].derivative(1) - analyticalMap[0].derivative(1) * analyticalMap[1].derivative(0);
-            break;
-        case 3:
-            //std::cout << " 24p957294308759347953089450934 tralalal" << std::endl;
-            rez += analyticalMap[0].derivative(0) * ( analyticalMap[1].derivative(1) * analyticalMap[2].derivative(2) - analyticalMap[1].derivative(2) * analyticalMap[2].derivative(1) );
-            rez += analyticalMap[0].derivative(1) * ( analyticalMap[1].derivative(2) * analyticalMap[2].derivative(0) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(2) );
-            rez += analyticalMap[0].derivative(2) * ( analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[1].derivative(1) * analyticalMap[2].derivative(0) );
-            //std::cout << " slkfskhfkshfkshdkfhhsdf trololol" << std::endl;
-
-            break;
-        }
-
-        //std::cout << "  === finished assembly, started cleanup" << std::endl;
-
-        // Clean-up in case some summands summed up to 0
-        rez.cleanUp();
-
-        //std::cout << "  === finished cleanup, started mult" << std::endl;
-
-        // Change sign if determinant is negative
-        if (rez.evaluate(refElement().position( 0, 0 )) < 0) { rez *= -1; }
-
-        //std::cout << "finished JacobianDeterminantAnalytical poly=" << rez.to_string() << std::endl;
-
-        return rez;
-    }
-
-    PolynomialVector NormalIntegrationElementAnalytical(const PolynomialVector & analyticalMap) const
-    {
-        assert(mydim > 0);
-        PolynomialVector rez;
-
-        // Case of edge in 2D
-        if ((mydimension == 1) && (coorddimension == 2))
-        {
-            rez.push_back(analyticalMap[1].derivative(0));
-            rez.push_back(analyticalMap[0].derivative(0) * (-1));
-        } else
-        // Case of face in 3D
-        if ((mydimension == 2) && (coorddimension == 3))
-        {
-            rez.push_back(analyticalMap[2].derivative(0) * analyticalMap[1].derivative(1) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1));
-            rez.push_back(analyticalMap[0].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[2].derivative(0) * analyticalMap[0].derivative(1));
-            rez.push_back(analyticalMap[1].derivative(0) * analyticalMap[0].derivative(1) - analyticalMap[0].derivative(0) * analyticalMap[1].derivative(1));
-        }
-
-        return rez;
-    }
-
-    LocalPolynomial IntegrationElementSquaredAnalytical(const PolynomialVector & analyticalMap) const
-    {
-        assert(mydim > 0);
-        LocalPolynomial rez;
-        switch (mydimension)
-        {
-        case 1:
-            for (int i = 0; i < coorddimension; i++) {
-                LocalPolynomial tmp = analyticalMap[i].derivative(0);
-                rez += tmp * tmp;
-            }
-            break;
-        case 2:
-            PolynomialVector normalIntegrationElement = NormalIntegrationElementAnalytical(analyticalMap);
-            for (int i = 0; i < coorddimension; i++) {
-                rez += normalIntegrationElement[i] * normalIntegrationElement[i];
-            }
-            break;
-        }
-        return rez;
-    }
-
+    /** \brief performs numerical integration of polynomial and non-polynomial functions. This functionality is necessary
+     * for the CurvilinearGeometry to be able to calculate volumes of its own elements, which may have non-polynomial DetJac */
     template <typename Functor, typename JacobiFunctor>
     typename Functor::ResultType integrateNumericalRecursive(
             const Functor & f,
             const JacobiFunctor & jacobiDet,
             double tolerance) const
     {
-        assert(mydim > 0);
-        const int DIM_SCALAR = 1;
+        assert(mydim > 0);                // We can not currently integrate over vertices, in principle this could be replaced by Dirac evaluation
         const int suggestedOrder = 1;
 
-        typedef Dune::QuadratureIntegrator<ctype, mydim, Functor>  QuadratureIntegrator;
+        typedef Dune::QuadratureIntegrator<ctype, mydim>  QuadratureIntegrator;
 
         return QuadratureIntegrator::integrateRecursive(type(), f, tolerance, jacobiDet, suggestedOrder).second;
 
@@ -1096,12 +857,18 @@ namespace Dune
         //return NInt.integrate( g, tolerance);
     }
 
+
+    /** \brief performs analytical volume integral of a scalar function given that cdim==mydim */
+    // [TODO] Move this functionality to a tutorial file
     ctype integrateAnalyticalScalar(const LocalPolynomial & P, const LocalPolynomial & jacobianDeterminant) const
     {
         assert(mydim > 0);
         return (P * jacobianDeterminant).integrateRefSimplex();
     }
 
+
+    /** \brief performs analytical surface integral of dot(f, n) */
+    // [TODO] Move this functionality to a tutorial file
     ctype integrateAnalyticalDot(const PolynomialVector & PVec, const PolynomialVector & normalIntegrationElement ) const
     {
         assert(mydim > 0);
@@ -1120,6 +887,13 @@ namespace Dune
   // CurvilinearGeometry::JacobianInverseTransposed
   // ----------------------------------------------
 
+
+  /*********************************************************/
+  /* Implementation of CurvilinearGeometry                **/
+  /* *******************************************************/
+
+  /** \brief Definition of Jacobian Inverse class */
+  // [FIXME] Defend against the case of det(jit) == 0
   template< class ct, int mydim, int cdim, class Traits >
   class CurvilinearGeometry< ct, mydim, cdim, Traits >::JacobianInverseTransposed
     : public FieldMatrix< ctype, coorddimension, mydimension >
@@ -1145,9 +919,7 @@ namespace Dune
   };
 
 
-  // Implementation of CurvilinearGeometry
-  // -------------------------------------
-
+  /** \brief Specialized constructor of Jit for non-cached geometry */
   template< class ct, int mydim, int cdim, class Traits >
   inline typename CurvilinearGeometry< ct, mydim, cdim, Traits >::JacobianInverseTransposed
   CurvilinearGeometry< ct, mydim, cdim, Traits >::jacobianInverseTransposed ( const LocalCoordinate &local ) const
@@ -1156,6 +928,9 @@ namespace Dune
       return jacobianInverseTransposed(local, analyticalMap);
   }
 
+
+  /** \brief Generic constructor of Jit for curvilinear geometry, that allows specifying pre-computed analytical map */
+  // [TODO] Unnecessary when we merge cached and non-cached geometries
   template< class ct, int mydim, int cdim, class Traits >
   inline typename CurvilinearGeometry< ct, mydim, cdim, Traits >::JacobianInverseTransposed
   CurvilinearGeometry< ct, mydim, cdim, Traits >::jacobianInverseTransposed ( const LocalCoordinate &local, const PolynomialVector & analyticalMap ) const
@@ -1193,12 +968,9 @@ namespace Dune
     typedef typename Dune::CurvilinearGeometryHelper::InternalIndexType         InternalIndexType;
     typedef typename Dune::CurvilinearGeometryHelper::InterpolatoryOrderType    InterpolatoryOrderType;
 
-    //! coordinate type
-    typedef ct ctype;
-    //! geometry dimension
-    static const int mydimension= mydim;
-    //! coordinate dimension
-    static const int coorddimension = cdim;
+    typedef ct ctype;                            //! coordinate type
+    static const int mydimension= mydim;         //! geometry dimension
+    static const int coorddimension = cdim;      //! coordinate dimension
 
     //! type of reference element
     typedef Dune::ReferenceElement< ctype, mydimension > ReferenceElement;
@@ -1214,6 +986,10 @@ namespace Dune
     typedef Polynomial<ctype, mydimension> LocalPolynomial;
     typedef std::vector<LocalPolynomial> PolynomialVector;
 
+    typedef typename Dune::DifferentialHelper::JacobianDeterminantAnalytical<This, cdim, mydim>         JacDetAnalytical;
+    typedef typename Dune::DifferentialHelper::NormalIntegrationElementAnalytical<This, cdim, mydim>    IntElemNormalAnalytical;
+    typedef typename Dune::DifferentialHelper::IntegrationElementSquaredAnalytical <This, cdim, mydim>  IntElemSquaredAnalytical;
+
 
     template< class Vertices >
     CachedCurvilinearGeometry ( const ReferenceElement &refElement,
@@ -1223,6 +999,7 @@ namespace Dune
     {
         init();
     }
+
 
     template< class Vertices >
     CachedCurvilinearGeometry (
@@ -1234,7 +1011,7 @@ namespace Dune
         init();
     }
 
-    //template< class Vertices >
+
     CachedCurvilinearGeometry ( const ElementInterpolator & elemInterp)
       : Base (elemInterp)
     {
@@ -1290,31 +1067,54 @@ namespace Dune
         return Base::local(global, local, analyticalMap_);
     }
 
+
     ctype integrationElement ( const LocalCoordinate &local ) const
     {
-        return Base::integrationElement ( local, analyticalMap_ );
+    	// [FIXME] Remove unnecessary debugging
+
+    	ctype numericalRez = Base::integrationElement ( local, analyticalMap_ );
+
+    	if (cdim == mydim)
+    	{
+    		ctype analyticalRez = JacobianDeterminantAnalytical().evaluate(local);
+
+    		if (fabs(analyticalRez - numericalRez) > 1.0e-10)
+    		{
+    			std::cout << "failed geometry set = ";
+    			for (int i = 0; i < Base::vertexSet().size(); i++) { std::cout << Base::vertexSet()[i] << "; "; }
+    			std::cout << std::endl;
+
+    			std::cout << "eval switch @ local pos = " << Base::refElement().position( 0, 0 ) << std::endl;
+    			std::cout << "AnalyticDetJ at this position is = " <<  JacobianDeterminantAnalytical().evaluate(Base::refElement().position( 0, 0 )) << std::endl;
+    			std::cout << "AnalyticDet=" << JacobianDeterminantAnalytical().to_string() << std::endl;
+    			std::cout << "AnalyticDetJ = " << analyticalRez << " != NumericalDetJ = " << numericalRez << std::endl;
+    			DUNE_THROW(Dune::IOError, "__ERROR: Analytic and numeric Jacobian determinants did not match");
+    		}
+    	}
+
+
+        return numericalRez;
     }
 
-    LocalPolynomial JacobianDeterminantAnalytical() const
-    {
-        return Base::JacobianDeterminantAnalytical(analyticalMap_);
-    }
 
-    PolynomialVector NormalIntegrationElementAnalytical() const
-    {
-        return Base::NormalIntegrationElementAnalytical(analyticalMap_);
-    }
+    PolynomialVector interpolatoryVectorAnalytical() const       { return analyticalMap_; }
 
-    LocalPolynomial IntegrationElementSquaredAnalytical() const
-    {
-        return Base::IntegrationElementSquaredAnalytical(analyticalMap_);
-    }
+
+    LocalPolynomial JacobianDeterminantAnalytical() const        { return JacobianDet_; }
+
+
+    PolynomialVector NormalIntegrationElementAnalytical() const  { return NormIntElem_; }
+
+
+    LocalPolynomial IntegrationElementSquaredAnalytical() const  { return IntElem2_; }
+
 
     ctype integrateScalar(const LocalPolynomial & P, double tolerance) const
     {
         if (mydimension == coorddimension) { return integrateAnalyticalScalar(P); }
         else                               { return integrateNumerical(PolynomialFunctor<ct, mydim>(P), tolerance); }
     }
+
 
     template <typename Functor>
     typename Functor::ResultType::value_type integrateNumerical(const Functor & f, double tolerance) const
@@ -1331,12 +1131,15 @@ namespace Dune
         }
     }
 
+
     ctype integrateAnalyticalScalar(const LocalPolynomial & P) const
     {
         return Base::integrateAnalyticalScalar(P, JacobianDet_);
     }
 
+
     // TODO: Throw error if invalid dim-cdim pair
+    // TODO: Implement integrateAnalyticalTimes function for Cached
     ctype integrateAnalyticalDot(const PolynomialVector & PVec) const
     {
         // If the dimensionality makes sense for this integral
@@ -1345,7 +1148,6 @@ namespace Dune
         return Base::integrateAnalyticalDot(PVec, NormIntElem_);
     }
 
-    // TODO: Implement integrateAnalyticalTimes function for Cached
 
     ctype volume (double tolerance) const
     {
@@ -1353,10 +1155,12 @@ namespace Dune
         return integrateScalar(identityPolynomial<ctype, mydim>(), tolerance);
     }
 
+
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local ) const
     {
         return Base::jacobianTransposed(local, analyticalMap_) ;
     }
+
 
     JacobianInverseTransposed jacobianInverseTransposed ( const LocalCoordinate &local ) const
     {
@@ -1370,16 +1174,16 @@ namespace Dune
     {
         analyticalMap_ = Base::interpolatoryVectorAnalytical();
 
+        // [TODO] Remove all initialization except analytic map, create only upon request
         if (mydim > 0)
         {
-          if (mydim == cdim) { JacobianDet_ = Base::JacobianDeterminantAnalytical(analyticalMap_); }
-          else               { IntElem2_ = Base::IntegrationElementSquaredAnalytical(analyticalMap_); }
+          if (mydim == cdim) { JacobianDet_ = JacDetAnalytical::eval(*this); }
+          else               { IntElem2_    = IntElemSquaredAnalytical::eval(*this); }
 
           bool valid_dim = ((mydimension == 1) && (coorddimension == 2)) || ((mydimension == 2) && (coorddimension == 3));
-          if (valid_dim)     { NormIntElem_ = Base::NormalIntegrationElementAnalytical(analyticalMap_); }
+          if (valid_dim)     { NormIntElem_ = IntElemNormalAnalytical::eval(*this); }
         }
     }
-
 
 
   protected:

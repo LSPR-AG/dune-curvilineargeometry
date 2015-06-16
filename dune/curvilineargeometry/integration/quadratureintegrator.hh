@@ -52,7 +52,7 @@ namespace Dune {
 
 
 
-template<class ctype, int mydim, class IntegrandFunctor>
+template<class ctype, int mydim>
 class QuadratureIntegrator {
     typedef Dune::QuadratureRule<ctype, mydim>    QRule;
     typedef Dune::QuadratureRules<ctype, mydim>   QRules;
@@ -89,26 +89,27 @@ class QuadratureIntegrator {
 
 
 
+
 public:
-
-    static const unsigned int nResult = IntegrandFunctor::RETURN_SIZE;
-	typedef typename IntegrandFunctor::ResultType   ResultType;
-	typedef typename ResultType::value_type         ResultValue;
-
-    typedef std::pair<unsigned int, ResultType>     StatInfo;       // To store pair (integrOrder, result)
-    typedef typename std::vector<StatInfo>          StatInfoVec;
-
-
-
-
-
 
     QuadratureIntegrator()  {}
 
 
+    template<class IntegrandFunctor>
+    struct Traits
+    {
+    	typedef typename IntegrandFunctor::ResultType         ResultType;
+    	typedef typename IntegrandFunctor::ResultValue        ResultValue;
+    	typedef typename std::pair<unsigned int, ResultType>  StatInfo;
+    	typedef typename std::vector<StatInfo>                StatInfoVec;
+
+    	static const unsigned int RETURN_SIZE = IntegrandFunctor::RETURN_SIZE;
+    };
+
+
     // Computes integral of a functor over an element using the provided Geometry to calculate integration elements
-    template<class Geometry>
-    static ResultType integrate(
+    template<class Geometry, class IntegrandFunctor>
+    static typename Traits<IntegrandFunctor>::ResultType integrate(
         const Geometry & geometry,
         const IntegrandFunctor & f,
         unsigned int integrOrder
@@ -120,26 +121,24 @@ public:
 
 
     // Computes integral of a functor over an element using the provided JacobianFunctor to calculate integration elements
-    template<class JacobiFunctor>
-    static ResultType integrate(
+    template<class JacobiFunctor, class IntegrandFunctor>
+    static typename Traits<IntegrandFunctor>::ResultType integrate(
         Dune::GeometryType gt,
         const IntegrandFunctor & f,
         unsigned int integrOrder,
-        const JacobiFunctor detJ
-    )
+        const JacobiFunctor detJ)
     {
         return integrateImpl(gt, f, integrOrder, detJ);
     }
 
 
     // Computes integral of a functor over an element recursively using the provided Geometry to calculate integration elements
-    template<class Geometry>
-    static StatInfo integrateRecursive(
+    template<class Geometry, class IntegrandFunctor>
+    static typename Traits<IntegrandFunctor>::StatInfo integrateRecursive(
         const Geometry & geometry,
         const IntegrandFunctor & f,
         ctype rel_tol,
-        unsigned int suggestedOrder = 1
-    )
+        unsigned int suggestedOrder = 1)
     {
         IntegrationElementFunctor<Geometry> detJ(geometry);
         return integrateRecursiveImpl(geometry.type(), f, rel_tol, suggestedOrder, detJ);
@@ -147,24 +146,29 @@ public:
 
 
     // Computes integral of a functor over an element recursively using the provided JacobianFunctor to calculate integration elements
-    template<class JacobiFunctor>
-    static StatInfo integrateRecursive(
+    template<class JacobiFunctor, class IntegrandFunctor>
+    static typename Traits<IntegrandFunctor>::StatInfo integrateRecursive(
         Dune::GeometryType gt,
         const IntegrandFunctor & f,
         ctype rel_tol,
         const JacobiFunctor & detJ,
-        unsigned int suggestedOrder = 1
-    )
+        unsigned int suggestedOrder = 1)
     {
         return integrateRecursiveImpl(gt, f, rel_tol, suggestedOrder, detJ);
     }
 
 
     // Integrates functor using all specified quadrature orders, returns vector of values
-    template<class Geometry>
-    static StatInfoVec integrateStat(const Geometry & geometry, const IntegrandFunctor & f, unsigned int integrOrderMax)
+    template<class Geometry, class IntegrandFunctor>
+    static typename Traits<IntegrandFunctor>::StatInfoVec integrateStat(
+    		const Geometry & geometry,
+    		const IntegrandFunctor & f,
+    		unsigned int integrOrderMax)
     {
-        StatInfoVec rez;
+    	typedef typename Traits<IntegrandFunctor>::ResultType   ResultType;
+    	typedef typename Traits<IntegrandFunctor>::StatInfo     StatInfo;
+
+    	std::vector<StatInfo> rez;
 
         for (unsigned int i = 1; i <= integrOrderMax; i++)
         {
@@ -182,14 +186,17 @@ protected:
 
 
     // Integrates functor over reference element using quadrature of a given order
-    template<class JacobiFunctor>
-    static ResultType integrateImpl(
+    template<class JacobiFunctor, class IntegrandFunctor>
+    static typename Traits<IntegrandFunctor>::ResultType integrateImpl(
         Dune::GeometryType gt,
         const IntegrandFunctor & f,
         unsigned int integrOrder,
         const JacobiFunctor & detJ
     )
     {
+    	typedef typename Traits<IntegrandFunctor>::ResultType   ResultType;
+    	const unsigned int nResult = Traits<IntegrandFunctor>::RETURN_SIZE;
+
         const QRule & rule = QRules::rule(gt, integrOrder);
         if (rule.order() < integrOrder)  { DUNE_THROW(Dune::Exception,"order not available"); }
 
@@ -204,6 +211,8 @@ protected:
             ctype weight = i->weight();
             ctype detjac = detJ(i->position())[0];
 
+            if (integrOrder > 6)  { std::cout << "eval f(x)=" << fval[0] << " detjac=" << detjac << std::endl; }
+
             for (unsigned int iResult = 0; iResult < nResult; iResult++)
             {
                 fval[iResult] *= weight * detjac;
@@ -211,19 +220,28 @@ protected:
             }
         }
 
+        int aaa;
+        if (integrOrder > 6)  { std::cin >> aaa; }
+
         return result;
     }
 
 
     // Integrates using gradually increasing quadrature order until estimated smooth relative tolerance achieved
-    template<class JacobiFunctor>
-    static StatInfo integrateRecursiveImpl(
+    template<class JacobiFunctor, class IntegrandFunctor>
+    static typename Traits<IntegrandFunctor>::StatInfo integrateRecursiveImpl(
             Dune::GeometryType gt,
             const IntegrandFunctor & f,
             ctype rel_tol,
             unsigned int suggestedOrder,
             const JacobiFunctor & jacobiFunctor)
     {
+    	typedef typename Traits<IntegrandFunctor>::ResultType   ResultType;
+    	typedef typename Traits<IntegrandFunctor>::ResultValue  ResultValue;
+    	typedef typename Traits<IntegrandFunctor>::StatInfo     StatInfo;
+    	const unsigned int nResult = Traits<IntegrandFunctor>::RETURN_SIZE;
+
+
     	std::cout << "Started recursive integral over geometry " << gt << "with relative tolerance "<< rel_tol << " suggester order " << suggestedOrder << std::endl;
 
 
@@ -290,12 +308,15 @@ protected:
                 resultThis[iResult] = resultNew[iResult];
                 deltaThis[iResult] = deltaNew;
             }
-
-            if (nResult == 6)  { //std::cout << resultThis[5] << std::endl;
-            	writeMatrix(resultThis[5], "/home/fomins/Documents/test/duneMatrix" + std::to_string(order) + ".txt");
-            }
-
             std::cout << "--- processed order=" << order << " quadrature size=" << thisQuadSize << " estimated relative error=" << relError << " desired error=" << rel_tol << std::endl;
+
+            // Write a matrix to a file for debugging purposes
+            //if (nResult == 6)  {
+            //if (order > 8)
+            //{
+            //	writeMatrix(resultThis[0], "/home/fomins/Documents/test/duneMatrix" + std::to_string(order) + ".txt");
+            //}
+            //            }
         }
 
         std::cout << "Finished recursive integral over geometry " << gt << std::endl;
