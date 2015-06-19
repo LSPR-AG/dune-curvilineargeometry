@@ -963,6 +963,8 @@ namespace Dune
     typedef CachedCurvilinearGeometry< ct, mydim, cdim, Traits > This;
     typedef CurvilinearGeometry< ct, mydim, cdim, Traits > Base;
 
+  public:
+
     typedef CurvilinearElementInterpolator <ct, mydim, cdim> ElementInterpolator;
 
     typedef typename Dune::CurvilinearGeometryHelper::InternalIndexType         InternalIndexType;
@@ -974,8 +976,6 @@ namespace Dune
 
     //! type of reference element
     typedef Dune::ReferenceElement< ctype, mydimension > ReferenceElement;
-
-  public:
 
     typedef typename Base::LocalCoordinate LocalCoordinate;
     typedef typename Base::GlobalCoordinate GlobalCoordinate;

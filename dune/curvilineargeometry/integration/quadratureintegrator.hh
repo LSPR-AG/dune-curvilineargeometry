@@ -211,7 +211,7 @@ protected:
             ctype weight = i->weight();
             ctype detjac = detJ(i->position())[0];
 
-            if (integrOrder > 6)  { std::cout << "eval f(x)=" << fval[0] << " detjac=" << detjac << std::endl; }
+            //if (integrOrder > 6)  { std::cout << "eval f(x)=" << fval[0] << " detjac=" << detjac << std::endl; }
 
             for (unsigned int iResult = 0; iResult < nResult; iResult++)
             {
@@ -219,9 +219,6 @@ protected:
                 result[iResult] += fval[iResult];
             }
         }
-
-        int aaa;
-        if (integrOrder > 6)  { std::cin >> aaa; }
 
         return result;
     }

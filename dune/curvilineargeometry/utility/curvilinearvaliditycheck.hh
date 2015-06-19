@@ -1,6 +1,7 @@
 #ifndef DUNE_CURVILINEAR_VALIDITY_CHECK_HH_
 #define DUNE_CURVILINEAR_VALIDITY_CHECK_HH_
 
+#include <iostream>
 #include <dune/curvilineargeometry/curvilineargeometry.hh>
 
 namespace Dune
@@ -41,7 +42,7 @@ bool SelfIntersection(
 			std::cout << "Warning: JacobianDeterminant has evaluated to a small value " << detjac << " at sample point " << samplePoints[i] << std::endl;
 		} else if (detjac < 0)
 		{
-			std::cout << "Jacobian Determinant: " << detjacP << std::endl;
+			std::cout << "Jacobian Determinant: " << detjacP.to_string() << std::endl;
 			std::cout << "Has negative value " << detjac << " at sample point " << samplePoints[i] << std::endl;
 
 			DUNE_THROW(Dune::IOError, "__ERROR: CheckSelfIntersection test suspects that the tested entity is self-intersecting");
