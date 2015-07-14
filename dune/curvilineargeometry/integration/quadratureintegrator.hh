@@ -239,7 +239,7 @@ protected:
     	const unsigned int nResult = Traits<IntegrandFunctor>::RETURN_SIZE;
 
 
-    	std::cout << "Started recursive integral over geometry " << gt << "with relative tolerance "<< rel_tol << " suggester order " << suggestedOrder << std::endl;
+    	//std::cout << "Started recursive integral over geometry " << gt << "with relative tolerance "<< rel_tol << " suggester order " << suggestedOrder << std::endl;
 
 
         // Initialise a zero result vector
@@ -305,7 +305,7 @@ protected:
                 resultThis[iResult] = resultNew[iResult];
                 deltaThis[iResult] = deltaNew;
             }
-            std::cout << "--- processed order=" << order << " quadrature size=" << thisQuadSize << " estimated relative error=" << relError << " desired error=" << rel_tol << std::endl;
+            //std::cout << "--- processed order=" << order << " quadrature size=" << thisQuadSize << " estimated relative error=" << relError << " desired error=" << rel_tol << std::endl;
 
             // Write a matrix to a file for debugging purposes
             //if (nResult == 6)  {
@@ -316,7 +316,7 @@ protected:
             //            }
         }
 
-        std::cout << "Finished recursive integral over geometry " << gt << std::endl;
+        std::cout << "Finished recursive integral over geometry " << gt << "suggested order: " << suggestedOrder << " final order " << order << std::endl;
 
         return StatInfo(order, resultThis);
     }

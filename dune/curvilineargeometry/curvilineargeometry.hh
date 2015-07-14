@@ -119,7 +119,7 @@ namespace Dune
           return ResultType(1, rez);
       }
 
-      bool isPolynomial()  { return (mydim == cdim)||(integration_element_generalised_.order() == 0); }
+      bool isPolynomial() const { return (mydim == cdim)||(integration_element_generalised_.order() <= 1); }
 
       unsigned int expectedOrder()  {
           return (mydim == cdim) ? integration_element_generalised_.order() : sqrt(integration_element_generalised_.order());
@@ -146,9 +146,9 @@ namespace Dune
 
       ResultType operator()(const LocalCoordinate & x) const { return ResultType(1, p_.evaluate(x)); }
 
-      bool isPolynomial()  { return true; }
+      bool isPolynomial() const { return true; }
 
-      unsigned int expectedOrder()  { return p_.order(); }
+      unsigned int expectedOrder() const  { return p_.order(); }
 
       ResultValue zeroValue(unsigned int rezIndex) const { return 0.0; }
 
@@ -851,7 +851,11 @@ namespace Dune
 
         typedef Dune::QuadratureIntegrator<ctype, mydim>  QuadratureIntegrator;
 
-        return QuadratureIntegrator::integrateRecursive(type(), f, tolerance, jacobiDet, suggestedOrder).second;
+        if (f.isPolynomial() && jacobiDet.isPolynomial()) {  // If the integrand is polynomial, it can be integrated using fixed order
+        	return QuadratureIntegrator::integrate(type(), f, suggestedOrder, jacobiDet);
+        } else {                                             // Otherwise, the order has to be determined recursively
+        	return QuadratureIntegrator::integrateRecursive(type(), f, tolerance, jacobiDet, suggestedOrder).second;
+        }
 
         //NumericalRecursiveInterpolationIntegrator<ct, mydim> NInt( type() );
         //return NInt.integrate( g, tolerance);
