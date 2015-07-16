@@ -329,17 +329,17 @@ int main ()
 	std::cout << "initialized" << std::endl;
 	const unsigned int N_TEST = 10;
 
-	powerTest<double, 1>(N_TEST);
-	powerTest<double, 2>(N_TEST);
-	powerTest<double, 3>(N_TEST);
+	//powerTest<double, 1>(N_TEST);
+	//powerTest<double, 2>(N_TEST);
+	//powerTest<double, 3>(N_TEST);
 
 	//powerTestRecursive<double, 1>(N_TEST);
 	//powerTestRecursive<double, 2>(N_TEST);
 	//powerTestRecursive<double, 3>(N_TEST);
 
-	//powerTestRootRecursive<double, 1>(1);
-	//powerTestRootRecursive<double, 2>(1);
-	//powerTestRootRecursive<double, 3>(1);
+	powerTestRootRecursive<double, 1>(1);
+	powerTestRootRecursive<double, 2>(1);
+	powerTestRootRecursive<double, 3>(1);
 
 	// Still some trickery is needed to make the complex tests compile
 	//powerTest<Complex, 1>(N_TEST);

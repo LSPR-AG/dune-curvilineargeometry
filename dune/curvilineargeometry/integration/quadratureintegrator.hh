@@ -251,9 +251,9 @@ protected:
 
         // Setting the initial estimated error of the integration to a reasonable value basically forces the routine to at least make two iterations
         // This avoids the case where the first guess for the integral is wrongly estimated as 0 due to unlucky symmetry of the integrand
-        std::vector<ctype> deltaThis(nResult, 1.0);
+        std::vector<ctype> relErrorThis(nResult, 1.0);
 
-        ctype relError = 1.0;                  // Set the initial relative error to non-zero such that there is at least one iteration
+        ctype relErrorRez = 1.0;                  // Set the initial relative error to non-zero such that there is at least one iteration
         ResultType         resultThis(zeroresult);  // Initialize the integral result to 0. This is purely conventional, it could be anything
 
         // Start at an order slightly earlier than the suggested one, to use it as an error reference
@@ -263,7 +263,7 @@ protected:
         int prevQuadSize = 0;
         int thisQuadSize = 0;
 
-        while (relError > rel_tol)
+        while (relErrorRez > rel_tol)
         {
             // Increase quadrature order. In Dune for some magical reason consecutive orders sometimes have the same quadrature
             // Keep increasing the order if the number of quadrature points did not change
@@ -279,31 +279,27 @@ protected:
             ResultType resultNew = integrate(gt, f, order, jacobiFunctor);
 
             // Refresh the relative error to calculate it anew
-            relError = 0;
+            relErrorRez = 0;
 
             for (unsigned int iResult = 0; iResult < nResult; iResult++)
             {
             	// The effective absolute error is defined as the difference between integrals at this and previous quadrature
-            	ResultValue deltaNewVec  = resultNew[iResult];
-                            deltaNewVec -= resultThis[iResult];
-                ctype deltaNew      = absoluteValue(deltaNewVec);
+            	ResultValue delta  = resultNew[iResult];
+                            delta -= resultThis[iResult];
+
+                ctype relErrorNew = relativeError(delta, resultNew[iResult]);
 
                 // Define smoothened absolute error as a linear combination between this and previous errors
                 // This avoids the case when two consecutive samplings give same wrong answer due to unlucky symmetry of the integrand wrt quadrature points
-                ctype deltaSmooth   = SMOOTH_FACTOR * deltaThis[iResult] +  (1 - SMOOTH_FACTOR) * deltaNew;
-
-
-            	// [TODO] If the previous error is small enough, re-computing the magnitude is unnecessary computational effort
-            	ctype magnitudeThis = absoluteValue(resultNew[iResult]);       // Find the magnitude of this result
-                ctype errorThis = relativeError(deltaSmooth, magnitudeThis);   // Calculate the relative error
+                ctype relErrorSmooth   = SMOOTH_FACTOR * relErrorThis[iResult] +  (1 - SMOOTH_FACTOR) * relErrorNew;
 
                 // If several quantities are integrated at the same time, only consider the worst error among them
                 // This is because we want all of the quantities to integrate to at least the requested precision
-                relError = std::max(relError, errorThis);
+                relErrorRez = std::max(relErrorRez, relErrorSmooth);
 
                 // Update values of result and error with new ones
-                resultThis[iResult] = resultNew[iResult];
-                deltaThis[iResult] = deltaNew;
+                resultThis[iResult]   = resultNew[iResult];
+                relErrorThis[iResult] = relErrorNew;
             }
             //std::cout << "--- processed order=" << order << " quadrature size=" << thisQuadSize << " estimated relative error=" << relError << " desired error=" << rel_tol << std::endl;
 
@@ -344,39 +340,62 @@ protected:
     }
 
 
-    static ctype relativeError(ctype abs_err, ctype abs_mag)
+    // Calculates relative 1-norm of a scalar
+    template<class ValueType>
+    static ctype relativeError(ValueType & delta, ValueType & mag)
     {
-		// Only calculate relative error if the absolute value of the error is large enough
+    	ctype abs_d = std::abs(delta);
+    	ctype abs_m = std::abs(mag);
+
+		// Only calculate relative error if the absolute value of the actual quantity is large enough
 		// Otherwise just return absolute error
-    	return (abs_err > 1.0e-15) ? abs_err / abs_mag : abs_err;
+    	return (abs_m > 1.0e-15) ? abs_d / abs_m : abs_d;
     }
 
 
-    template<class ValueType>
-    static ctype absoluteValue(ValueType & v)
-    {
-    	return std::abs(v);
-    }
-
-
+    // Calculates relative one-norm of a FieldVector
     template<class ValueType, int RESULT_DIM>
-    static ctype absoluteValue(Dune::FieldVector<ValueType, RESULT_DIM> & v)
+    static ctype relativeError(
+    	Dune::FieldVector<ValueType, RESULT_DIM> & delta,
+    	Dune::FieldVector<ValueType, RESULT_DIM> & mag)
     {
-    	return v.two_norm();
+    	//v.two_norm()
+
+    	ctype rez = 0;
+    	for (int i = 0; i < RESULT_DIM; i++) { rez = std::max(rez, relativeError(delta[i], mag[i])); }
+    	return rez;
     }
 
 
+    // Calculates relative one-norm of a DynamicVector
     template<class ValueType>
-    static ctype absoluteValue(Dune::DynamicVector<ValueType> & v)
+    static ctype relativeError(
+    	Dune::DynamicVector<ValueType> & delta,
+    	Dune::DynamicVector<ValueType> & mag)
     {
-    	return v.two_norm();
+    	// v.two_norm();
+
+    	ctype rez = 0;
+    	for (int i = 0; i < delta.N(); i++) { rez = std::max(rez, relativeError(delta[i], mag[i])); }
+    	return rez;
     }
 
 
+    // Calculates relative one-norm of a DynamicMatrix
     template<class ValueType>
-    static ctype absoluteValue(Dune::DynamicMatrix<ValueType> & v)
+    static ctype relativeError(
+    	Dune::DynamicMatrix<ValueType> & delta,
+    	Dune::DynamicMatrix<ValueType> & mag)
     {
-    	return v.frobenius_norm();
+    	//return v.frobenius_norm();
+
+    	ctype rez = 0;
+    	for (int i = 0; i < delta.N(); i++) {
+    		for (int j = 0; j < delta.M(); j++) {
+    			rez = std::max(rez, relativeError(delta[i][j], mag[i][j]));
+    		}
+    	}
+    	return rez;
     }
 
 
