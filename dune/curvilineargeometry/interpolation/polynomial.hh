@@ -139,23 +139,50 @@ class Polynomial {
   typedef unsigned int uint;
 
 public:
-  SummandVector poly_;
+  SummandVector         poly_;
+  mutable std::vector<double>   factorial_;       // DO NOT USE CTYPE HERE! Factorial has to be forced to be a real variable to fit all the numbers
+  mutable bool                  cached_;          // Init this variable if the polynomial will not be edited any more, and needs to be optimized for efficient access
+  mutable uint                  order_;           // The max polynomial order of the monomials
+  mutable std::vector<int>     orderdim_;        // Max monomial order for a given dimension
 
-  Polynomial()                      { poly_.push_back(zeroMonomial()); }  // Empty polynomial
+
+  // Empty polynomial
+  Polynomial() :
+	  cached_(false),     // Cache is always empty unless the user explicitly asks for it
+  	  order_(0)
+  {
+	  factorial_ = std::vector<double> {1, 1};  // Initialize the first two members of the factorial
+	  poly_.push_back(zeroMonomial());
+
+  }
+
 
   // Polynomial from a summand
-  Polynomial(Monomial polySM)  {
+  Polynomial(Monomial polySM)  :
+	  cached_(false),     // Cache is always empty unless the user explicitly asks for it
+	  order_(0)
+  {
 	  if (dim != polySM.dim())  { std::cout << "attempting to push a " << polySM.dim() << " monomial to a poly " << dim << std::endl;  }
 	  assert(dim == polySM.dim());  // Must push polynomial of correct dimension
+
+	  factorial_ = std::vector<double> {1, 1};  // Initialize the first two members of the factorial
 	  poly_.push_back(polySM);
   }
+
+
   //Polynomial(SummandVector polyNew) { poly_ = polyNew; }                  // Polynomial from a vector of summands
 
+
   Polynomial(const Polynomial & other) :
-    poly_(other.poly_)
+    poly_(other.poly_),
+    cached_(other.cached_),
+    order_(other.order_),
+    orderdim_(other.orderdim_),
+    factorial_(other.factorial_)
   {
 
   }
+
 
   Monomial zeroMonomial()  { return Monomial(0.0, std::vector<int> (dim, 0)); }
 
@@ -345,6 +372,7 @@ public:
     return rez;
   }
 
+
   /** \brief Magnitude of Polynomial
    *
    *  \returns    Highest absolute value of a prefactor of a summand of a Polynomial
@@ -381,6 +409,8 @@ public:
    *  \returns    value of the polynoimal at the given point
    */
   ctype evaluate(const LocalCoordinate & point) const {
+	if (cached_)  { return evaluateCached(point); }
+
 	ctype rez = 0;
 
     for (uint i = 0; i < poly_.size(); i++) {
@@ -391,6 +421,7 @@ public:
     return rez;
   }
 
+
   /** \brief Integrates the Polynomial over a reference simplex (edge, triangle or tetrahedron, depending on dim)
    *
    *  \returns    Returns the value of the analytical integral of the Polynomial
@@ -398,24 +429,24 @@ public:
   ctype integrateRefSimplex() const {
 	assert((dim > 0) && (dim <= 3));
 
-	ctype rez = 0.0;
-
-    // Generate factorial list up to the needed order
-    uint polyorder = order();
-    std::vector<double> factorial(2, 1.0);  // NOTE: !!! factorial should be a Real variable, do not use ctype here
-    for (uint i = 2; i <= polyorder + dim; i++) { factorial.push_back( i * factorial[i - 1] ); }
+    if (!cached_)  {
+    	order_ = order();
+    	updateFactorial();
+    }
 
     // Compute the analytical integral
+    ctype rez = 0.0;
     for (uint i = 0; i < poly_.size(); i++) {
       switch (dim)
       {
           case 1 : rez += poly_[i].pref_ / double(poly_[i].power_[0] + 1);  break;
-          case 2 : rez += poly_[i].pref_ * factorial[poly_[i].power_[0]] * factorial[poly_[i].power_[1]] / factorial[poly_[i].power_[0] + poly_[i].power_[1] + 2];  break;
-          case 3 : rez += poly_[i].pref_ * factorial[poly_[i].power_[0]] * factorial[poly_[i].power_[1]] * factorial[poly_[i].power_[2]] / factorial[poly_[i].power_[0] + poly_[i].power_[1] + poly_[i].power_[2] + 3];  break;
+          case 2 : rez += poly_[i].pref_ * factorial_[poly_[i].power_[0]] * factorial_[poly_[i].power_[1]] / factorial_[poly_[i].power_[0] + poly_[i].power_[1] + 2];  break;
+          case 3 : rez += poly_[i].pref_ * factorial_[poly_[i].power_[0]] * factorial_[poly_[i].power_[1]] * factorial_[poly_[i].power_[2]] / factorial_[poly_[i].power_[0] + poly_[i].power_[1] + poly_[i].power_[2] + 3];  break;
       }
     }
     return rez;
   }
+
 
   /** \brief Removes all summands that are effectively 0
    *
@@ -435,6 +466,7 @@ public:
 
     poly_ = poly_cleaned;
   }
+
 
   /** \brief Adds up repeating powers.
    *
@@ -468,6 +500,18 @@ public:
     poly_ = polyNew;
   }
 
+
+  // Declares that the this polynomial will no longer be edited. It hence gets optimized for evaluation and integration.
+  void cache()
+  {
+	  //std::cout << "cache called" << std::endl;
+
+	  cached_ = true;
+	  updateOrderDim();
+	  updateFactorial();
+  }
+
+
   /** \brief Convert the Polynomial to a string for future output
    *
    */
@@ -488,6 +532,61 @@ public:
     return out_str.str();
   }
 
+
+
+protected:
+
+  // Generate factorial list up to the needed order
+  void updateFactorial() const
+  {
+	int start = factorial_.size();
+	for (uint i = start; i <= order_ + dim; i++) { factorial_.push_back( i * factorial_[i - 1] ); }
+  }
+
+
+  void updateOrderDim() const
+  {
+	  order_ = 0;
+	  orderdim_ = std::vector<int> (3, 0);
+
+	  for (uint i = 0; i < poly_.size(); i++)  {
+		  uint ordertmp = 0;
+
+		  for (uint d = 0; d < dim; d++)
+		  {
+			  ordertmp += poly_[i].power_[d];
+			  orderdim_[d] = std::max(orderdim_[d], poly_[i].power_[d]);
+		  }
+
+		  order_ = std::max(order_, ordertmp);
+	  }
+  }
+
+
+  // Calculating the pow(double, i) is expensive. One solution is to compute all necessary powers for each dimension once, and then just reuse them for monomials
+  // Possible Optimization 1: This method is suboptimal if the number of monomials is smaller than the order of polynomial
+  // Possible Optimization 2: This method is suboptimal if not all powers below max are used. In this case there are more sophisticated algorithms to ge
+  //   all necessary powers with sub-linear computation time, but they are a bit involved
+  ctype evaluateCached(const LocalCoordinate & point) const {
+	//std::cout << "using cached" << std::endl;
+
+	// Pre-compute all used powers for each dimension
+	ctype monomialeval[dim][order_ + 1];  // calculatex (x_d)^i, where x_d is d-th coordinate, and i is the power
+	for (uint d = 0; d < dim; d++)  {
+		monomialeval[d][0] = 1;
+		for (int i = 1; i <= orderdim_[d]; i++)  { monomialeval[d][i] = monomialeval[d][i - 1] * point[d]; }
+	}
+
+	ctype rez = 0;
+
+    for (uint i = 0; i < poly_.size(); i++) {
+      ctype powTmp = 1.0;
+      for (int d = 0; d < dim; d++) { powTmp *= monomialeval[d][poly_[i].power_[d]]; }
+      rez += poly_[i].pref_ * powTmp;
+    }
+    return rez;
+  }
+
 };
 
 
@@ -503,6 +602,7 @@ template<class ctype, int dim>
 Polynomial<ctype, dim> identityPolynomial() {
     return Polynomial<ctype, dim> ( typename PolynomialTraits<ctype>::Monomial(1.0, std::vector<int>(dim, 0)) );
 }
+
 
 
 } // namespace Dune

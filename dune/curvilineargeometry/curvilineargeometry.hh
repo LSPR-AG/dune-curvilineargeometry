@@ -108,7 +108,9 @@ namespace Dune
 
       JacobianFunctor(const LocalPolynomial & integration_element_g) :
           integration_element_generalised_ (integration_element_g)
-      {}
+      {
+    	  integration_element_generalised_.cache();
+      }
 
       ResultType     operator()(const LocalCoordinate & x) const {
           ctype rez;
@@ -121,8 +123,8 @@ namespace Dune
 
       bool isPolynomial() const { return (mydim == cdim)||(integration_element_generalised_.order() <= 1); }
 
-      unsigned int expectedOrder()  {
-          return (mydim == cdim) ? integration_element_generalised_.order() : sqrt(integration_element_generalised_.order());
+      unsigned int expectedOrder() const {
+          return (mydim == cdim) ? integration_element_generalised_.order() : round(sqrt(integration_element_generalised_.order()));
       }
 
       ResultValue zeroValue(unsigned int rezIndex) const { return 0.0; }
@@ -847,7 +849,7 @@ namespace Dune
             double tolerance) const
     {
         assert(mydim > 0);                // We can not currently integrate over vertices, in principle this could be replaced by Dirac evaluation
-        const int suggestedOrder = 1;
+        const int suggestedOrder = f.expectedOrder() + jacobiDet.expectedOrder();
 
         typedef Dune::QuadratureIntegrator<ctype, mydim>  QuadratureIntegrator;
 

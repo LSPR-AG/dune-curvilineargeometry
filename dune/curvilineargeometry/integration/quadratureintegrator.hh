@@ -172,10 +172,29 @@ public:
 
         for (unsigned int i = 1; i <= integrOrderMax; i++)
         {
-            rez.push_back(StatInfo(
-                QRules::rule(geometry.type(), i).size(),
-                integrate(geometry, f, i)
-            ));
+            rez.push_back(StatInfo( QRules::rule(geometry.type(), i).size(), integrate(geometry, f, i) ));
+        }
+
+        return rez;
+    }
+
+
+    // Integrates functor using all specified quadrature orders, returns vector of values
+    template<class JacobiFunctor, class IntegrandFunctor>
+    static typename Traits<IntegrandFunctor>::StatInfoVec integrateStat(
+            Dune::GeometryType gt,
+    		const IntegrandFunctor & f,
+            const JacobiFunctor & detJ,
+    		unsigned int integrOrderMax)
+    {
+    	typedef typename Traits<IntegrandFunctor>::ResultType   ResultType;
+    	typedef typename Traits<IntegrandFunctor>::StatInfo     StatInfo;
+
+    	std::vector<StatInfo> rez;
+
+        for (unsigned int i = 1; i <= integrOrderMax; i++)
+        {
+            rez.push_back(StatInfo( QRules::rule(gt, i).size(), integrate(gt, f, i, detJ) ));
         }
 
         return rez;

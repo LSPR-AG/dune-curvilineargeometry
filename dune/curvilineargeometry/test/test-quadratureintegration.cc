@@ -64,6 +64,10 @@ struct function2d6 : public functionDouble {  functionDouble::ResultType operato
 struct function2d7 : public functionDouble {  functionDouble::ResultType operator()(const GlobalVector2D & in) const  { return functionDouble::ResultType(1, 3628800 * pow(in[0], 7) * pow(in[1], 10)); }  };
 struct function2d8 : public functionDouble {  functionDouble::ResultType operator()(const GlobalVector2D & in) const  { return functionDouble::ResultType(1, sqrt(pow(in[0], 7) * pow(in[1], 10) + 0.5)); }  };
 
+struct function3d1 : public functionDouble {  functionDouble::ResultType operator()(const GlobalVector3D & in) const  { return functionDouble::ResultType(1, 1.0); }  };
+struct function3d2 : public functionDouble {  functionDouble::ResultType operator()(const GlobalVector3D & in) const  { return functionDouble::ResultType(1, sqrt(in[0] * in[1] * in[2])); }  };
+struct function3d3 : public functionDouble {  functionDouble::ResultType operator()(const GlobalVector3D & in) const  { return functionDouble::ResultType(1, sqrt(pow(in[0], 2) + pow(in[1], 2) + pow(in[2], 2))); }  };
+
 
 template<class ctype, int dim>
 Dune::Polynomial<ctype, dim> NewtonPolynomial(int power)
@@ -180,6 +184,7 @@ int main ()
 
   typedef Dune::QuadratureIntegrator<double, 1> QuadIntegrator1D;
   typedef Dune::QuadratureIntegrator<double, 2> QuadIntegrator2D;
+  typedef Dune::QuadratureIntegrator<double, 3> QuadIntegrator3D;
   //Dune::QuadratureIntegrator<double, 3, 1> funIntegrator3DScalar;
 
   double rec_tol = 1.0e-5;
@@ -198,9 +203,13 @@ int main ()
   recursiveWrite(QuadIntegrator2D::integrateRecursive(faceGeometry, function2d7(), rec_tol, unityJacobianFunctor()));
   recursiveWrite(QuadIntegrator2D::integrateRecursive(faceGeometry, function2d8(), rec_tol, unityJacobianFunctor()));
 
-  depthTest<1>(25, rec_tol);
-  depthTest<2>(25, rec_tol);
-  depthTest<3>(25, rec_tol);
+  recursiveWrite(QuadIntegrator3D::integrateRecursive(elemGeometry, function3d1(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator3D::integrateRecursive(elemGeometry, function3d2(), rec_tol, unityJacobianFunctor()));
+  recursiveWrite(QuadIntegrator3D::integrateRecursive(elemGeometry, function3d3(), rec_tol, unityJacobianFunctor()));
+
+  //depthTest<1>(25, rec_tol);
+  //depthTest<2>(25, rec_tol);
+  //depthTest<3>(25, rec_tol);
 
 
   /*
