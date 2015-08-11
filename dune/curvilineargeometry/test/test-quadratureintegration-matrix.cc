@@ -251,7 +251,9 @@ template<class ctype, int dim>
 void powerTestRecursive(unsigned int N_TEST)
 {
 	const unsigned int MAX_MATRIX_DIM = 30;
-	const double   REL_TOL = 1.0e-10;
+	const double   RELATIVE_TOLERANCE = 1.0e-10;
+	const double   ACCURACY_GOAL = 1.0e-20;
+	const unsigned int NORM_TYPE = Dune::QUADRATURE_NORM_L2;
 
 	Dune::GeometryType simplexGeometry;   simplexGeometry.makeSimplex(dim);
 
@@ -271,9 +273,9 @@ void powerTestRecursive(unsigned int N_TEST)
 			unsigned int nCol = 1 + (rand() % MAX_MATRIX_DIM);
 
 			PolyFunctor         polyFunctor(nRow, nCol, iPower);
-			PolyQuadIntegrator  integrator;
 
-			Matrix rez  = integrator.integrateRecursive(simplexGeometry, polyFunctor, REL_TOL, unityJacobianFunctor(), iPower).second[0];  // Note that first we extract result vector from the return value, then the result from the vector
+			// Note that first we extract result vector from the return value, then the result from the vector
+			Matrix rez  = PolyQuadIntegrator::template integrateRecursive<unityJacobianFunctor, polyFunctor, NORM_TYPE>(simplexGeometry, polyFunctor, unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL, iPower).second[0];
 			Matrix test = polyFunctor.integrateRef()[0];
 
 			double err_this = matrixError(rez, test);

@@ -43,7 +43,7 @@
 #include <dune/geometry/type.hh>
 #include <dune/geometry/quadraturerules.hh>
 
-
+#include <dune/curvilineargeometry/integration/quadraturerelativeerror.hh>
 
 
 
@@ -57,7 +57,7 @@ class QuadratureIntegrator {
     typedef Dune::QuadratureRule<ctype, mydim>    QRule;
     typedef Dune::QuadratureRules<ctype, mydim>   QRules;
 
-    static const int MAX_INT_ORDER = 60;
+    static const int MAX_INT_ORDER = 60;   // Maximal Quadrature order currently available in Dune
 
 
     template <class Geometry>
@@ -133,28 +133,32 @@ public:
 
 
     // Computes integral of a functor over an element recursively using the provided Geometry to calculate integration elements
-    template<class Geometry, class IntegrandFunctor>
+    template<class Geometry, class IntegrandFunctor, int NormType>
     static typename Traits<IntegrandFunctor>::StatInfo integrateRecursive(
         const Geometry & geometry,
         const IntegrandFunctor & f,
-        ctype rel_tol,
+        ctype RELATIVE_TOLERANCE,
+        ctype ACCURACY_GOAL,
         unsigned int suggestedOrder = 1)
     {
-        IntegrationElementFunctor<Geometry> detJ(geometry);
-        return integrateRecursiveImpl(geometry.type(), f, rel_tol, suggestedOrder, detJ);
+    	typedef IntegrationElementFunctor<Geometry>  JacobiFunctor;
+
+    	JacobiFunctor detJ(geometry);
+        return integrateRecursiveImpl<JacobiFunctor, IntegrandFunctor, NormType>(geometry.type(), f, detJ, RELATIVE_TOLERANCE, ACCURACY_GOAL, suggestedOrder);
     }
 
 
     // Computes integral of a functor over an element recursively using the provided JacobianFunctor to calculate integration elements
-    template<class JacobiFunctor, class IntegrandFunctor>
+    template<class JacobiFunctor, class IntegrandFunctor, int NormType>
     static typename Traits<IntegrandFunctor>::StatInfo integrateRecursive(
         Dune::GeometryType gt,
         const IntegrandFunctor & f,
-        ctype rel_tol,
         const JacobiFunctor & detJ,
+        ctype RELATIVE_TOLERANCE,
+        ctype ACCURACY_GOAL,
         unsigned int suggestedOrder = 1)
     {
-        return integrateRecursiveImpl(gt, f, rel_tol, suggestedOrder, detJ);
+        return integrateRecursiveImpl<JacobiFunctor, IntegrandFunctor, NormType>(gt, f, detJ, RELATIVE_TOLERANCE, ACCURACY_GOAL, suggestedOrder);
     }
 
 
@@ -244,13 +248,14 @@ protected:
 
 
     // Integrates using gradually increasing quadrature order until estimated smooth relative tolerance achieved
-    template<class JacobiFunctor, class IntegrandFunctor>
+    template<class JacobiFunctor, class IntegrandFunctor, int NormType>
     static typename Traits<IntegrandFunctor>::StatInfo integrateRecursiveImpl(
             Dune::GeometryType gt,
             const IntegrandFunctor & f,
-            ctype rel_tol,
-            unsigned int suggestedOrder,
-            const JacobiFunctor & jacobiFunctor)
+            const JacobiFunctor & jacobiFunctor,
+            ctype RELATIVE_TOLERANCE,
+            ctype ACCURACY_GOAL,
+            unsigned int suggestedOrder)
     {
     	typedef typename Traits<IntegrandFunctor>::ResultType   ResultType;
     	typedef typename Traits<IntegrandFunctor>::ResultValue  ResultValue;
@@ -282,7 +287,7 @@ protected:
         int prevQuadSize = 0;
         int thisQuadSize = 0;
 
-        while (relErrorRez > rel_tol)
+        while (relErrorRez > RELATIVE_TOLERANCE)
         {
             // Increase quadrature order. In Dune for some magical reason consecutive orders sometimes have the same quadrature
             // Keep increasing the order if the number of quadrature points did not change
@@ -306,7 +311,7 @@ protected:
             	ResultValue delta  = resultNew[iResult];
                             delta -= resultThis[iResult];
 
-                ctype relErrorNew = relativeError(delta, resultNew[iResult]);
+                ctype relErrorNew = Dune::QuadratureRelativeError<ctype, ResultValue, NormType>::eval(delta, resultNew[iResult], ACCURACY_GOAL);
 
                 // Define smoothened absolute error as a linear combination between this and previous errors
                 // This avoids the case when two consecutive samplings give same wrong answer due to unlucky symmetry of the integrand wrt quadrature points
@@ -320,15 +325,20 @@ protected:
                 resultThis[iResult]   = resultNew[iResult];
                 relErrorThis[iResult] = relErrorNew;
             }
-            //std::cout << "--- processed order=" << order << " quadrature size=" << thisQuadSize << " estimated relative error=" << relError << " desired error=" << rel_tol << std::endl;
+
+            std::cout << "--- processed order=" << order
+            		  << " quadrature size="    << thisQuadSize
+            		  << " estimated relative error=" << writeVector<ctype>(relErrorThis)
+            		  << " desired error=" << RELATIVE_TOLERANCE << std::endl;
 
             // Write a matrix to a file for debugging purposes
-            //if (nResult == 6)  {
-            //if (order > 8)
-            //{
-            //	writeMatrix(resultThis[0], "/home/fomins/Documents/test/duneMatrix" + std::to_string(order) + ".txt");
-            //}
-            //            }
+            // FIXME DEBUG
+            if (nResult == 2)  {
+            if (order > 15)
+            {
+            	writeMatrix(resultThis[1], "/home/fomins/Documents/test/duneMatrix" + std::to_string(order) + ".txt");
+            }
+                        }
         }
 
         std::cout << "Finished recursive integral over geometry " << gt << "suggested order: " << suggestedOrder << " final order " << order << std::endl;
@@ -336,10 +346,44 @@ protected:
         return StatInfo(order, resultThis);
     }
 
+    template<typename Val>
+    static std::string writeVector(std::vector<Val> a)
+    {
+    	std::stringstream aaa;
+
+    	aaa << "[";
+    	for (int i = 0; i < a.size(); i++)  { aaa << a[i] << ","; }
+    	aaa << "]";
+    	return aaa.str();
+    }
+
+
 
     template <class VT>           static void writeMatrix(VT & mat, std::string filename) {}
-    template <class VT, int dim>  static void writeMatrix(Dune::FieldVector<VT, dim> & mat, std::string filename) {}
-    template <class VT>           static void writeMatrix(Dune::DynamicVector<VT> & mat,    std::string filename) {}
+    template <class VT>           static void writeMatrix(Dune::DynamicVector<VT> & mat,    std::string filename)
+    {
+    	unsigned int L = mat.N();
+    	unsigned int nDof = floor(0.5 * (sqrt(1 + 8 * L) - 1));
+    	unsigned int pos = 0;
+
+    	std::cout << "Writing matrix to matlab " << L << " " << nDof << " " << std::endl;
+
+    	std::ofstream myfile (filename);
+    	if (myfile.is_open())
+    	{
+        	for (int i = 0; i < nDof; i++)
+        	{
+            	for (int j = 0; j <= i; j++)
+            	{
+            		myfile << mat[pos++] << " ";
+            	}
+            	myfile << std::endl;
+        	}
+    		myfile.close();
+    	}
+    }
+
+
 
     template <class VT>
     static void writeMatrix (Dune::DynamicMatrix<VT> & mat, std::string filename)
@@ -359,63 +403,6 @@ protected:
     }
 
 
-    // Calculates relative 1-norm of a scalar
-    template<class ValueType>
-    static ctype relativeError(ValueType & delta, ValueType & mag)
-    {
-    	ctype abs_d = std::abs(delta);
-    	ctype abs_m = std::abs(mag);
-
-		// Only calculate relative error if the absolute value of the actual quantity is large enough
-		// Otherwise just return absolute error
-    	return (abs_m > 1.0e-15) ? abs_d / abs_m : abs_d;
-    }
-
-
-    // Calculates relative one-norm of a FieldVector
-    template<class ValueType, int RESULT_DIM>
-    static ctype relativeError(
-    	Dune::FieldVector<ValueType, RESULT_DIM> & delta,
-    	Dune::FieldVector<ValueType, RESULT_DIM> & mag)
-    {
-    	//v.two_norm()
-
-    	ctype rez = 0;
-    	for (int i = 0; i < RESULT_DIM; i++) { rez = std::max(rez, relativeError(delta[i], mag[i])); }
-    	return rez;
-    }
-
-
-    // Calculates relative one-norm of a DynamicVector
-    template<class ValueType>
-    static ctype relativeError(
-    	Dune::DynamicVector<ValueType> & delta,
-    	Dune::DynamicVector<ValueType> & mag)
-    {
-    	// v.two_norm();
-
-    	ctype rez = 0;
-    	for (int i = 0; i < delta.N(); i++) { rez = std::max(rez, relativeError(delta[i], mag[i])); }
-    	return rez;
-    }
-
-
-    // Calculates relative one-norm of a DynamicMatrix
-    template<class ValueType>
-    static ctype relativeError(
-    	Dune::DynamicMatrix<ValueType> & delta,
-    	Dune::DynamicMatrix<ValueType> & mag)
-    {
-    	//return v.frobenius_norm();
-
-    	ctype rez = 0;
-    	for (int i = 0; i < delta.N(); i++) {
-    		for (int j = 0; j < delta.M(); j++) {
-    			rez = std::max(rez, relativeError(delta[i][j], mag[i][j]));
-    		}
-    	}
-    	return rez;
-    }
 
 
 

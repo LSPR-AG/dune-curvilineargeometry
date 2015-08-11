@@ -656,19 +656,20 @@ bool SimplexTest(Functor f, int ord, int f_type, int f_order, std::string f_name
         std::cout << ": Integral-test: --Omitted because polynomial order too small" << std::endl;
     } else
     {
-        double tmpTolerance = 1.0e-5;
+        double RELATIVE_TOLERANCE = 1.0e-5;
+        double ACCURACY_GOAL = 1.0e-15;
 
         for (int bf_ord = 0; bf_ord <= 5; bf_ord++)
         {
             Polynomial<ctype, mydim> basisP = BasisPolynomial<ctype, mydim>(bf_ord);
 
-            double int_rez = SimplexGeom.integrateScalar(basisP, tmpTolerance);
-            double int_rez_cached = SimplexGeomCached.integrateScalar(basisP, tmpTolerance);
+            double int_rez = SimplexGeom.integrateScalar(basisP, RELATIVE_TOLERANCE, ACCURACY_GOAL);
+            double int_rez_cached = SimplexGeomCached.integrateScalar(basisP, RELATIVE_TOLERANCE, ACCURACY_GOAL);
 
             double int_true = integralResult<mydim, cdim>(bf_ord, f_type);
 
-            test6_pass &= fabs((int_rez - int_true) / int_true) < tmpTolerance;
-            test6_cached_pass &= fabs((int_rez_cached - int_true) / int_true) < tmpTolerance;
+            test6_pass &= fabs((int_rez - int_true) / int_true) < RELATIVE_TOLERANCE;
+            test6_cached_pass &= fabs((int_rez_cached - int_true) / int_true) < RELATIVE_TOLERANCE;
             //std::cout << ": Integral of order " << bf_ord << " over entity dim " << mydim << " and order " << ord << " evaluated to ";
             //std::cout << int_rez << " which has error: " << int_rez - integralResults<mydim, cdim>(bf_ord, f_type) << std::endl;
         }

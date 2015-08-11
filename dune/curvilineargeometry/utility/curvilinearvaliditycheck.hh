@@ -31,10 +31,15 @@ bool SelfIntersection(
 
 	LocalCoordinateSet samplePoints = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<ctype, mydimension>(sampleOrder);
 
+	ctype detJacMin = 10000;
+	ctype detJacMax = -10000;
+
 	for (unsigned int i = 0; i < samplePoints.size(); i++)
 	{
 		LocalPolynomial  detjacP = Dune::DifferentialHelper::JacobianDeterminantAnalytical<CurvGeom, coorddimension, mydimension>::eval(curvgeom);
 		ctype            detjac = detjacP.evaluate(samplePoints[i]);
+		detJacMin = std::min(detJacMin, detjac);
+		detJacMax = std::max(detJacMax, detjac);
 
 
 		if (fabs(detjac) < tolerance )
@@ -48,6 +53,8 @@ bool SelfIntersection(
 			DUNE_THROW(Dune::IOError, "__ERROR: CheckSelfIntersection test suspects that the tested entity is self-intersecting");
 		}
 	}
+
+	std::cout << "SelfIntersectionTest: detjac min/max ratio = " << detJacMin / detJacMax << std::endl;
 }
 
 

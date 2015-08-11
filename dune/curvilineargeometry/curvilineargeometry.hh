@@ -534,10 +534,13 @@ namespace Dune
      *  \returns the result of the integral
      */
     // [TODO]  Move integration to tutorial
-    ctype integrateScalar(const LocalPolynomial & P, double tolerance) const
+    ctype integrateScalar(
+    	const LocalPolynomial & P,
+    	ctype RELATIVE_TOLERANCE,
+    	ctype ACCURACY_GOAL) const
     {
         if (mydimension == coorddimension) { return integrateAnalyticalScalar(P); }
-        else                               { return integrateNumerical(PolynomialFunctor<ct, mydim>(P), tolerance); }
+        else                               { return integrateNumerical(PolynomialFunctor<ct, mydim>(P), RELATIVE_TOLERANCE, ACCURACY_GOAL); }
     }
 
     /** \brief Integrates the given functor numerically over the element
@@ -549,19 +552,22 @@ namespace Dune
      *  \returns the result of the integral
      */
     template <typename Functor>
-    typename Functor::ResultType::value_type integrateNumerical(const Functor & f, double tolerance) const
+    typename Functor::ResultType::value_type integrateNumerical(
+    	const Functor & f,
+    	ctype RELATIVE_TOLERANCE,
+        ctype ACCURACY_GOAL) const
     {
         if (mydimension == coorddimension)
         {
             LocalPolynomial jDet = JacobianDeterminantAnalytical();
             JacobianFunctor<ct, mydim, cdim> g(jDet);
-            return integrateNumericalRecursive(f, g, tolerance)[0];
+            return integrateNumericalRecursive(f, g, RELATIVE_TOLERANCE, ACCURACY_GOAL)[0];
         }
         else
         {
             LocalPolynomial integrationElementSquared = IntegrationElementSquaredAnalytical();
             JacobianFunctor<ct, mydim, cdim> g(integrationElementSquared);
-            return integrateNumericalRecursive(f, g, tolerance)[0];
+            return integrateNumericalRecursive(f, g, RELATIVE_TOLERANCE, ACCURACY_GOAL)[0];
         }
     }
 
@@ -632,10 +638,14 @@ namespace Dune
      *  \endcode
      *  which is wrong for n-linear surface maps and other nonlinear maps.
      */
-    ctype volume (double tolerance) const
+    ctype volume (ctype RELATIVE_TOLERANCE) const
     {
         if (mydim == 0)  { return 0; }
-        return integrateScalar(identityPolynomial<ctype, mydim>(), tolerance);
+
+        // As long as ACCURACY_GOAL is small, its actual value is irrelevant, because it only matters if integral is close to 0, but element volumes should not be 0
+        ctype ACCURACY_GOAL = Traits::tolerance();
+
+        return integrateScalar(identityPolynomial<ctype, mydim>(), RELATIVE_TOLERANCE, ACCURACY_GOAL);
     }
 
     /** \brief obtain the transposed of the Jacobian
@@ -846,17 +856,20 @@ namespace Dune
     typename Functor::ResultType integrateNumericalRecursive(
             const Functor & f,
             const JacobiFunctor & jacobiDet,
-            double tolerance) const
+            ctype RELATIVE_TOLERANCE,
+            ctype ACCURACY_GOAL) const
     {
         assert(mydim > 0);                // We can not currently integrate over vertices, in principle this could be replaced by Dirac evaluation
         const int suggestedOrder = f.expectedOrder() + jacobiDet.expectedOrder();
+
+        const unsigned int NORM_TYPE = Dune::QUADRATURE_NORM_L2;
 
         typedef Dune::QuadratureIntegrator<ctype, mydim>  QuadratureIntegrator;
 
         if (f.isPolynomial() && jacobiDet.isPolynomial()) {  // If the integrand is polynomial, it can be integrated using fixed order
         	return QuadratureIntegrator::integrate(type(), f, suggestedOrder, jacobiDet);
         } else {                                             // Otherwise, the order has to be determined recursively
-        	return QuadratureIntegrator::integrateRecursive(type(), f, tolerance, jacobiDet, suggestedOrder).second;
+        	return QuadratureIntegrator::template integrateRecursive<JacobiFunctor, Functor, NORM_TYPE>(type(), f, jacobiDet, RELATIVE_TOLERANCE, ACCURACY_GOAL, suggestedOrder).second;
         }
 
         //NumericalRecursiveInterpolationIntegrator<ct, mydim> NInt( type() );
@@ -1115,25 +1128,25 @@ namespace Dune
     LocalPolynomial IntegrationElementSquaredAnalytical() const  { return IntElem2_; }
 
 
-    ctype integrateScalar(const LocalPolynomial & P, double tolerance) const
+    ctype integrateScalar(const LocalPolynomial & P, ctype RELATIVE_TOLERANCE, ctype ACCURACY_GOAL) const
     {
         if (mydimension == coorddimension) { return integrateAnalyticalScalar(P); }
-        else                               { return integrateNumerical(PolynomialFunctor<ct, mydim>(P), tolerance); }
+        else                               { return integrateNumerical(PolynomialFunctor<ct, mydim>(P), RELATIVE_TOLERANCE, ACCURACY_GOAL); }
     }
 
 
     template <typename Functor>
-    typename Functor::ResultType::value_type integrateNumerical(const Functor & f, double tolerance) const
+    typename Functor::ResultType::value_type integrateNumerical(const Functor & f, ctype RELATIVE_TOLERANCE, ctype ACCURACY_GOAL) const
     {
         if (mydimension == coorddimension)
         {
             JacobianFunctor<ct, mydim, cdim> g(JacobianDet_);
-            return Base::integrateNumericalRecursive(f, g, tolerance)[0];
+            return Base::integrateNumericalRecursive(f, g, RELATIVE_TOLERANCE, ACCURACY_GOAL)[0];
         }
         else
         {
             JacobianFunctor<ct, mydim, cdim> g(IntElem2_);
-            return Base::integrateNumericalRecursive(f, g, tolerance)[0];
+            return Base::integrateNumericalRecursive(f, g, RELATIVE_TOLERANCE, ACCURACY_GOAL)[0];
         }
     }
 
@@ -1155,10 +1168,14 @@ namespace Dune
     }
 
 
-    ctype volume (double tolerance) const
+    ctype volume (ctype RELATIVE_TOLERANCE) const
     {
         if (mydim == 0) { return 0; }
-        return integrateScalar(identityPolynomial<ctype, mydim>(), tolerance);
+
+        // As long as ACCURACY_GOAL is small, its actual value is irrelevant, because it only matters if integral is close to 0, but element volumes should not be 0
+        ctype ACCURACY_GOAL = Traits::tolerance();
+
+        return integrateScalar(identityPolynomial<ctype, mydim>(), RELATIVE_TOLERANCE, ACCURACY_GOAL);
     }
 
 
