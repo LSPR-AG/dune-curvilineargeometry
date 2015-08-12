@@ -5,10 +5,11 @@ namespace Dune
 {
 
 enum QuadratureNorm {
-	QUADRATURE_NORM_L1,
-	QUADRATURE_NORM_L2,			// Ratio of two-norms of error / value
-	QUADRATURE_NORM_RELATIVE_L2,   // two-norm of vector of ratios (error_i / value_i)
-	QUADRATURE_NORM_INDIVIDUAL     // max of all ratios error_i / value_i
+	QUADRATURE_NORM_DEFAULT = 0,       // Default norm to be used for scalars
+	QUADRATURE_NORM_L1 = 1,
+	QUADRATURE_NORM_L2 = 2,			   // Ratio of two-norms of error / value
+	QUADRATURE_NORM_RELATIVE_L2 = 3,   // two-norm of vector of ratios (error_i / value_i)
+	QUADRATURE_NORM_INDIVIDUAL = 4     // max of all ratios error_i / value_i
 };
 
 
@@ -18,8 +19,42 @@ enum QuadratureNorm {
 // ***************************************************
 
 
-template<class ctype, class ValueType, int NormType>
+template<class ctype, int NormType>
 struct QuadratureRelativeError {
+
+	template <class ValueType>
+	static ctype eval( ValueType & delta, ValueType & mag, ctype ACCURACY_GOAL) {	DUNE_THROW(NotImplemented, "Trying to call generic method"); }
+
+	// FieldVector
+	template<class ValueType, int mydim>
+	static ctype eval( Dune::FieldVector<ValueType, mydim> & delta, Dune::FieldVector<ValueType, mydim> & mag, ctype ACCURACY_GOAL) {
+		DUNE_THROW(NotImplemented, "Trying to call generic method");
+	}
+
+	// DynamicVector
+	template<class ValueType>
+	static ctype eval( Dune::DynamicVector<ValueType> & delta, Dune::DynamicVector<ValueType> & mag, ctype ACCURACY_GOAL) {
+		DUNE_THROW(NotImplemented, "Trying to call generic method");
+	}
+
+	// DynamicMatrix
+	template<class ValueType>
+	static ctype eval( Dune::DynamicMatrix<ValueType> & delta, Dune::DynamicMatrix<ValueType> & mag, ctype ACCURACY_GOAL) {
+		DUNE_THROW(NotImplemented, "Trying to call generic method");
+	}
+
+};
+
+
+// ***************************************************
+// Calculates relative 1-norm for scalars
+// ***************************************************
+
+
+template<class ctype>
+struct QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT> {
+
+	template <class ValueType>
 	static ctype eval(
 		ValueType & delta,     // The difference between two values used as absolute error estimate
 		ValueType & mag,       // A value used as a magnitude estimate
@@ -32,120 +67,157 @@ struct QuadratureRelativeError {
 		// Otherwise just return absolute error
 		return (abs_m > ACCURACY_GOAL) ? abs_d / abs_m : abs_d;
 	}
+
+
+
+
 };
 
 
 // ***************************************************
-// Calculates relative norm of a DynamicVector
+// Calculates relative infinity-norm
 // ***************************************************
 
 
-template<class ctype, class ValueType, int NormType>
-struct QuadratureRelativeError<ctype, Dune::DynamicVector<ValueType>, NormType>
-{
-	typedef Dune::DynamicVector<ValueType>  ResultType;
+template<class ctype>
+struct QuadratureRelativeError<ctype, QUADRATURE_NORM_INDIVIDUAL> {
 
-	static ctype eval( ResultType & delta, ResultType & mag, ctype ACCURACY_GOAL) {  }
-};
+	// Scalar
+	template <class ValueType>
+	static ctype eval( ValueType & delta, ValueType & mag, ctype ACCURACY_GOAL) {
+		return QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(delta, mag, ACCURACY_GOAL);
+	}
 
-
-template<class ctype, class ValueType>
-struct QuadratureRelativeError<ctype, Dune::DynamicVector<ValueType>, QUADRATURE_NORM_INDIVIDUAL>
-{
-	typedef Dune::DynamicVector<ValueType>  ResultType;
-
-	static ctype eval( ResultType & delta, ResultType & mag, ctype ACCURACY_GOAL) {
+	// FieldVector
+	template<class ValueType, int mydim>
+	static ctype eval( Dune::FieldVector<ValueType, mydim> & delta, Dune::FieldVector<ValueType, mydim> & mag, ctype ACCURACY_GOAL) {
 		ctype rez = 0;
-		for (int i = 0; i < delta.N(); i++) { rez = std::max(rez, QuadratureRelativeError<ctype, ValueType, 0>::eval(delta[i], mag[i], ACCURACY_GOAL)); }
+		for (int i = 0; i < mydim; i++) {
+			ctype tmp = QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(delta[i], mag[i], ACCURACY_GOAL);
+			rez = std::max(rez, tmp);
+		}
 		return rez;
 	}
-};
 
-
-template<class ctype, class ValueType>
-struct QuadratureRelativeError<ctype, Dune::DynamicVector<ValueType>, QUADRATURE_NORM_RELATIVE_L2>
-{
-	typedef Dune::DynamicVector<ValueType>  ResultType;
-
-	static ctype eval( ResultType & delta, ResultType & mag, ctype ACCURACY_GOAL) {
+	// DynamicVector
+	template<class ValueType>
+	static ctype eval( Dune::DynamicVector<ValueType> & delta, Dune::DynamicVector<ValueType> & mag, ctype ACCURACY_GOAL) {
 		ctype rez = 0;
+
 		for (int i = 0; i < delta.N(); i++) {
-			ctype tmp = QuadratureRelativeError<ctype, ValueType, 0>::eval(delta[i], mag[i], ACCURACY_GOAL);
-			rez += tmp * tmp;
+			ctype tmp = QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(delta[i], mag[i], ACCURACY_GOAL);
+			rez = std::max(rez, tmp);
 		}
-		return sqrt(rez / delta.N());
+		return rez;
 	}
-};
 
-
-template<class ctype, class ValueType>
-struct QuadratureRelativeError<ctype, Dune::DynamicVector<ValueType>, QUADRATURE_NORM_L2>
-{
-	typedef Dune::DynamicVector<ValueType>  ResultType;
-
-	static ctype eval( ResultType & delta, ResultType & mag, ctype ACCURACY_GOAL) {
-		return delta.two_norm() / mag.two_norm();
-	}
-};
-
-
-// ***************************************************
-// Calculates relative one-norm of a DynamicMatrix
-// ***************************************************
-
-template<class ctype, class ValueType, int NormType>
-struct QuadratureRelativeError<ctype, Dune::DynamicMatrix<ValueType>, NormType>
-{
-	typedef Dune::DynamicMatrix<ValueType>  ResultType;
-
-	static ctype eval( ResultType & delta, ResultType & mag, ctype ACCURACY_GOAL) {  }
-};
-
-
-template<class ctype, class ValueType>
-struct QuadratureRelativeError<ctype, Dune::DynamicMatrix<ValueType>, QUADRATURE_NORM_INDIVIDUAL>
-{
-	typedef Dune::DynamicMatrix<ValueType>  ResultType;
-
-	static ctype eval( ResultType & delta, ResultType & mag, ctype ACCURACY_GOAL) {
+	// DynamicMatrix
+	template<class ValueType>
+	static ctype eval( Dune::DynamicMatrix<ValueType> & delta, Dune::DynamicMatrix<ValueType> & mag, ctype ACCURACY_GOAL) {
 		ctype rez = 0;
 		for (int i = 0; i < delta.N(); i++) {
 			for (int j = 0; j < delta.M(); j++) {
-				rez = std::max(rez, QuadratureRelativeError<ctype, ValueType, 0>::eval(delta[i][j], mag[i][j], ACCURACY_GOAL));
+				ctype tmp = QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(delta[i][j], mag[i][j], ACCURACY_GOAL);
+				rez = std::max(rez, tmp);
 			}
 		}
 		return rez;
 	}
+
 };
 
 
-template<class ctype, class ValueType>
-struct QuadratureRelativeError<ctype, Dune::DynamicMatrix<ValueType>, QUADRATURE_NORM_RELATIVE_L2>
-{
-	typedef Dune::DynamicMatrix<ValueType>  ResultType;
 
-	static ctype eval( ResultType & delta, ResultType & mag, ctype ACCURACY_GOAL) {
+
+
+// ***************************************************
+// Calculates 2-norm of relative vectors
+// ***************************************************
+
+
+template<class ctype>
+struct QuadratureRelativeError<ctype, QUADRATURE_NORM_RELATIVE_L2> {
+
+	// Scalar
+	template <class ValueType>
+	static ctype eval( ValueType & delta, ValueType & mag, ctype ACCURACY_GOAL) {
+		return QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(delta, mag, ACCURACY_GOAL);
+	}
+
+	// FieldVector
+	template<class ValueType, int mydim>
+	static ctype eval( Dune::FieldVector<ValueType, mydim> & delta, Dune::FieldVector<ValueType, mydim> & mag, ctype ACCURACY_GOAL) {
+		ctype rez = 0;
+		for (int i = 0; i < mydim; i++) {
+			ctype tmp = QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(delta[i], mag[i], ACCURACY_GOAL);
+			rez += tmp * tmp;
+		}
+		return sqrt(rez / mydim);
+	}
+
+	// DynamicVector
+	template<class ValueType>
+	static ctype eval( Dune::DynamicVector<ValueType> & delta, Dune::DynamicVector<ValueType> & mag, ctype ACCURACY_GOAL) {
+		ctype rez = 0;
+		for (int i = 0; i < delta.N(); i++) {
+			ctype tmp = QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(delta[i], mag[i], ACCURACY_GOAL);
+			rez += tmp * tmp;
+		}
+		return sqrt(rez / delta.N());
+	}
+
+	// DynamicMatrix
+	template<class ValueType>
+	static ctype eval( Dune::DynamicMatrix<ValueType> & delta, Dune::DynamicMatrix<ValueType> & mag, ctype ACCURACY_GOAL) {
 		ctype rez = 0;
 		for (int i = 0; i < delta.N(); i++) {
 			for (int j = 0; j < delta.M(); j++) {
-				ctype tmp = QuadratureRelativeError<ctype, ValueType, 0>::eval(delta[i][j], mag[i][j], ACCURACY_GOAL);
+				ctype tmp = QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(delta[i][j], mag[i][j], ACCURACY_GOAL);
 				rez = tmp * tmp;
 			}
 		}
 		return sqrt(rez / (delta.N() * delta.M()));
 	}
+
 };
 
 
-template<class ctype, class ValueType>
-struct QuadratureRelativeError<ctype, Dune::DynamicMatrix<ValueType>, QUADRATURE_NORM_L2>
-{
-	typedef Dune::DynamicMatrix<ValueType>  ResultType;
 
-	static ctype eval( ResultType & delta, ResultType & mag, ctype ACCURACY_GOAL) {
+// ***************************************************
+// Calculates relative 2-norm
+// ***************************************************
+
+
+template<class ctype>
+struct QuadratureRelativeError<ctype, QUADRATURE_NORM_L2> {
+
+	// Scalar
+	template <class ValueType>
+	static ctype eval( ValueType & delta, ValueType & mag, ctype ACCURACY_GOAL) {
+		return QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(delta, mag, ACCURACY_GOAL);
+	}
+
+	// FieldVector
+	template<class ValueType, int mydim>
+	static ctype eval( Dune::FieldVector<ValueType, mydim> & delta, Dune::FieldVector<ValueType, mydim> & mag, ctype ACCURACY_GOAL) {
+		return delta.two_norm() / mag.two_norm();
+	}
+
+	// DynamicVector
+	template<class ValueType>
+	static ctype eval( Dune::DynamicVector<ValueType> & delta, Dune::DynamicVector<ValueType> & mag, ctype ACCURACY_GOAL) {
+		return delta.two_norm() / mag.two_norm();
+	}
+
+	// DynamicMatrix
+	template<class ValueType>
+	static ctype eval( Dune::DynamicMatrix<ValueType> & delta, Dune::DynamicMatrix<ValueType> & mag, ctype ACCURACY_GOAL) {
 		return delta.frobenius_norm() / mag.frobenius_norm();
 	}
+
 };
+
+
 
 
 

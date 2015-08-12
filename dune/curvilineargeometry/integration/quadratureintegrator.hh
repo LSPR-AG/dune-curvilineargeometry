@@ -311,7 +311,7 @@ protected:
             	ResultValue delta  = resultNew[iResult];
                             delta -= resultThis[iResult];
 
-                ctype relErrorNew = Dune::QuadratureRelativeError<ctype, ResultValue, NormType>::eval(delta, resultNew[iResult], ACCURACY_GOAL);
+                ctype relErrorNew = Dune::QuadratureRelativeError<ctype, NormType>::eval(delta, resultNew[iResult], ACCURACY_GOAL);
 
                 // Define smoothened absolute error as a linear combination between this and previous errors
                 // This avoids the case when two consecutive samplings give same wrong answer due to unlucky symmetry of the integrand wrt quadrature points
@@ -326,19 +326,23 @@ protected:
                 relErrorThis[iResult] = relErrorNew;
             }
 
+            /*
             std::cout << "--- processed order=" << order
             		  << " quadrature size="    << thisQuadSize
             		  << " estimated relative error=" << writeVector<ctype>(relErrorThis)
             		  << " desired error=" << RELATIVE_TOLERANCE << std::endl;
+            */
 
             // Write a matrix to a file for debugging purposes
             // FIXME DEBUG
+            /*
             if (nResult == 2)  {
             if (order > 15)
             {
             	writeMatrix(resultThis[1], "/home/fomins/Documents/test/duneMatrix" + std::to_string(order) + ".txt");
             }
                         }
+            */
         }
 
         std::cout << "Finished recursive integral over geometry " << gt << "suggested order: " << suggestedOrder << " final order " << order << std::endl;

@@ -144,8 +144,8 @@ void statWrite(StatInfoVec statInfoVec)
 	std::cout << "--------Done writing statInfo---------" << std::endl;
 }
 
-template <int dim>
-void depthTest(int maxdim, double rec_tol)
+template <int dim, int NORM_TYPE>
+void depthTest(int maxdim, double RELATIVE_TOLERANCE, double ACCURACY_GOAL)
 {
 	typedef PolynomialFunctor<double, dim>                               PolyFunctor;
 	typedef Dune::QuadratureIntegrator<double, dim>                      Integrator;
@@ -159,7 +159,7 @@ void depthTest(int maxdim, double rec_tol)
 		Dune::Polynomial<double, dim> thisPoly = NewtonPolynomial<double, dim>(i);
 
 		double rez_poly = thisPoly.integrateRefSimplex();
-		StatInfo rez_quad = Integrator::integrateRecursive(gt, PolyFunctor(thisPoly), rec_tol, unityJacobianFunctor());
+		StatInfo rez_quad = Integrator::template integrateRecursive<unityJacobianFunctor, PolyFunctor, NORM_TYPE>(gt, PolyFunctor(thisPoly), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL);
 
 		double err = fabs(rez_poly - rez_quad.second[0]);
 		if (fabs(rez_poly) > 1.0e-15)  { err /= rez_poly; }
@@ -210,9 +210,9 @@ int main ()
   recursiveWrite(QuadIntegrator3D::template integrateRecursive<unityJacobianFunctor, function3d2, NORM_TYPE>(elemGeometry, function3d2(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
   recursiveWrite(QuadIntegrator3D::template integrateRecursive<unityJacobianFunctor, function3d3, NORM_TYPE>(elemGeometry, function3d3(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
 
-  //depthTest<1>(25, rec_tol);
-  //depthTest<2>(25, rec_tol);
-  //depthTest<3>(25, rec_tol);
+  depthTest<1, NORM_TYPE>(25, RELATIVE_TOLERANCE, ACCURACY_GOAL);
+  depthTest<2, NORM_TYPE>(25, RELATIVE_TOLERANCE, ACCURACY_GOAL);
+  depthTest<3, NORM_TYPE>(25, RELATIVE_TOLERANCE, ACCURACY_GOAL);
 
 
   /*
