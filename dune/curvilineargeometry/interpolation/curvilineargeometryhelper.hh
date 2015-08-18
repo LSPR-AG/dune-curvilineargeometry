@@ -261,6 +261,51 @@ class CurvilinearGeometryHelper {
     }
 
 
+    /** \brief Finds coordinate inside parent of this entity. mydim and cdim define dimensions of subentity and parent respectively
+     *  \param[in]  gt        GeometryType of the subentity
+     *  \param[in]  subIndex  index of the subentity inside of the specified entity
+     *  \param[in]  p         coordinate of the point inside of the subentity
+     */
+    template<class ct, int mydim, int cdim>
+    static Dune::FieldVector<ct, cdim> coordinateInParent(Dune::GeometryType gt, unsigned int subIndex, Dune::FieldVector<ct, mydim> & p)
+    {
+    	static const int codimSub  = cdim - mydim;
+    	static const int codimVert = cdim;
+
+    	typedef Dune::FieldVector<ct, cdim>  ParentCoordinate;
+    	const Dune::ReferenceElement< ct, cdim > & ref = Dune::ReferenceElements< ct, cdim >::general(gt);
+
+    	assert((cdim == gt.dim()) && (mydim < cdim));
+    	//if (mydim == cdim)  { return p; }
+    	switch (mydim) {
+    		case 1  :
+    		{
+    			ParentCoordinate p0 = ref.position(ref.subEntity(subIndex, codimSub, 0, codimVert), codimVert);
+    			ParentCoordinate p1 = ref.position(ref.subEntity(subIndex, codimSub, 1, codimVert), codimVert);
+    			ParentCoordinate pv1 = p0 - p1;
+    			pv1 *= p[0];
+
+    			ParentCoordinate rez = p0 + pv1;
+    			return rez;
+    		} break;
+    		case 2  :
+    		{
+    			ParentCoordinate p0 = ref.position(ref.subEntity(subIndex, codimSub, 0, codimVert), codimVert);
+    			ParentCoordinate p1 = ref.position(ref.subEntity(subIndex, codimSub, 1, codimVert), codimVert);
+    			ParentCoordinate p2 = ref.position(ref.subEntity(subIndex, codimSub, 2, codimVert), codimVert);
+
+    			ParentCoordinate pv1 = p1 - p0;   pv1 *= p[0];
+    			ParentCoordinate pv2 = p2 - p0;   pv2 *= p[1];
+    			ParentCoordinate rez = p0 + pv1 + pv2;
+
+    			return rez;
+    		} break;
+    		default : DUNE_THROW(IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: coordinateInParent - unexpected subentity dimension");
+    	}
+    }
+
+
+
     /** \brief List of internal vertex indices of an element corresponding to the interpolatory vertices of a subentity of the element
      *  \param[in]  entityGeometry	GeometryType of the element of interest
      *  \param[in]  order		Interpolation Order of the element of interest
@@ -268,20 +313,20 @@ class CurvilinearGeometryHelper {
      *  \param[in]  subentityIndex		Subentity internal index inside the element
      */
     template <class ct, int cdim>
-    static std::vector<InternalIndexType> subentityInternalCoordinateSet(Dune::GeometryType entityGeometry, int order, int subentityCodim, int subentityIndex)
+    static std::vector<InternalIndexType> subentityInternalCoordinateSet(Dune::GeometryType gt, int order, int subentityCodim, int subentityIndex)
     {
-    	if (entityGeometry.dim() == 0) { return std::vector<InternalIndexType>(1, 0); }
+    	if (gt.dim() == 0) { return std::vector<InternalIndexType>(1, 0); }
 
     	typedef Dune::FieldVector<int, cdim> IntFieldVector;
 
     	std::vector<InternalIndexType> rez;
 
-    	const Dune::ReferenceElement< ct, cdim > & ref = Dune::ReferenceElements< ct, cdim >::general(entityGeometry);
+    	const Dune::ReferenceElement< ct, cdim > & ref = Dune::ReferenceElements< ct, cdim >::general(gt);
 
     	int nSubentity = ref.size(subentityCodim);
     	int nSubCorner = ref.size(0, subentityCodim, cdim);
 
-        if (!entityGeometry.isSimplex())                           { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: subentityInternalCoordinateSet() only implemented for Simplex geometries at the moment"); }
+        if (!gt.isSimplex())                                       { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: subentityInternalCoordinateSet() only implemented for Simplex geometries at the moment"); }
         if ((subentityCodim < 0)||(subentityCodim >= cdim))        { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: subentityInternalCoordinateSet() - Unexpected subentity codimension"); }
         if ((subentityIndex < 0)||(subentityIndex >= nSubentity))  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: subentityInternalCoordinateSet() - Unexpected subentity index"); }
 
@@ -296,7 +341,7 @@ class CurvilinearGeometryHelper {
         }
 
         // If coordinates of a corner are requested, then it is simply 1 corner of the element
-        if (subentityCodim == cdim)  { return std::vector<InternalIndexType> (1, cornerIndex(entityGeometry, order, subentityIndex)); }
+        if (subentityCodim == cdim)  { return std::vector<InternalIndexType> (1, cornerIndex(gt, order, subentityIndex)); }
 
 
         // General case
@@ -307,7 +352,7 @@ class CurvilinearGeometryHelper {
         std::vector<IntFieldVector> cornerInternalCoord;
         for (int i = 0; i < nSubCorner; i++)  {
         	cornerInd.push_back(ref.subEntity(subentityIndex, subentityCodim, i, cdim));
-        	cornerInternalCoord.push_back(cornerInternalCoordinate<int, cdim>(entityGeometry, cornerInd[i]));
+        	cornerInternalCoord.push_back(cornerInternalCoordinate<int, cdim>(gt, cornerInd[i]));
         }
 
         // Consider each geometry separately
@@ -318,7 +363,6 @@ class CurvilinearGeometryHelper {
 
         return rez;
     }
-
 
 
     // Returns corner id's of this entity

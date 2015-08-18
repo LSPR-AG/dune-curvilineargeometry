@@ -46,6 +46,17 @@ typedef std::vector<FieldVector3D> FieldVectorVector3D;
 
 typedef PolynomialTraits<double>::Monomial  Monomial;
 
+struct TestStruct
+{
+	int nFail_;
+	int nTot_;
+	double worst_;
+
+	TestStruct(int nFail, int nTot, double worst) : nFail_(nFail), nTot_(nTot), worst_(worst) {}
+};
+
+typedef std::pair<TestStruct, TestStruct>  TestPair;
+
 
 // ************************************************************************************************
 // IMPLEMENTING AUXILIARY METHODS
@@ -53,13 +64,6 @@ typedef PolynomialTraits<double>::Monomial  Monomial;
 
 // Generates uniform random numbers in interval [a,b]
 double randomReal(double a, double b) { return a + (b - a)*(double(rand()) / RAND_MAX); }
-
-// Constructs a random grid over a simplex with a given number of samples
-template <int dim>
-std::vector<FieldVector< double, dim > > sampleRandom(int sampleNo) {
-    std::vector<FieldVector< double, dim > > tmprez;
-    return tmprez;
-}
 
 // Constructs a random grid over a box, where each dimension is uniformly in the interval [a,b]
 template <int dim>
@@ -72,6 +76,13 @@ std::vector<FieldVector< double, dim > > sampleBox(int sampleNo, double a, doubl
         rez.push_back(tmp);
     }
     return rez;
+}
+
+// Constructs a random grid over a simplex with a given number of samples
+template <int dim>
+std::vector<FieldVector< double, dim > > sampleRandom(int sampleNo) {
+	DUNE_THROW(NotImplemented, "CurvilinearGeometryTest - using generic method");
+    return std::vector<FieldVector< double, dim > >();
 }
 
 // Generates set of coordinates randomly (uniformly) sampled over an edge
@@ -154,6 +165,7 @@ FieldVector3D initFieldVector(double x, double y, double z) {
     return rez;
 }
 
+/*
 template<class ctype, int mydim>
 Dune::FieldVector< ctype, mydim > localCorner(int i)
 {
@@ -185,7 +197,7 @@ Dune::FieldVector< ctype, mydim > localCorner(int i)
     }
     return rez;
 }
-
+*/
 
 // ************************************************************************************************
 // IMPLEMENTING FUNCTORS - EXAMPLE LOCAL-TO-GLOBAL MAPS
@@ -218,30 +230,32 @@ template<class ctype, int mydim, int cdim> struct myFunctorNonlinear1  : public 
 template<class ctype, int mydim, int cdim> struct myFunctorNonlinear2  : public myFieldVectorFunctor<ctype, mydim, cdim> { };
 
 // Actual functors that evaluate some Local-To-Global transform
-template<> struct myFunctorIdentity<double, 1, 1> : public Base11  { Base11::ResultType operator()(const Base11::InputValue & in) { return Base11::ResultType(1, initFieldVector(in[0])); }  };
-template<> struct myFunctorIdentity<double, 1, 2> : public Base12  { Base12::ResultType operator()(const Base12::InputValue & in) { return Base12::ResultType(1, initFieldVector(in[0], 0)); }  };
-template<> struct myFunctorIdentity<double, 1, 3> : public Base13  { Base13::ResultType operator()(const Base13::InputValue & in) { return Base13::ResultType(1, initFieldVector(in[0], 0, 0)); }  };
-template<> struct myFunctorIdentity<double, 2, 2> : public Base22  { Base22::ResultType operator()(const Base22::InputValue & in) { return Base22::ResultType(1, initFieldVector(in[0], in[1])); }  };
-template<> struct myFunctorIdentity<double, 2, 3> : public Base23  { Base23::ResultType operator()(const Base23::InputValue & in) { return Base23::ResultType(1, initFieldVector(in[0], in[1], 0)); }  };
-template<> struct myFunctorIdentity<double, 3, 3> : public Base33  { Base33::ResultType operator()(const Base33::InputValue & in) { return Base33::ResultType(1, initFieldVector(in[0], in[1], in[2])); }  };
+template<> struct myFunctorIdentity<double, 1, 1> : public Base11  { Base11::ResultType operator()(const Base11::InputValue & in) const { return Base11::ResultType(1, initFieldVector(in[0])); }  };
+template<> struct myFunctorIdentity<double, 1, 2> : public Base12  { Base12::ResultType operator()(const Base12::InputValue & in) const { return Base12::ResultType(1, initFieldVector(in[0], 0)); }  };
+template<> struct myFunctorIdentity<double, 1, 3> : public Base13  { Base13::ResultType operator()(const Base13::InputValue & in) const { return Base13::ResultType(1, initFieldVector(in[0], 0, 0)); }  };
+template<> struct myFunctorIdentity<double, 2, 2> : public Base22  { Base22::ResultType operator()(const Base22::InputValue & in) const { return Base22::ResultType(1, initFieldVector(in[0], in[1])); }  };
+template<> struct myFunctorIdentity<double, 2, 3> : public Base23  { Base23::ResultType operator()(const Base23::InputValue & in) const { return Base23::ResultType(1, initFieldVector(in[0], in[1], 0)); }  };
+template<> struct myFunctorIdentity<double, 3, 3> : public Base33  { Base33::ResultType operator()(const Base33::InputValue & in) const { return Base33::ResultType(1, initFieldVector(in[0], in[1], in[2])); }  };
 
-template<> struct myFunctorLinear<double, 1, 1> : public Base11  { Base11::ResultType operator()(const Base11::InputValue & in) { return Base11::ResultType(1, initFieldVector(1.0 + 2.0 * in[0])); }  };
-template<> struct myFunctorLinear<double, 1, 2> : public Base12  { Base12::ResultType operator()(const Base12::InputValue & in) { return Base12::ResultType(1, initFieldVector(2.0 * in[0], 3.0 * in[0])); }  };
-template<> struct myFunctorLinear<double, 1, 3> : public Base13  { Base13::ResultType operator()(const Base13::InputValue & in) { return Base13::ResultType(1, initFieldVector(2.0 * in[0], 0.5 + 3.0 * in[0], 5.0 * in[0])); }  };
-template<> struct myFunctorLinear<double, 2, 2> : public Base22  { Base22::ResultType operator()(const Base22::InputValue & in) { return Base22::ResultType(1, initFieldVector(1.0 + in[0], in[0] + in[1])); }  };
-template<> struct myFunctorLinear<double, 2, 3> : public Base23  { Base23::ResultType operator()(const Base23::InputValue & in) { return Base23::ResultType(1, initFieldVector(in[1], 3.0 * in[0], in[0] + in[1])); }  };
-template<> struct myFunctorLinear<double, 3, 3> : public Base33  { Base33::ResultType operator()(const Base33::InputValue & in) { return Base33::ResultType(1, initFieldVector(in[0] + in[1], in[1] + in[2], in[2] + in[0])); }  };
+template<> struct myFunctorLinear<double, 1, 1> : public Base11  { Base11::ResultType operator()(const Base11::InputValue & in) const { return Base11::ResultType(1, initFieldVector(1.0 + 2.0 * in[0])); }  };
+template<> struct myFunctorLinear<double, 1, 2> : public Base12  { Base12::ResultType operator()(const Base12::InputValue & in) const { return Base12::ResultType(1, initFieldVector(2.0 * in[0], 3.0 * in[0])); }  };
+template<> struct myFunctorLinear<double, 1, 3> : public Base13  { Base13::ResultType operator()(const Base13::InputValue & in) const { return Base13::ResultType(1, initFieldVector(2.0 * in[0], 0.5 + 3.0 * in[0], 5.0 * in[0])); }  };
+template<> struct myFunctorLinear<double, 2, 2> : public Base22  { Base22::ResultType operator()(const Base22::InputValue & in) const { return Base22::ResultType(1, initFieldVector(1.0 + in[0], in[0] + in[1])); }  };
+template<> struct myFunctorLinear<double, 2, 3> : public Base23  { Base23::ResultType operator()(const Base23::InputValue & in) const { return Base23::ResultType(1, initFieldVector(in[1], 3.0 * in[0], in[0] + in[1])); }  };
+template<> struct myFunctorLinear<double, 3, 3> : public Base33  { Base33::ResultType operator()(const Base33::InputValue & in) const { return Base33::ResultType(1, initFieldVector(in[0] + in[1], in[1] + in[2], in[2] + in[0])); }  };
 
-template<> struct myFunctorNonlinear1<double, 1, 1> : public Base11  { Base11::ResultType operator()(const Base11::InputValue & in) { return Base11::ResultType(1, initFieldVector(in[0] * in[0])); }  };
-template<> struct myFunctorNonlinear1<double, 1, 2> : public Base12  { Base12::ResultType operator()(const Base12::InputValue & in) { return Base12::ResultType(1, initFieldVector(in[0], in[0] * in[0])); }  };
-template<> struct myFunctorNonlinear1<double, 1, 3> : public Base13  { Base13::ResultType operator()(const Base13::InputValue & in) { return Base13::ResultType(1, initFieldVector(in[0], in[0] * in[0], 2.0)); }  };
-template<> struct myFunctorNonlinear1<double, 2, 2> : public Base22  { Base22::ResultType operator()(const Base22::InputValue & in) { return Base22::ResultType(1, initFieldVector(in[0]*in[0], in[1] * in[1])); }  };
-template<> struct myFunctorNonlinear1<double, 2, 3> : public Base23  { Base23::ResultType operator()(const Base23::InputValue & in) { return Base23::ResultType(1, initFieldVector(in[1] * in[1], in[0] * in[0], in[0] * in[1])); }  };
-template<> struct myFunctorNonlinear1<double, 3, 3> : public Base33  { Base33::ResultType operator()(const Base33::InputValue & in) { return Base33::ResultType(1, initFieldVector(in[0] * in[0], in[1] * in[1], in[2] * in[2])); }  };
-
-
+template<> struct myFunctorNonlinear1<double, 1, 1> : public Base11  { Base11::ResultType operator()(const Base11::InputValue & in) const { return Base11::ResultType(1, initFieldVector(in[0] * in[0])); }  };
+template<> struct myFunctorNonlinear1<double, 1, 2> : public Base12  { Base12::ResultType operator()(const Base12::InputValue & in) const { return Base12::ResultType(1, initFieldVector(in[0], in[0] * in[0])); }  };
+template<> struct myFunctorNonlinear1<double, 1, 3> : public Base13  { Base13::ResultType operator()(const Base13::InputValue & in) const { return Base13::ResultType(1, initFieldVector(in[0], in[0] * in[0], 2.0)); }  };
+template<> struct myFunctorNonlinear1<double, 2, 2> : public Base22  { Base22::ResultType operator()(const Base22::InputValue & in) const { return Base22::ResultType(1, initFieldVector(in[0]*in[0], in[1] * in[1])); }  };
+template<> struct myFunctorNonlinear1<double, 2, 3> : public Base23  { Base23::ResultType operator()(const Base23::InputValue & in) const { return Base23::ResultType(1, initFieldVector(in[1] * in[1], in[0] * in[0], in[0] * in[1])); }  };
+template<> struct myFunctorNonlinear1<double, 3, 3> : public Base33  { Base33::ResultType operator()(const Base33::InputValue & in) const { return Base33::ResultType(1, initFieldVector(in[0] * in[0], in[1] * in[1], in[2] * in[2])); }  };
 
 
+
+// ************************************************************************************************
+// IMPLEMENTING TEST RESULTS
+// ************************************************************************************************
 
 // Returns one of 5 possible polynomials such that polynomial order = index
 template<class ctype, int mydim>
@@ -410,227 +424,220 @@ double integralDotResult(int el_type)
 
 
 
+
+
+
 // ************************************************************************************************
-// IMPLEMENTING TEST METHODS
+// IMPLEMENTING TESTS
 // ************************************************************************************************
 
-template<class ctype, int mydim, int cdim, typename Functor>
-bool SimplexTest(Functor f, int ord, int f_type, int f_order, std::string f_name)
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// 1. CORNER-TEST
+// This test checks if the corner coordinates returned by CurvilinearGeometry correspond to the ones used in initializing it.
+// ---------------------------------------------------------------------------------------------------------------------------
+template<class Functor, class SimplexGeom, class ReferenceElement>
+TestStruct test01_corner(
+	const Functor & f,
+	const SimplexGeom & simplexGeom,
+	const ReferenceElement & refElement,
+	double ABSOLUTE_TOLERANCE)
 {
-    typedef Dune::FieldVector< ctype, mydim > LocalVector;
-    typedef Dune::FieldVector< ctype, cdim > GlobalVector;
-    typedef std::vector< LocalVector > LocalVectorVector;
-    typedef std::vector< GlobalVector > GlobalVectorVector;
+	static const int mydim = SimplexGeom::mydimension;
+	typedef typename SimplexGeom::GlobalCoordinate   GlobalCoordinate;
 
-    typedef CurvilinearGeometry< ctype, mydim - 1, cdim> SubentityGeometry;
-    typedef CachedCurvilinearGeometry< ctype, mydim - 1, cdim> SubentityCachedGeometry;
-    typedef std::vector<SubentityGeometry> SubentityGeometryVector;
-    typedef std::vector<SubentityCachedGeometry> SubentityCachedGeometryVector;
-    typedef FieldVector< ctype, mydim - 1 > SubLocalCoordinate;
+	TestStruct rez(0, 0, 0.0);
 
-
-    std::cout << " * testing order " << ord << " behaviour for " << f_name << std::endl;
-
-    // ************************************************************
-    // Produce Geometry Type
-    // ************************************************************
-
-    Dune::GeometryType simplexGeometryType( Dune::GenericGeometry::SimplexTopology< mydim >::type::id, mydim );
-    const Dune::ReferenceElement< ctype, mydim > &refElement = Dune::ReferenceElements< ctype, mydim >::general( simplexGeometryType );
-
-    int nSubentities = refElement.size(1);
-
-    // ************************************************************
-    // Produce local simplex grid and map it to global using given Functor
-    // ************************************************************
-
-    LocalVectorVector local_vertices = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, mydim>(ord);
-    GlobalVectorVector global_vertices;
-    for (int i = 0; i < local_vertices.size(); i++) {global_vertices.push_back(f(local_vertices[i])[0]); }
-
-    // ************************************************************
-    // Produce a Curvilinear Geometry
-    // ************************************************************
-
-    Dune::CurvilinearGeometry< ctype, mydim, cdim >  SimplexGeom(refElement, global_vertices, ord);
-
-    // ************************************************************
-    // Produce a Cached Curvilinear Geometry
-    // ************************************************************
-
-    Dune::CachedCurvilinearGeometry< ctype, mydim, cdim >  SimplexGeomCached(refElement, global_vertices, ord);
-
-
-
-
-    // ------------------------ Started Tests ------------------------------------------------------------------------------------
-    // ---------------------------------------------------------------------------------------------------------------------------
-    bool test1_pass = true;   bool test1_cached_pass = true;
-    bool test2_pass = true;   bool test2_cached_pass = true;
-    bool test3_pass = true;   bool test3_cached_pass = true;
-    bool test4_pass = true;   bool test4_cached_pass = true;
-    bool test5_pass = true;   bool test5_cached_pass = true;
-    bool test6_pass = true;   bool test6_cached_pass = true;
-    bool test7_pass = true;   bool test7_cached_pass = true;
-
-    bool test3_isinside_pass = true;   bool test3_isinside_cached_pass = true;
-    bool test4_isinside_pass = true;   bool test4_isinside_cached_pass = true;
-
-
-    // ---------------------------------------------------------------------------------------------------------------------------
-    // 1. CORNER-TEST
-    // This test checks if the corner coordinates returned by CurvilinearGeometry correspond to the ones used in initializing it.
-    // ---------------------------------------------------------------------------------------------------------------------------
     for (int i = 0; i < mydim+1; i++) {
-        double tmpTolerance = 1.0e-15;
-        GlobalVector tmpCorner = f(localCorner<double, mydim>(i))[0];
+        //GlobalCoordinate tmpCorner = f(localCorner<double, mydim>(i))[0];
+    	GlobalCoordinate tmpCorner = f(refElement.position(i, mydim))[0];
+    	double err = (simplexGeom.corner(i) - tmpCorner).two_norm();
 
-        test1_pass &= (SimplexGeom.corner(i) - tmpCorner).two_norm() < tmpTolerance;
-        test1_cached_pass &= (SimplexGeomCached.corner(i) - tmpCorner).two_norm() < tmpTolerance;
+    	rez.nTot_++;
+    	if (err > ABSOLUTE_TOLERANCE)  { rez.nFail_++; }
+    	rez.worst_ = std::max(rez.worst_, err);
     }
-    std::cout << ": Corners-test pass = " << test1_pass << " cached-pass = " << test1_cached_pass << std::endl;
+
+    return rez;
+}
 
 
-    // ---------------------------------------------------------------------------------------------------------------------------
-    // 2. LOCAL->GLOBAL TEST
-    // This test samples the example global map over the simplex, and checks if these samples match with the CurvilinearGeometry.global()
-    // ----------------------------------------------------------------------------------------------------------------------------------
-    if (ord < f_order) {
-        // Only count as error if interpolatory polynomial is of sufficient order
-        std::cout << ": Local-To-Global-test: --Omitted because polynomial order too small" << std::endl;
-    }
-    else
-    {
-        double tmpTolerance = 1.0e-12;
-        LocalVectorVector randomLocalSample = sampleRandom<mydim>(20);
+// ---------------------------------------------------------------------------------------------------------------------------
+// 2. LOCAL->GLOBAL TEST
+// This test samples the example global map over the simplex, and checks if these samples match with the CurvilinearGeometry.global()
+// ----------------------------------------------------------------------------------------------------------------------------------
+template<class Functor, class SimplexGeom, class LocalVectorVector>
+TestStruct test02_local_to_global(
+	bool verbose,
+	const Functor & f,
+	const SimplexGeom & simplexGeom,
+	const LocalVectorVector & randomLocalSample,
+	int interpOrder,
+	int functionOrder,
+	double ABSOLUTE_TOLERANCE)
+{
+	TestStruct rez(0, 0, 0.0);
 
+	// Only count as error if interpolatory polynomial is of sufficient order
+    if (interpOrder < functionOrder) { if (verbose) { std::cout << ": Local-To-Global-test: --Omitted because polynomial order too small" << std::endl; } }
+    else {
         for (int i = 0; i < randomLocalSample.size(); i++)
         {
-            double errTmp = (SimplexGeom.global(randomLocalSample[i]) - f(randomLocalSample[i])[0]).two_norm();
-            double errTmpCached = (SimplexGeomCached.global(randomLocalSample[i]) - f(randomLocalSample[i])[0]).two_norm();
+            double err = (simplexGeom.global(randomLocalSample[i]) - f(randomLocalSample[i])[0]).two_norm();
 
-            test2_pass &= errTmp < tmpTolerance;
-            test2_cached_pass &= errTmpCached < tmpTolerance;
+        	rez.nTot_++;
+        	if (err > ABSOLUTE_TOLERANCE)  { rez.nFail_++; }
+        	rez.worst_ = std::max(rez.worst_, err);
         }
-        std::cout << ": Local-To-Global-test pass = " << test2_pass << " cached-pass = " << test2_cached_pass << std::endl ;
     }
 
+    return rez;
+}
 
-    // ---------------------------------------------------------------------------------------------------------------------------
-    // 3. GLOBAL->LOCAL TEST
-    // This test checks if local coordinates of the global interpolation vertices are recovered
-    // ----------------------------------------------------------------------------------------------------------------------------------
-    if (mydim != cdim) { std::cout << ": Global-to-Local functionality not available for mismatching mydim and cdim" << std::endl; }
-    else
-    {
-        double tmpTolerance = 1.0e-7;
 
+// ---------------------------------------------------------------------------------------------------------------------------
+// 3. GLOBAL->LOCAL TEST
+// This test checks if local coordinates of the global interpolation vertices are recovered
+// ----------------------------------------------------------------------------------------------------------------------------------
+template<class SimplexGeom, class GlobalCoordinate, class LocalCoordinate>
+TestPair test03_global_to_local(
+	bool verbose,
+	const SimplexGeom & simplexGeom,
+	const std::vector<GlobalCoordinate> & global_vertices,
+	const std::vector<LocalCoordinate>  & local_vertices,
+	double ABSOLUTE_TOLERANCE)
+
+{
+	static const int cdim  = SimplexGeom::coorddimension;
+	static const int mydim = SimplexGeom::mydimension;
+
+	TestStruct rezTmp(0, 0, 0.0);
+	TestPair rez(rezTmp, rezTmp);
+	LocalCoordinate L;
+
+    if (mydim != cdim) { if (verbose) { std::cout << ": Global-to-Local functionality not available for mismatching mydim and cdim" << std::endl; } }
+    else {
         for (int i = 0; i < global_vertices.size(); i++) {
-            LocalVector L;
-            LocalVector L_c;
+        	rez.first.nTot_++;
+        	rez.second.nTot_++;
 
-            // Order important, local() method initializes L
-            test3_isinside_pass &= SimplexGeom.local(global_vertices[i], L);
-            test3_isinside_cached_pass &= SimplexGeomCached.local(global_vertices[i], L_c);
+        	// Order important, local() method initializes L
+        	bool isInside = simplexGeom.local(global_vertices[i], L);
+        	double err = (L - local_vertices[i]).two_norm();
 
-            test3_pass &= (L - local_vertices[i]).two_norm() < tmpTolerance;
-            test3_cached_pass &= (L_c - local_vertices[i]).two_norm() < tmpTolerance;
-
+        	if (!isInside)                { rez.first.nFail_++; }
+        	if (err > ABSOLUTE_TOLERANCE) { rez.second.nFail_++; }
+        	rez.second.worst_ = std::max(rez.second.worst_, err);
             //std::cout << "  -- recovered vertex " << L << " from real vertex " << local_vertices[i] << " via global " << global_vertices[i] << " positioning is " << is_inside << std::endl;
         }
-        std::cout << ": Global-To-Local-test 1 pass = " << test3_pass << " cached-pass = " << test3_cached_pass;
-        std::cout << ", is_inside test pass = " << test3_isinside_pass << " cached-pass = " << test3_isinside_cached_pass << std::endl ;
     }
+    return rez;
+}
 
 
-    // ---------------------------------------------------------------------------------------------------------------------------
-    // 4. GLOBAL->LOCAL TEST 2
-    // Test if LOCAL->GLOBAL->LOCAL for random sample inside element is preserved
-    // ----------------------------------------------------------------------------------------------------------------------------------
-    if (mydim != cdim) { std::cout << ": Global-to-Local functionality not available for mismatching mydim and cdim" << std::endl; }
-    else
-    {
-        double tmpTolerance = 1.0e-7;
-        LocalVectorVector randomLocalSample = sampleRandom< mydim >(20);
+// ---------------------------------------------------------------------------------------------------------------------------
+// 4. GLOBAL->LOCAL TEST 2
+// Test if LOCAL->GLOBAL->LOCAL for random sample inside element is preserved
+// ---------------------------------------------------------------------------------------------------------------------------
+template<class SimplexGeom, class LocalCoordinate>
+TestPair test04_global_to_local(
+	bool verbose,
+	const SimplexGeom & simplexGeom,
+	const std::vector<LocalCoordinate> & randomLocalSample,
+	double ABSOLUTE_TOLERANCE)
 
+{
+	static const int cdim  = SimplexGeom::coorddimension;
+	static const int mydim = SimplexGeom::mydimension;
+
+	TestStruct rezTmp(0, 0, 0.0);
+	TestPair rez(rezTmp, rezTmp);
+	LocalCoordinate L;
+
+    if (mydim != cdim) { if (verbose) { std::cout << ": Global-to-Local functionality not available for mismatching mydim and cdim" << std::endl; } }
+    else {
         for (int i = 0; i < randomLocalSample.size(); i++)
         {
-            LocalVector L;
-            LocalVector L_c;
+        	rez.first.nTot_++;
+        	rez.second.nTot_++;
 
-            // Order important, local() method initializes L
-            test4_isinside_pass &= SimplexGeom.local(SimplexGeom.global(randomLocalSample[i]), L);
-            test4_isinside_cached_pass &= SimplexGeomCached.local(SimplexGeomCached.global(randomLocalSample[i]), L_c);
+        	// Order important, local() method initializes L
+        	bool isInside = simplexGeom.local(simplexGeom.global(randomLocalSample[i]), L);
+        	double err = (randomLocalSample[i] - L).two_norm();
 
-            test4_pass &= (randomLocalSample[i] - L).two_norm() < tmpTolerance;
-            test4_cached_pass &= (randomLocalSample[i] - L_c).two_norm() < tmpTolerance;
-
+        	if (!isInside)                { rez.first.nFail_++; }
+        	if (err > ABSOLUTE_TOLERANCE) { rez.second.nFail_++; }
+        	rez.second.worst_ = std::max(rez.second.worst_, err);
             //std::cout << "  -- recovered vertex " << L << " from real vertex " << randomLocalSample[i] << " via global " << SimplexGeom.global(randomLocalSample[i]) << " positioning is " << is_inside << std::endl;
         }
-        std::cout << ": Global-To-Local-test 2 pass = " << test4_pass << " cached-pass = " << test4_cached_pass;
-        std::cout << ", is_inside test pass = " << test4_isinside_pass << " cached-pass = " << test4_isinside_cached_pass << std::endl ;
     }
+    return rez;
+}
 
 
-    // ---------------------------------------------------------------------------------------------------------------------------
-    // 5. IS_INSIDE TEST
-    // This test generates a grid of global points just outside the boundary of the element
-    // the is_inside method should evaluate to false for all of them
-    // ----------------------------------------------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------------------------
+// 5. IS_INSIDE TEST
+// This test generates a grid of global points just outside the boundary of the element
+// the is_inside method should evaluate to false for all of them
+// ---------------------------------------------------------------------------------------------------------------------------
+template<class SimplexGeom, class LocalCoordinate, class GlobalCoordinate>
+TestStruct test05_isoutside(
+	bool verbose,
+	const SimplexGeom & simplexGeom,
+	int nSubentities)
+{
+	typedef typename SimplexGeom::ctype  ctype;
+	static const int cdim  = SimplexGeom::coorddimension;
+	static const int mydim = SimplexGeom::mydimension;
+	static const int subdim = mydim - 1;
 
-    if ((mydim != cdim) || (mydim < 1) || (mydim > 3))
-    {
-        std::cout << ": Global-to-Local functionality only available for tests of simplex geometries with matching dimensions" << std::endl;
-    }
-    else if (mydim == 1)
-    {
+    // Define subentity geometries
+    typedef FieldVector< ctype, subdim> SubLocalCoordinate;
+
+    TestStruct rez(0, 0, 0.0);
+    LocalCoordinate L;
+
+	if ((mydim != cdim) || (mydim < 1) || (mydim > 3))  {
+	    if (verbose) { std::cout << ": Global-to-Local functionality only available for tests of simplex geometries with matching dimensions" << std::endl; }
+	}
+	else if (mydim == 1) {
         // Check of points close to the corners but outside are really outside
-        GlobalVector c1 = SimplexGeom.corner(0);
-        GlobalVector c2 = SimplexGeom.corner(1);
+        GlobalCoordinate c1 = simplexGeom.corner(0);
+        GlobalCoordinate c2 = simplexGeom.corner(1);
 
-        GlobalVector delta = c2 - c1;
+        GlobalCoordinate delta = c2 - c1;
         delta *= 0.01;
 
-        LocalVector L;
-        test5_pass &= !SimplexGeom.local(c1 - delta, L);  test5_cached_pass &= !SimplexGeomCached.local(c1 - delta, L);
-        test5_pass &= !SimplexGeom.local(c2 + delta, L);  test5_cached_pass &= !SimplexGeomCached.local(c2 + delta, L);
+        rez.nTot_ = 2;
 
-        std::cout << ": IsOutside test pass = " << test5_pass << " cached-pass = " << test5_cached_pass << std::endl;
-    }
-    else
-    {
-        // Produce points surrounding the element from the outside
-        // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        int surround_grid_order = 10;
-        double displacement = 0.1;
+        if (simplexGeom.local(c1 - delta, L))  { rez.nFail_++; }   // Check vertex just outside left corner of the edge
+        if (simplexGeom.local(c2 + delta, L))  { rez.nFail_++; }   // Check vertex just outside right corner of the edge
+	} else {
+		// Produce points surrounding the element from the outside
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	    int surround_grid_order = 10;
+	    double displacement = 0.1;
 
-        std::vector<SubLocalCoordinate > sublocal_coordinates = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, mydim-1>(surround_grid_order);
+        std::vector<SubLocalCoordinate > sublocal_coordinates = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, subdim>(surround_grid_order);
 
-        GlobalVectorVector element_surround_points;
-        GlobalVectorVector element_surround_points_cached;
+        std::vector<GlobalCoordinate> element_surround_points;
 
         // For each point on of the local grid, evaluate each subentity and its normal for that point
         // Thus compute point outside the element for each local grid point
-
-        //std::cout << " creating normals " << std::endl;
         for (int biter = 0; biter < nSubentities; biter++)
         {
-        	SubentityGeometry subElement = SimplexGeom.template subentityGeometry < mydim - 1>(biter);
-        	SubentityCachedGeometry subCachedElement = SimplexGeomCached.template subentityGeometry < mydim - 1>(biter);
-
             for (int i = 0; i < sublocal_coordinates.size(); i++)
             {
-                GlobalVector gp = subElement.global(sublocal_coordinates[i]);
-                GlobalVector gp_cached = subCachedElement.global(sublocal_coordinates[i]);
+            	LocalCoordinate  local  = Dune::CurvilinearGeometryHelper::coordinateInParent<ctype, subdim, mydim>(simplexGeom.type(), biter, sublocal_coordinates[i]);
+                GlobalCoordinate global = simplexGeom.global(local);
+                GlobalCoordinate normal = simplexGeom.subentityUnitNormal(biter, local);
 
-                GlobalVector np = subElement.normal(sublocal_coordinates[i]);
-                GlobalVector np_cached = subCachedElement.normal(sublocal_coordinates[i]);
+                //GlobalCoordinate gp = subElement.global(sublocal_coordinates[i]);
+                //GlobalCoordinate np = subElement.normal(sublocal_coordinates[i]);
 
-                np *= displacement;
-                np_cached *= displacement;
+                normal *= displacement;
 
-                element_surround_points.push_back(gp + np);
-                element_surround_points_cached.push_back(gp_cached + np_cached);
+                element_surround_points.push_back(global + normal);
             }
         }
 
@@ -638,51 +645,73 @@ bool SimplexTest(Functor f, int ord, int f_type, int f_order, std::string f_name
         // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         for (int i = 0; i < element_surround_points.size(); i++)
         {
-            LocalVector L;
-            test5_pass &= !SimplexGeom.local(element_surround_points[i], L);
-            test5_cached_pass &= !SimplexGeomCached.local(element_surround_points_cached[i], L);
-
+        	rez.nTot_++;
+        	bool isInside = simplexGeom.local(element_surround_points[i], L);
+        	if (isInside)  { rez.nFail_++; }
             //std::cout << "-- for global vertex " << element_surround_points[i] << " recovered local vertex" << L << "and its is_inside = " << is_inside << std::endl;
         }
-        std::cout << ": IsOutside test pass = " << test5_pass << " cached-pass = " << test5_cached_pass << std::endl;
-    }
+	}
 
-    // ---------------------------------------------------------------------------------------------------------------------------
-    // INTEGRAL_TEST
-    // This test integrates over the element the basis functions given as polynomials of local coordinates
-    // CurvilinearGeometry should choose the analytical integration for matching dimensions and numerical for mismatching
-    // ---------------------------------------------------------------------------------------------------------------------------
-    if (ord < f_order) {
-        std::cout << ": Integral-test: --Omitted because polynomial order too small" << std::endl;
+	return rez;
+}
+
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// 6. INTEGRAL_TEST
+// This test integrates over the element the basis functions given as polynomials of local coordinates
+// CurvilinearGeometry should choose the analytical integration for matching dimensions and numerical for mismatching
+// [FIXME] Introduce tests for the case of integrals integrating to 0
+// ---------------------------------------------------------------------------------------------------------------------------
+template<class SimplexGeom, class SimplexIntegrationHelper>
+TestStruct test06_integration(bool verbose, const SimplexGeom & simplexGeom, int interpOrder, int functionOrder, int functType, double RELATIVE_TOLERANCE, double ACCURACY_GOAL)
+{
+	typedef typename SimplexGeom::ctype  ctype;
+	static const int cdim  = SimplexGeom::coorddimension;
+	static const int mydim = SimplexGeom::mydimension;
+
+	TestStruct rez(0, 0, 0.0);
+
+    if (interpOrder < functionOrder) {
+        if (verbose) { std::cout << ": Integral-test: --Omitted because polynomial order too small" << std::endl; }
     } else
     {
-        double RELATIVE_TOLERANCE = 1.0e-5;
-        double ACCURACY_GOAL = 1.0e-15;
-
         for (int bf_ord = 0; bf_ord <= 5; bf_ord++)
         {
             Polynomial<ctype, mydim> basisP = BasisPolynomial<ctype, mydim>(bf_ord);
 
-            double int_rez = SimplexGeom.integrateScalar(basisP, RELATIVE_TOLERANCE, ACCURACY_GOAL);
-            double int_rez_cached = SimplexGeomCached.integrateScalar(basisP, RELATIVE_TOLERANCE, ACCURACY_GOAL);
+            double int_rez  = SimplexIntegrationHelper::integrateScalar(simplexGeom, basisP, RELATIVE_TOLERANCE, ACCURACY_GOAL);
+            double int_true = integralResult<mydim, cdim>(bf_ord, functType);
 
-            double int_true = integralResult<mydim, cdim>(bf_ord, f_type);
+            rez.nTot_++;
+            double err = fabs((int_rez - int_true) / int_true);  // NOTE: Make sure that none of the integrands amounts to zero
+            if (err > RELATIVE_TOLERANCE)  { rez.nFail_++; }     // NOTE: It is important relative error requested from the integrator is at least as good as the real relative error
+            rez.worst_ = std::max(rez.worst_, err);
 
-            test6_pass &= fabs((int_rez - int_true) / int_true) < RELATIVE_TOLERANCE;
-            test6_cached_pass &= fabs((int_rez_cached - int_true) / int_true) < RELATIVE_TOLERANCE;
-            //std::cout << ": Integral of order " << bf_ord << " over entity dim " << mydim << " and order " << ord << " evaluated to ";
+            //std::cout << ": Integral of order " << bf_ord << " over entity dim " << mydim << " and order " << interpOrder << " evaluated to ";
             //std::cout << int_rez << " which has error: " << int_rez - integralResults<mydim, cdim>(bf_ord, f_type) << std::endl;
         }
     }
-    std::cout << ": Integral test pass = " << test6_pass << " cached-pass = " << test6_cached_pass << std::endl;
 
-    // ---------------------------------------------------------------------------------------------------------------------------
-    // Dot product integral test
-    // This test integrates over the element the polynomial vector basis function cdot the surface normal
-    // Only available for integrals which have a surface normal
-    // ---------------------------------------------------------------------------------------------------------------------------
-    if (ord < f_order) {
-        std::cout << ": Integral-test: --Omitted because polynomial order too small" << std::endl;
+    return rez;
+}
+
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// 7. Dot product integral test
+// This test integrates over the element the polynomial vector basis function cdot the surface normal
+// Only available for integrals which have a surface normal
+// ---------------------------------------------------------------------------------------------------------------------------
+template<class SimplexGeom, class SimplexIntegrationHelper>
+TestStruct test07_dot_integration(bool verbose, const SimplexGeom & simplexGeom, int interpOrder, int functionOrder, int functType, double ABSOLUTE_TOLERANCE)
+{
+	typedef typename SimplexGeom::ctype  ctype;
+	static const int cdim  = SimplexGeom::coorddimension;
+	static const int mydim = SimplexGeom::mydimension;
+
+	TestStruct rez(0, 0, 0.0);
+
+    if (interpOrder < functionOrder) {
+        if (verbose)  { std::cout << ": Integral-test: --Omitted because polynomial order too small" << std::endl; }
     }
     else if (((mydim == 1)&&(cdim == 2))||((mydim == 2)&&(cdim == 3)))
     {
@@ -691,45 +720,190 @@ bool SimplexTest(Functor f, int ord, int f_type, int f_order, std::string f_name
         std::vector<Polynomial<ctype, mydim>> basisVectorP = BasisVectorDiagonal<ctype, mydim>();
 
         // Need a basis function which is a vector in global coordinates
-        double int_rez = SimplexGeom.integrateAnalyticalDot(basisVectorP);
-        double int_rez_cached = SimplexGeomCached.integrateAnalyticalDot(basisVectorP);
+        double int_rez  = SimplexIntegrationHelper::integrateAnalyticalDot(simplexGeom, basisVectorP);
+        double int_true = integralDotResult<mydim, cdim>(functType);
 
-        double int_true = integralDotResult<mydim, cdim>(f_type);
-
-        test7_pass &= fabs((int_rez - int_true) / int_true) < tmpTolerance;
-        test7_cached_pass &= fabs((int_rez_cached - int_true) / int_true) < tmpTolerance;
-
-        std::cout << ": Integral - Surface Dot Product - pass =  " << test7_pass << " cached-pass = " << test7_cached_pass << std::endl;
+        rez.nTot_++;
+        double err = fabs((int_rez - int_true) / int_true);  // NOTE: Make sure that none of the integrands amounts to zero
+        if (err > ABSOLUTE_TOLERANCE)  { rez.nFail_++; }
+        rez.worst_ = std::max(rez.worst_, err);
     } else
     {
-        std::cout << ": Integral - Surface Dot Product Not Available for these dimensions " << std::endl;
+        if (verbose) { std::cout << ": Integral - Surface Dot Product Not Available for these dimensions " << std::endl; }
     }
 
+    return rez;
+}
 
 
-    // Test for normal direction
+// ************************************************************************************************
+// IMPLEMENTING TEST METHODS
+// ************************************************************************************************
+
+bool testReport(const TestStruct & rez, std::string testname, bool verbose) {
+	bool pass = (rez.nFail_ == 0);
+	//if ((!pass) || verbose)  {
+		std::cout << "   *** Test " << testname << " Fails=" << rez.nFail_ << "/" << rez.nTot_ << ", worst result=" << rez.worst_ << std::endl;
+	//}
+	return pass;
+}
+
+
+template<typename CurvGeom, typename Functor>
+bool SimplexTest(bool verbose, Functor f, int testIndex, int interpOrder, int functType, int functionOrder, std::string f_name)
+{
+	if (verbose) { std::cout << " * testing order " << interpOrder << " behaviour for " << f_name << std::endl; }
+
+	// Extract geometry templates
+	typedef typename CurvGeom::ctype   ctype;
+	static const int mydim = CurvGeom::mydimension;
+	static const int cdim  = CurvGeom::coorddimension;
+
+	// Define derived types
+	typedef typename CurvGeom::LocalCoordinate    LocalCoordinate;
+	typedef typename CurvGeom::GlobalCoordinate   GlobalCoordinate;
+    typedef std::vector< LocalCoordinate > LocalVectorVector;
+    typedef std::vector< GlobalCoordinate > GlobalVectorVector;
+    typedef typename CurvGeom::IntegrationHelper        SimplexIntegrationHelper;
+
+    // Construct reference element
+    Dune::GeometryType simplexGeometryType( Dune::GenericGeometry::SimplexTopology< mydim >::type::id, mydim );
+    const Dune::ReferenceElement< ctype, mydim > &refElement = Dune::ReferenceElements< ctype, mydim >::general( simplexGeometryType );
+    int nSubentities = refElement.size(1);
+
+    // Construct local simplex grid and map it to global using given Functor
+    LocalVectorVector local_vertices = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, mydim>(interpOrder);
+    GlobalVectorVector global_vertices;
+    for (int i = 0; i < local_vertices.size(); i++) {global_vertices.push_back(f(local_vertices[i])[0]); }
+
+    // Construct a Curvilinear Geometry
+    CurvGeom SimplexGeom(refElement, global_vertices, interpOrder);
+
+    // Produce a set of sample points randomly sampled over the entity
+    LocalVectorVector randomLocalSample = sampleRandom<mydim>(20);
+
+
+
+    // ------------------------ Started Tests ------------------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------------------------------------
+
+    // Define integration constants
+    double RELATIVE_TOLERANCE = 1.0e-5;
+    double ACCURACY_GOAL = 1.0e-15;
+
+    // Define precision constants
+    double ABSOLUTE_TOLERANCE_1 = 1.0e-15;
+    double ABSOLUTE_TOLERANCE_2 = 1.0e-12;
+    double ABSOLUTE_TOLERANCE_3 = 1.0e-7;
+    double ABSOLUTE_TOLERANCE_4 = 1.0e-7;
+    double ABSOLUTE_TOLERANCE_7 = 1.0e-10;
+
+    // Perform the actual tests
+    switch(testIndex)
+    {
+    case 1 :
+    {
+    	TestStruct test1_pass = test01_corner(f, SimplexGeom,       refElement, ABSOLUTE_TOLERANCE_1);
+    	return testReport(test1_pass, "1", verbose);
+    } break;
+    case 2 :
+    {
+    	TestStruct test2_pass = test02_local_to_global(verbose, f, SimplexGeom,       randomLocalSample, interpOrder, functionOrder, ABSOLUTE_TOLERANCE_2);
+    	return testReport(test2_pass, "2", verbose);
+    } break;
+    case 3 :
+    {
+    	TestPair   test3_pass = test03_global_to_local(verbose, SimplexGeom,       global_vertices, local_vertices, ABSOLUTE_TOLERANCE_3);
+    	bool rez3  = testReport(test3_pass.first,  "3-isinside", verbose);
+    	     rez3 &= testReport(test3_pass.second, "3-global_to_local", verbose);
+    	return rez3;
+    } break;
+    case 4 :
+    {
+    	TestPair   test4_pass = test04_global_to_local(verbose, SimplexGeom,       randomLocalSample, ABSOLUTE_TOLERANCE_4);
+    	bool rez4  = testReport(test4_pass.first,  "4-isinside", verbose);
+    	     rez4 &= testReport(test4_pass.second, "4-global_to_local", verbose);
+    	return rez4;
+    } break;
+    case 5 :
+    {
+    	TestStruct test5_pass = test05_isoutside<CurvGeom, LocalCoordinate, GlobalCoordinate>(verbose, SimplexGeom, nSubentities);
+    	return testReport(test5_pass, "5", verbose);
+    } break;
+    case 6 :
+    {
+    	TestStruct test6_pass = test06_integration<CurvGeom, SimplexIntegrationHelper>(verbose, SimplexGeom, interpOrder, functionOrder, functType, RELATIVE_TOLERANCE, ACCURACY_GOAL);
+    	return testReport(test6_pass, "6", verbose);
+    } break;
+    case 7 :
+    {
+    	TestStruct test7_pass = test07_dot_integration<CurvGeom, SimplexIntegrationHelper>(verbose, SimplexGeom, interpOrder, functionOrder, functType, ABSOLUTE_TOLERANCE_7);
+    	return testReport(test7_pass, "7", verbose);
+    } break;
+
+    }
+
+    // [TODO] Test for normal direction
     //
     // ************************************************************
     // ALL TESTS FINISHED
     // ************************************************************
-
-
 }
 
 
 template<class ctype, int mydim, int cdim>
-bool SimplexTestWrapper()
+bool SimplexTestWrapper(bool verbose)
 {
     std::cout << "----- started testing simplex with mydim=" << mydim << " and world_dim=" << cdim << std::endl;
     std::cout << "-------------------------------------------------------------------------------------------------" << std::endl;
 
-    for (int ord = 1; ord <= 5; ord++)
+    typedef Dune::CurvilinearGeometry<ctype, mydim, cdim>        CurvGeom;
+    typedef Dune::CachedCurvilinearGeometry<ctype, mydim, cdim>  CachedCurvGeom;
+
+    typedef myFunctorIdentity  <double, mydim, cdim>  FiD;
+    typedef myFunctorLinear    <double, mydim, cdim>  Flin;
+    typedef myFunctorNonlinear1<double, mydim, cdim>  Fquad1;
+
+    static const int MIN_TEST = 1;
+    static const int MAX_TEST = 7;
+    static const int N_INTERP_ORDER = 5;
+
+    bool rez = true;
+
+    std::cout << "[Running CurvilinearGeometry tests..." << std::endl;
+    for (int iTest = MIN_TEST; iTest <= MAX_TEST; iTest++)
     {
-        SimplexTest<ctype, mydim, cdim>(myFunctorIdentity  <double, mydim, cdim>(), ord, 1, 1, "identity map");
-        SimplexTest<ctype, mydim, cdim>(myFunctorLinear    <double, mydim, cdim>(), ord, 2, 1, "linear map");
-        SimplexTest<ctype, mydim, cdim>(myFunctorNonlinear1<double, mydim, cdim>(), ord, 3, 2, "quadratic map");
+
+        bool test_pass = true;
+        for (int ord = 1; ord <= N_INTERP_ORDER; ord++)
+        {
+        	test_pass &= SimplexTest<CurvGeom, FiD>   (verbose, FiD(),    iTest, ord, 1, 1, "identity map");
+        	test_pass &= SimplexTest<CurvGeom, Flin>  (verbose, Flin(),   iTest, ord, 1, 1, "linear map");
+        	test_pass &= SimplexTest<CurvGeom, Fquad1>(verbose, Fquad1(), iTest, ord, 2, 2, "quadratic map");
+        }
+
+        if (!test_pass)  { std::cout << "--Warning: Have Failed tests" << std::endl; }
+        rez &= test_pass;
     }
-    return true;
+    std::cout << "... Finished CurvilinearGeometry tests]" << std::endl;
+
+    std::cout << "[Running Cached CurvilinearGeometry tests..." << std::endl;
+    for (int iTest = MIN_TEST; iTest <= MAX_TEST; iTest++)
+    {
+        bool test_pass_cache = true;
+        for (int ord = 1; ord <= N_INTERP_ORDER; ord++)
+        {
+        	test_pass_cache &= SimplexTest<CachedCurvGeom, FiD>   (verbose, FiD(),    iTest, ord, 1, 1, "identity map");
+        	test_pass_cache &= SimplexTest<CachedCurvGeom, Flin>  (verbose, Flin(),   iTest, ord, 1, 1, "linear map");
+        	test_pass_cache &= SimplexTest<CachedCurvGeom, Fquad1>(verbose, Fquad1(), iTest, ord, 2, 2, "quadratic map");
+        }
+
+        if (!test_pass_cache)  { std::cout << "--Warning: Have Failed tests" << std::endl; }
+        rez &= test_pass_cache;
+    }
+    std::cout << "... Finished CurvilinearGeometry tests]" << std::endl;
+
+    return rez;
 }
 
 
@@ -741,14 +915,15 @@ int main ( int argc, char **argv )
   srand (time(NULL));
 
   bool pass = true;
+  bool verbose = false;
 
   std::cout << ">>> Checking ctype = double" << std::endl;
-  pass &= SimplexTestWrapper<double, 1, 1>();
-  pass &= SimplexTestWrapper<double, 1, 2>();
-  pass &= SimplexTestWrapper<double, 1, 3>();
-  pass &= SimplexTestWrapper<double, 2, 2>();
-  pass &= SimplexTestWrapper<double, 2, 3>();
-  pass &= SimplexTestWrapper<double, 3, 3>();
+  pass &= SimplexTestWrapper<double, 1, 1>(verbose);
+  pass &= SimplexTestWrapper<double, 1, 2>(verbose);
+  pass &= SimplexTestWrapper<double, 1, 3>(verbose);
+  pass &= SimplexTestWrapper<double, 2, 2>(verbose);
+  pass &= SimplexTestWrapper<double, 2, 3>(verbose);
+  pass &= SimplexTestWrapper<double, 3, 3>(verbose);
 
 
 /*  std::cout << "-----Joke test------" << std::endl;
@@ -765,6 +940,7 @@ int main ( int argc, char **argv )
   std::cout << "test result: " << Dune::ReferenceElements<double, 2>::general( simplexG ).checkInside(JokeTestVec2) << std::endl;*/
 
 
+  std::cout << "Totall test pass = " << pass << std::endl;
 
-  return (pass ? 0 : 1);
+  return 0;
 }

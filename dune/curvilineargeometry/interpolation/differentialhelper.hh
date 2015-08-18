@@ -21,20 +21,6 @@ namespace Dune
 namespace DifferentialHelper
 {
 
-
-// [TODO] Merge with CurvilinearGeometryTraits
-template <class ctype, int cdim, int mydim>
-struct DifferentialHelperTraits
-{
-	//typedef Dune::CurvilinearGeometry<ctype, cdim, mydim>  CurvilinearGeometry;
-
-	typedef Dune::Polynomial<ctype, cdim>                     Polynomial;
-	typedef typename std::vector<Polynomial>                  PolynomialVector;
-	typedef typename Dune::PolynomialTraits<ctype>::Monomial  Monomial;
-};
-
-
-
 const int DIM0D = 0;
 const int DIM1D = 1;
 const int DIM2D = 2;
@@ -52,12 +38,12 @@ template <class CurvGeom, int cdim, int mydim>
 struct JacobianDeterminantAnalytical
 {
 	typedef typename CurvGeom::LocalPolynomial  LocalPolynomial;
+	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
 	{
-		// [FIXME] Throw error here because generic method called
-	    LocalPolynomial rez;
-	    return rez;
+		DUNE_THROW(NotImplemented, "Called generic method of DifferentialHelper::JacobianDeterminantAnalytical");
+	    return LocalPolynomial();
 	}
 };
 
@@ -68,9 +54,8 @@ struct JacobianDeterminantAnalytical<CurvGeom, DIM1D, DIM1D>
 	typedef typename CurvGeom::LocalPolynomial   LocalPolynomial;
 	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
 	{
-	    PolynomialVector analyticalMap = curvgeom.interpolatoryVectorAnalytical();
 	    LocalPolynomial rez = analyticalMap[0].derivative(0);
 
 	    // Clean-up in case some summands summed up to 0
@@ -90,9 +75,8 @@ struct JacobianDeterminantAnalytical<CurvGeom, DIM2D, DIM2D>
 	typedef typename CurvGeom::LocalPolynomial   LocalPolynomial;
 	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
 	{
-	    PolynomialVector analyticalMap = curvgeom.interpolatoryVectorAnalytical();
 	    LocalPolynomial rez = analyticalMap[0].derivative(0) * analyticalMap[1].derivative(1) - analyticalMap[0].derivative(1) * analyticalMap[1].derivative(0);
 
 	    // Clean-up in case some summands summed up to 0
@@ -112,10 +96,9 @@ struct JacobianDeterminantAnalytical<CurvGeom, DIM3D, DIM3D>
 	typedef typename CurvGeom::LocalPolynomial   LocalPolynomial;
 	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
 	{
 	    LocalPolynomial rez;
-	    PolynomialVector analyticalMap = curvgeom.interpolatoryVectorAnalytical();
 
 	    rez += analyticalMap[0].derivative(0) * ( analyticalMap[1].derivative(1) * analyticalMap[2].derivative(2) - analyticalMap[1].derivative(2) * analyticalMap[2].derivative(1) );
 	    rez += analyticalMap[0].derivative(1) * ( analyticalMap[1].derivative(2) * analyticalMap[2].derivative(0) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(2) );
@@ -142,9 +125,9 @@ struct NormalIntegrationElementAnalytical
 {
 	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
 
-	static PolynomialVector eval(const CurvGeom & curvgeom)
+	static PolynomialVector eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
 	{
-		// [FIXME] Throw error here because generic method called
+		DUNE_THROW(NotImplemented, "Called generic method of DifferentialHelper::NormalIntegrationElementAnalytical");
 	    PolynomialVector rez;
 	    return rez;
 	}
@@ -157,9 +140,8 @@ struct NormalIntegrationElementAnalytical<CurvGeom, DIM2D, DIM1D>
 {
 	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
 
-	static PolynomialVector eval(const CurvGeom & curvgeom)
+	static PolynomialVector eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
 	{
-		PolynomialVector analyticalMap = curvgeom.interpolatoryVectorAnalytical();
 	    PolynomialVector rez;
 
 	    rez.push_back(analyticalMap[1].derivative(0));
@@ -176,9 +158,8 @@ struct NormalIntegrationElementAnalytical<CurvGeom, DIM3D, DIM2D>
 {
 	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
 
-	static PolynomialVector eval(const CurvGeom & curvgeom)
+	static PolynomialVector eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
 	{
-		PolynomialVector analyticalMap = curvgeom.interpolatoryVectorAnalytical();
 	    PolynomialVector rez;
 
 	    rez.push_back(analyticalMap[2].derivative(0) * analyticalMap[1].derivative(1) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1));
@@ -200,10 +181,11 @@ template <class CurvGeom, int cdim, int mydim>
 struct IntegrationElementSquaredAnalytical
 {
 	typedef typename CurvGeom::LocalPolynomial  LocalPolynomial;
+	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
 	{
-		// [FIXME] Throw error here because generic method called
+		DUNE_THROW(NotImplemented, "Called generic method of DifferentialHelper::IntegrationElementSquaredAnalytical");
 	    LocalPolynomial rez;
 	    return rez;
 	}
@@ -217,9 +199,8 @@ struct IntegrationElementSquaredAnalytical<CurvGeom, cdim, DIM1D>
 	typedef typename CurvGeom::LocalPolynomial  LocalPolynomial;
 	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
 	{
-		PolynomialVector analyticalMap = curvgeom.interpolatoryVectorAnalytical();
 		LocalPolynomial rez;
 
 	    for (int i = 0; i < cdim; i++) {
@@ -238,11 +219,11 @@ struct IntegrationElementSquaredAnalytical<CurvGeom, DIM3D, DIM2D>
 	typedef typename CurvGeom::LocalPolynomial   LocalPolynomial;
 	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
 	{
 		LocalPolynomial rez;
 
-	    PolynomialVector normalIntegrationElement = NormalIntegrationElementAnalytical<CurvGeom, DIM3D, DIM2D>::eval(curvgeom);
+	    PolynomialVector normalIntegrationElement = NormalIntegrationElementAnalytical<CurvGeom, DIM3D, DIM2D>::eval(curvgeom, analyticalMap);
 	    for (int i = 0; i < DIM3D; i++) {
 	        rez += normalIntegrationElement[i] * normalIntegrationElement[i];
 	    }

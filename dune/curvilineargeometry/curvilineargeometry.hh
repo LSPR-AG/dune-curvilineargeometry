@@ -36,8 +36,8 @@
 #include <dune/curvilineargeometry/interpolation/curvilinearelementinterpolator.hh>
 #include <dune/curvilineargeometry/interpolation/differentialhelper.hh>
 #include <dune/curvilineargeometry/interpolation/pointlocation.hh>
-#include <dune/curvilineargeometry/integration/numericalrecursiveinterpolationintegrator.hh>
-#include <dune/curvilineargeometry/integration/quadratureintegrator.hh>
+#include <dune/curvilineargeometry/integration/integrationhelper.hh>
+
 
 
 namespace Dune
@@ -71,6 +71,8 @@ namespace Dune
   {
     typedef GenericGeometry::MatrixHelper< GenericGeometry::DuneCoordTraits< ct > > MatrixHelper;
 
+    static const unsigned int QUADRATURE_NORM_TYPE = Dune::QUADRATURE_NORM_L2;
+
     /** \brief tolerance to numerical algorithms */
     static ct tolerance () { return ct( 16 ) * std::numeric_limits< ct >::epsilon(); }
 
@@ -88,74 +90,6 @@ namespace Dune
     };
   };
 
-
-  // Evaluates the generalized Jacobian determinant using pre-computed polynomial integration elements
-  // If the integral is over codim-0 element, the integration element is just the jacobian determinant
-  // Otherwise sqrt(det(J^T * J))
-  // [TODO] Template operator to avoid the unnecessary if-statement inside
-  // [TODO] Move functors into traits, so that they do not appear explicitly in namespace dune
-  template<class ctype, int mydim, int cdim>
-  struct JacobianFunctor
-  {
-      typedef Polynomial<ctype, mydim> LocalPolynomial;
-      typedef FieldVector< ctype, mydim > LocalCoordinate;
-
-      static const unsigned int RETURN_SIZE = 1;
-      typedef ctype                        ResultValue;
-      typedef typename std::vector<ctype>  ResultType;
-
-      LocalPolynomial integration_element_generalised_;
-
-      JacobianFunctor(const LocalPolynomial & integration_element_g) :
-          integration_element_generalised_ (integration_element_g)
-      {
-    	  integration_element_generalised_.cache();
-      }
-
-      ResultType     operator()(const LocalCoordinate & x) const {
-          ctype rez;
-
-          if (mydim == cdim)  { rez = integration_element_generalised_.evaluate(x); }
-          else                { rez = sqrt(integration_element_generalised_.evaluate(x)); }
-
-          return ResultType(1, rez);
-      }
-
-      bool isPolynomial() const { return (mydim == cdim)||(integration_element_generalised_.order() <= 1); }
-
-      unsigned int expectedOrder() const {
-          return (mydim == cdim) ? integration_element_generalised_.order() : round(sqrt(integration_element_generalised_.order()));
-      }
-
-      ResultValue zeroValue(unsigned int rezIndex) const { return 0.0; }
-  };
-
-
-
-  // Functor that evaluates a polynomial that it carries inside
-  template<class ctype, int mydim>
-  struct PolynomialFunctor
-  {
-      typedef Polynomial<ctype, mydim> LocalPolynomial;
-      typedef FieldVector< ctype, mydim > LocalCoordinate;
-
-      static const unsigned int RETURN_SIZE = 1;
-      typedef ctype                        ResultValue;
-      typedef typename std::vector<ctype>  ResultType;
-
-
-      PolynomialFunctor(const LocalPolynomial & p) : p_(p) {}
-
-      ResultType operator()(const LocalCoordinate & x) const { return ResultType(1, p_.evaluate(x)); }
-
-      bool isPolynomial() const { return true; }
-
-      unsigned int expectedOrder() const  { return p_.order(); }
-
-      ResultValue zeroValue(unsigned int rezIndex) const { return 0.0; }
-
-      LocalPolynomial p_;
-  };
 
   // CurvilinearGeometry
   // -------------------
@@ -221,6 +155,10 @@ namespace Dune
     typedef typename Dune::DifferentialHelper::JacobianDeterminantAnalytical<This, cdim, mydim>         JacDetAnalytical;
     typedef typename Dune::DifferentialHelper::NormalIntegrationElementAnalytical<This, cdim, mydim>    IntElemNormalAnalytical;
     typedef typename Dune::DifferentialHelper::IntegrationElementSquaredAnalytical <This, cdim, mydim>  IntElemSquaredAnalytical;
+
+    // Define integration routines for this geometry
+    typedef typename Dune::IntegralHelper<This, Traits::QUADRATURE_NORM_TYPE>  IntegrationHelper;
+
 
     // Define tests that help to determine if a point is inside an entity
     typedef typename Dune::CurvilinearPointLocation::FarPointTest<This, cdim, mydim>      FarPointTest;
@@ -496,9 +434,9 @@ namespace Dune
      */
     LocalPolynomial JacobianDeterminantAnalytical() const
     {
-        //PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
+        PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
         //return JacobianDeterminantAnalytical(analyticalMap);
-    	return JacDetAnalytical::eval(*this);
+    	return JacDetAnalytical::eval(*this, analyticalMap);
     }
 
 
@@ -508,125 +446,18 @@ namespace Dune
      */
     PolynomialVector NormalIntegrationElementAnalytical() const
     {
-        //PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
+        PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
         //return NormalIntegrationElementAnalytical(analyticalMap);
-        return IntElemNormalAnalytical::eval(*this);
+        return IntElemNormalAnalytical::eval(*this, analyticalMap);
     }
 
 
     /** \brief Calculates analytically det|JJ^T|, without taking the square root. Re-uses NormalIntegrationElementAnalytical */
     LocalPolynomial IntegrationElementSquaredAnalytical() const
     {
-        //PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
+        PolynomialVector analyticalMap = interpolatoryVectorAnalytical();
         //return IntegrationElementSquaredAnalytical(analyticalMap);
-    	return IntElemSquaredAnalytical::eval(*this);
-    }
-
-
-    /** \brief Integrate the given polynomial over the element
-     *
-     *  If the dimension of the element and world match, the analytical integration will be performed.
-     *  Otherwise, analytical integration is not possible, and numerical integration will be performed.
-     *
-     *  \param[in]  P  Polynomial to integrate (for example, a basis function)
-     *  \param[in]  tolerance  the acceptable relative error for numerical integration
-     *
-     *  \returns the result of the integral
-     */
-    // [TODO]  Move integration to tutorial
-    ctype integrateScalar(
-    	const LocalPolynomial & P,
-    	ctype RELATIVE_TOLERANCE,
-    	ctype ACCURACY_GOAL) const
-    {
-        if (mydimension == coorddimension) { return integrateAnalyticalScalar(P); }
-        else                               { return integrateNumerical(PolynomialFunctor<ct, mydim>(P), RELATIVE_TOLERANCE, ACCURACY_GOAL); }
-    }
-
-    /** \brief Integrates the given functor numerically over the element
-     *
-     *
-     *  \param[in]  f  Functor which maps a local coordinate to a real value
-     *  \param[in]  tolerance  the acceptable relative error for numerical integration
-     *
-     *  \returns the result of the integral
-     */
-    template <typename Functor>
-    typename Functor::ResultType::value_type integrateNumerical(
-    	const Functor & f,
-    	ctype RELATIVE_TOLERANCE,
-        ctype ACCURACY_GOAL) const
-    {
-        if (mydimension == coorddimension)
-        {
-            LocalPolynomial jDet = JacobianDeterminantAnalytical();
-            JacobianFunctor<ct, mydim, cdim> g(jDet);
-            return integrateNumericalRecursive(f, g, RELATIVE_TOLERANCE, ACCURACY_GOAL)[0];
-        }
-        else
-        {
-            LocalPolynomial integrationElementSquared = IntegrationElementSquaredAnalytical();
-            JacobianFunctor<ct, mydim, cdim> g(integrationElementSquared);
-            return integrateNumericalRecursive(f, g, RELATIVE_TOLERANCE, ACCURACY_GOAL)[0];
-        }
-    }
-
-    /** \brief Integrate given polynomial analytically over the element
-     *
-     *  \param[in]  P    Polynomial to integrate over the element
-     *  \returns an integral of P over the element
-     *  \note (!) Analytical integration is only possible when mydim == cdim
-     *  \note (!) At the moment only capable of integrating over a Simplex
-     *
-     *  TODO: Need to throw error if called with mydim != cdim
-     */
-    // [TODO]  Move integration to tutorial
-    ctype integrateAnalyticalScalar(const LocalPolynomial & P) const
-    {
-        LocalPolynomial JDet = JacobianDeterminantAnalytical();
-        return integrateAnalyticalScalar(P, JDet);
-    }
-
-    /** \brief Integrate given polynomial vector normal projection analytically over the element
-     *
-     *  \param[in]  PVec    Polynomial vector to project-integrate over the element
-     *  \returns an integral of PVec over the element boundary, projected
-     *  \note (!) This operation only has meaning to elements which have normals - edges in 2D and faces in 3D
-     *  \note (!) At the moment only capable of integrating over a Simplex
-     *
-     *  TODO: Need to throw error if invalid mydim-cdim pair
-     */
-    // [TODO]  Move integration to tutorial
-    ctype integrateAnalyticalDot(const PolynomialVector & PVec) const
-    {
-        // If the dimensionality makes sense for this integral
-        bool valid_dim = ((mydimension == 1) && (coorddimension == 2)) || ((mydimension == 2) && (coorddimension == 3));
-
-        PolynomialVector normalElement = NormalIntegrationElementAnalytical();
-
-        return integrateAnalyticalDot(PVec, normalElement);
-    }
-
-    /** \brief Integrate given polynomial vector normal cross product analytically over the element
-     *
-     *  \param[in]  PVec    Polynomial vector to cross-product-integrate over the element
-     *  \returns a coordinate - integral of PVec cross-product with normal over the element boundary
-     *  \note (!) This operation only has meaning to elements which have normals - edges in 2D and faces in 3D
-     *  \note (!) At the moment only capable of integrating over a Simplex
-     *
-     *  TODO: NOT IMPLEMENTED YET
-     */
-
-    // [TODO]  Move integration to tutorial
-    GlobalCoordinate integrateAnalyticalTimes(const PolynomialVector & PVec) const
-    {
-        GlobalCoordinate rez;
-
-        // For 2D must return a scalar
-        // For 3D must return a 3D vector
-        // Maybe first enquire if this functionality is really necessary, then implement?
-
-        return rez;
+    	return IntElemSquaredAnalytical::eval(*this, analyticalMap);
     }
 
 
@@ -645,7 +476,7 @@ namespace Dune
         // As long as ACCURACY_GOAL is small, its actual value is irrelevant, because it only matters if integral is close to 0, but element volumes should not be 0
         ctype ACCURACY_GOAL = Traits::tolerance();
 
-        return integrateScalar(identityPolynomial<ctype, mydim>(), RELATIVE_TOLERANCE, ACCURACY_GOAL);
+        return IntegrationHelper::integrateScalar(*this, identityPolynomial<ctype, mydim>(), RELATIVE_TOLERANCE, ACCURACY_GOAL);
     }
 
     /** \brief obtain the transposed of the Jacobian
@@ -850,53 +681,6 @@ namespace Dune
     }
 
 
-    /** \brief performs numerical integration of polynomial and non-polynomial functions. This functionality is necessary
-     * for the CurvilinearGeometry to be able to calculate volumes of its own elements, which may have non-polynomial DetJac */
-    template <typename Functor, typename JacobiFunctor>
-    typename Functor::ResultType integrateNumericalRecursive(
-            const Functor & f,
-            const JacobiFunctor & jacobiDet,
-            ctype RELATIVE_TOLERANCE,
-            ctype ACCURACY_GOAL) const
-    {
-        assert(mydim > 0);                // We can not currently integrate over vertices, in principle this could be replaced by Dirac evaluation
-        const int suggestedOrder = f.expectedOrder() + jacobiDet.expectedOrder();
-
-        const unsigned int NORM_TYPE = Dune::QUADRATURE_NORM_L2;
-
-        typedef Dune::QuadratureIntegrator<ctype, mydim>  QuadratureIntegrator;
-
-        if (f.isPolynomial() && jacobiDet.isPolynomial()) {  // If the integrand is polynomial, it can be integrated using fixed order
-        	return QuadratureIntegrator::integrate(type(), f, suggestedOrder, jacobiDet);
-        } else {                                             // Otherwise, the order has to be determined recursively
-        	return QuadratureIntegrator::template integrateRecursive<JacobiFunctor, Functor, NORM_TYPE>(type(), f, jacobiDet, RELATIVE_TOLERANCE, ACCURACY_GOAL, suggestedOrder).second;
-        }
-
-        //NumericalRecursiveInterpolationIntegrator<ct, mydim> NInt( type() );
-        //return NInt.integrate( g, tolerance);
-    }
-
-
-    /** \brief performs analytical volume integral of a scalar function given that cdim==mydim */
-    // [TODO] Move this functionality to a tutorial file
-    ctype integrateAnalyticalScalar(const LocalPolynomial & P, const LocalPolynomial & jacobianDeterminant) const
-    {
-        assert(mydim > 0);
-        return (P * jacobianDeterminant).integrateRefSimplex();
-    }
-
-
-    /** \brief performs analytical surface integral of dot(f, n) */
-    // [TODO] Move this functionality to a tutorial file
-    ctype integrateAnalyticalDot(const PolynomialVector & PVec, const PolynomialVector & normalIntegrationElement ) const
-    {
-        assert(mydim > 0);
-        // Construct boundary integration element normal polynomial vector
-        LocalPolynomial integrand;
-        for (int i = 0; i < coorddimension; i++) { integrand += PVec[i] * normalIntegrationElement[i]; }
-        return integrand.integrateRefSimplex();
-    }
-
   protected:
     ElementInterpolator elementInterpolator_;
   };
@@ -1009,6 +793,8 @@ namespace Dune
     typedef typename Dune::DifferentialHelper::NormalIntegrationElementAnalytical<This, cdim, mydim>    IntElemNormalAnalytical;
     typedef typename Dune::DifferentialHelper::IntegrationElementSquaredAnalytical <This, cdim, mydim>  IntElemSquaredAnalytical;
 
+    typedef typename Dune::IntegralHelper<This, Traits::QUADRATURE_NORM_TYPE>  IntegrationHelper;
+
 
     template< class Vertices >
     CachedCurvilinearGeometry ( const ReferenceElement &refElement,
@@ -1037,6 +823,13 @@ namespace Dune
         init();
     }
 
+
+    ~CachedCurvilinearGeometry()
+    {
+        if (JacobianDet_)  { delete JacobianDet_; };
+        if (IntElem2_)     { delete IntElem2_; };
+        if (NormIntElem_)  { delete NormIntElem_; };
+    }
 
     /** \brief Construct CachedCurvilinearGeometry classes for all mydim-1 subentities of this element
      *
@@ -1116,58 +909,7 @@ namespace Dune
     }
 
 
-    PolynomialVector interpolatoryVectorAnalytical() const       { return analyticalMap_; }
-
-
-    LocalPolynomial JacobianDeterminantAnalytical() const        { return JacobianDet_; }
-
-
-    PolynomialVector NormalIntegrationElementAnalytical() const  { return NormIntElem_; }
-
-
-    LocalPolynomial IntegrationElementSquaredAnalytical() const  { return IntElem2_; }
-
-
-    ctype integrateScalar(const LocalPolynomial & P, ctype RELATIVE_TOLERANCE, ctype ACCURACY_GOAL) const
-    {
-        if (mydimension == coorddimension) { return integrateAnalyticalScalar(P); }
-        else                               { return integrateNumerical(PolynomialFunctor<ct, mydim>(P), RELATIVE_TOLERANCE, ACCURACY_GOAL); }
-    }
-
-
-    template <typename Functor>
-    typename Functor::ResultType::value_type integrateNumerical(const Functor & f, ctype RELATIVE_TOLERANCE, ctype ACCURACY_GOAL) const
-    {
-        if (mydimension == coorddimension)
-        {
-            JacobianFunctor<ct, mydim, cdim> g(JacobianDet_);
-            return Base::integrateNumericalRecursive(f, g, RELATIVE_TOLERANCE, ACCURACY_GOAL)[0];
-        }
-        else
-        {
-            JacobianFunctor<ct, mydim, cdim> g(IntElem2_);
-            return Base::integrateNumericalRecursive(f, g, RELATIVE_TOLERANCE, ACCURACY_GOAL)[0];
-        }
-    }
-
-
-    ctype integrateAnalyticalScalar(const LocalPolynomial & P) const
-    {
-        return Base::integrateAnalyticalScalar(P, JacobianDet_);
-    }
-
-
-    // TODO: Throw error if invalid dim-cdim pair
-    // TODO: Implement integrateAnalyticalTimes function for Cached
-    ctype integrateAnalyticalDot(const PolynomialVector & PVec) const
-    {
-        // If the dimensionality makes sense for this integral
-        bool valid_dim = ((mydim == 1) && (cdim == 2)) || ((mydim == 2) && (cdim == 3));
-
-        return Base::integrateAnalyticalDot(PVec, NormIntElem_);
-    }
-
-
+    /** \brief Compute Jit using pre-computed analytical map */
     ctype volume (ctype RELATIVE_TOLERANCE) const
     {
         if (mydim == 0) { return 0; }
@@ -1175,37 +917,70 @@ namespace Dune
         // As long as ACCURACY_GOAL is small, its actual value is irrelevant, because it only matters if integral is close to 0, but element volumes should not be 0
         ctype ACCURACY_GOAL = Traits::tolerance();
 
-        return integrateScalar(identityPolynomial<ctype, mydim>(), RELATIVE_TOLERANCE, ACCURACY_GOAL);
+        return IntegrationHelper::integrateScalar(*this, identityPolynomial<ctype, mydim>(), RELATIVE_TOLERANCE, ACCURACY_GOAL);
     }
 
 
+    /** \brief Compute Jt using pre-computed analytical map */
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local ) const
     {
         return Base::jacobianTransposed(local, analyticalMap_) ;
     }
 
 
+    /** \brief Compute Jit using pre-computed analytical map */
     JacobianInverseTransposed jacobianInverseTransposed ( const LocalCoordinate &local ) const
     {
         return Base::jacobianInverseTransposed(local, analyticalMap_);
     }
 
+
+    /** \brief Retrieve pre-computed analytical map from local to global coordinates */
+    PolynomialVector interpolatoryVectorAnalytical() const       { return analyticalMap_; }
+
+
+    /** \brief Retrieve pre-computed analytical Jacobian determinant. If it does not exist yet, pre-compute it */
+    LocalPolynomial JacobianDeterminantAnalytical() const {
+    	if (!JacobianDet_)  {
+    		assert((mydim > 0)&&(mydim == cdim));  // Analytical Jacobian determinant only defined for volume-geometries
+    		JacobianDet_ = new LocalPolynomial(JacDetAnalytical::eval(*this, analyticalMap_));
+    	}
+
+    	return *JacobianDet_;
+    }
+
+
+    /** \brief Retrieve pre-computed analytical normal integration element. If it does not exist yet, pre-compute it */
+    PolynomialVector NormalIntegrationElementAnalytical() const  {
+    	if (!NormIntElem_)  {
+    		bool valid_dim = ((mydimension == 1) && (coorddimension == 2)) || ((mydimension == 2) && (coorddimension == 3));
+    		assert(valid_dim);  // Analytical integration element only defined for surface-geometries and line-geometries
+    		NormIntElem_ = new PolynomialVector(IntElemNormalAnalytical::eval(*this, analyticalMap_));
+    	}
+
+    	return *NormIntElem_;
+    }
+
+
+    /** \brief Retrieve pre-computed analytical generalized integration element squared. If it does not exist yet, pre-compute it */
+    LocalPolynomial IntegrationElementSquaredAnalytical() const  {
+    	if (!IntElem2_)  {
+    		assert((mydim > 0)&&(mydim != cdim));  // Analytical integration element only defined for surface-geometries and line-geometries
+    		IntElem2_ = new LocalPolynomial(IntElemSquaredAnalytical::eval(*this, analyticalMap_));
+    	}
+
+    	return *IntElem2_;
+    }
+
+
+
   private:
 
     // Initialization runs at the constructor
-    void init()
-    {
-        analyticalMap_ = Base::interpolatoryVectorAnalytical();
-
-        // [TODO] Remove all initialization except analytic map, create only upon request
-        if (mydim > 0)
-        {
-          if (mydim == cdim) { JacobianDet_ = JacDetAnalytical::eval(*this); }
-          else               { IntElem2_    = IntElemSquaredAnalytical::eval(*this); }
-
-          bool valid_dim = ((mydimension == 1) && (coorddimension == 2)) || ((mydimension == 2) && (coorddimension == 3));
-          if (valid_dim)     { NormIntElem_ = IntElemNormalAnalytical::eval(*this); }
-        }
+    void init()  { analyticalMap_ = Base::interpolatoryVectorAnalytical();
+    	JacobianDet_ = nullptr;
+    	IntElem2_ = nullptr;
+    	NormIntElem_ = nullptr;
     }
 
 
@@ -1215,9 +990,9 @@ namespace Dune
 
   private:
     mutable PolynomialVector analyticalMap_;
-    mutable LocalPolynomial JacobianDet_;
-    mutable LocalPolynomial IntElem2_;
-    mutable PolynomialVector NormIntElem_;
+    mutable LocalPolynomial  * JacobianDet_;
+    mutable LocalPolynomial  * IntElem2_;
+    mutable PolynomialVector * NormIntElem_;
   };
 
 } // namespace Dune
