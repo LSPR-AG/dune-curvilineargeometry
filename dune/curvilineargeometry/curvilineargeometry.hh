@@ -882,30 +882,7 @@ namespace Dune
 
     ctype integrationElement ( const LocalCoordinate &local ) const
     {
-    	// [FIXME] Remove unnecessary debugging
-
-    	ctype numericalRez = Base::integrationElement ( local, analyticalMap_ );
-
-    	if (cdim == mydim)
-    	{
-    		ctype analyticalRez = JacobianDeterminantAnalytical().evaluate(local);
-
-    		if (fabs(analyticalRez - numericalRez) > 1.0e-10)
-    		{
-    			std::cout << "failed geometry set = ";
-    			for (int i = 0; i < Base::vertexSet().size(); i++) { std::cout << Base::vertexSet()[i] << "; "; }
-    			std::cout << std::endl;
-
-    			std::cout << "eval switch @ local pos = " << Base::refElement().position( 0, 0 ) << std::endl;
-    			std::cout << "AnalyticDetJ at this position is = " <<  JacobianDeterminantAnalytical().evaluate(Base::refElement().position( 0, 0 )) << std::endl;
-    			std::cout << "AnalyticDet=" << JacobianDeterminantAnalytical().to_string() << std::endl;
-    			std::cout << "AnalyticDetJ = " << analyticalRez << " != NumericalDetJ = " << numericalRez << std::endl;
-    			DUNE_THROW(Dune::IOError, "__ERROR: Analytic and numeric Jacobian determinants did not match");
-    		}
-    	}
-
-
-        return numericalRez;
+        return Base::integrationElement ( local, analyticalMap_ );
     }
 
 

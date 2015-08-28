@@ -57,14 +57,20 @@ class CurvilinearElementInterpolator {
     typedef typename Dune::CurvilinearGeometryHelper::InterpolatoryOrderType   InterpolatoryOrderType;
     typedef typename Dune::CurvilinearGeometryHelper::IntegerCoordinateVector  IntegerCoordinateVector;
 
-    typedef FieldVector<ctype, mydimension> LocalVector;
-    typedef FieldVector< ctype, coorddimension > GlobalVector;
-    typedef Polynomial<ctype, mydimension> LocalPolynomial;
-    typedef std::vector<LocalPolynomial> PolynomialVector;
-    typedef typename Dune::PolynomialTraits<ctype>::Monomial Monomial;
 
-    typedef Dune::ReferenceElement< ctype, mydimension > ReferenceElement;
-    typedef Dune::ReferenceElements< ctype, mydimension > ReferenceElements;
+    typedef std::vector<ctype>                                 NumVector1D;
+    typedef std::vector<NumVector1D>                           NumVector2D;
+    typedef std::vector<NumVector2D>                           NumVector3D;
+
+    typedef std::vector<std::vector<ctype> >                   PowerVector;
+    typedef FieldVector<ctype, mydimension>                    LocalVector;
+    typedef FieldVector< ctype, coorddimension >               GlobalVector;
+    typedef Polynomial<ctype, mydimension>                     LocalPolynomial;
+    typedef std::vector<LocalPolynomial>                       PolynomialVector;
+    typedef typename Dune::PolynomialTraits<ctype>::Monomial   Monomial;
+
+    typedef Dune::ReferenceElement< ctype, mydimension >       ReferenceElement;
+    typedef Dune::ReferenceElements< ctype, mydimension >      ReferenceElements;
 
     const ReferenceElement *refElement_;
     InterpolatoryOrderType order_;
@@ -159,26 +165,18 @@ class CurvilinearElementInterpolator {
     int nSubentity(int codim) const { return refElement_->size(codim); }
 
 
-    /** \brief  Lagrange LocalPolynomial corresponding to a given vertex, evaluated at local reference coordinates (u,v,w)
+    /** \brief  Lagrange LocalPolynomial corresponding to a given vertex, evaluated at local reference coordinates (U[0][1],U[1][1],U[2][1])
      *  \param[in]  vertexIndex		The internal index of the associated interpolatory vertex
      *  \param[in]  local		The local coordinate to evaluate the polynomial
+     *
+     *  IMPORTANT: This method is inefficient. When multiple Lagrange Polynomials are needed for a single coordinate, pre-compute power vector.
      * 
      *  note: there is one lagrange polynomial corresponding to each interpolatory vertex, therefore it makes sense to have the same index for polynomials and vertices
      */
     double lagrangePolynomial(InternalIndexType vertexIndex, const LocalVector &local) const
     {
-    	assert(mydim > 0);
-        if (!type().isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: lagrangePolynomial() only implemented for Simplex geometries at the moment"); }
-
-        double rez = 0;
-
-        switch (mydim) {
-        case 1:  rez = lagrangePolynomialEdge       (vertexIndex, local[0]                     );   break;
-        case 2:  rez = lagrangePolynomialTriangle   (vertexIndex, local[0], local[1]           );   break;
-        case 3:  rez = lagrangePolynomialTetrahedron(vertexIndex, local[0], local[1], local[2] );   break;
-        }
-
-        return rez;
+    	PowerVector pw = powerVector(local);
+    	return lagrangePolynomial(vertexIndex, pw);
     }
 
     /** \brief  Numerically evaluates the curvilinear map from local to global coordinates
@@ -191,16 +189,15 @@ class CurvilinearElementInterpolator {
     	// In case of 0-dim geometry, a 0-dim vector is mapped to a single point defining the geometry
     	if (mydim == 0) { return point_[0]; }
 
-        GlobalVector rez;
+    	// Pre-compute all monomials used in computation to save time
+    	NumVector1D M = hierarchicMonomial(local);
 
-        for (int j = 0; j < coorddimension; j++) { rez[j] = 0; }
+        GlobalVector rez(0.0);
+        //for (int j = 0; j < coorddimension; j++) { rez[j] = 0; }
 
         for (int i = 0; i < dofPerOrder(); i++)
         {
-            rez.axpy(lagrangePolynomial(i, local), point_[i]);
-
-            //double LP = lagrangePolynomial(i, local);
-            //for (int j = 0; j < coorddimension; j++) { rez[j] += point_[i][j] * LP; }
+            rez.axpy(lagrangePolynomial(i, M), point_[i]);
         }
 
         return rez;
@@ -247,62 +244,144 @@ class CurvilinearElementInterpolator {
     // Implementation of the SimplexInterpolator Class
     // *****************************************************
 
+    // Generates monomials in hierarchically-increasing-order, since this way same monomial vector is applicable to all interpolation orders
+    // Hierarchic means that first all monomials of order N appear, and then are followed by order N+1
+    // 1D: 1, x, x^2, x^3, ...
+    // 2D: 1, x, y, x^2, xy, y^2, x^3, x^2y, xy^2, y^3, ...
+    // 3D: 1, x, y, z, x^2, xy, xz, y^2, yz, z^2, x^3, x^2y, x^2z, xy^2, xyz, xz^2, y^3, y^2z yz^2, z^3, ...
+    NumVector1D hierarchicMonomial(const LocalVector &local) const
+	{
+    	NumVector1D rez(1, 1.0);
+
+    	switch(mydim)
+    	{
+    	case 1 :
+    	{
+    		for (int iOrd = 1; iOrd <= order_; iOrd++)  { rez.push_back(rez[iOrd - 1] * local[0]); }
+    	} break;
+    	case 2 :
+    	{
+    		// First generate all monomials in conventional order
+    		NumVector2D tmp2d(order_ + 1, NumVector1D(order_ + 1, 1.0));
+    		for (int ix = 1; ix <= order_; ix++)  { tmp2d[ix][0] = tmp2d[ix - 1][0] * local[0]; }
+    		for (int ix = 0; ix <= order_; ix++)  {
+        		for (int iy = 1; iy <= order_ - ix; iy++)  { tmp2d[ix][iy] = tmp2d[ix][iy - 1] * local[1]; }
+    		}
+
+    		// Then convert them to hierarchical order
+    		for (int iOrd = 1; iOrd <= order_; iOrd++)  {
+    			for (int ix = iOrd; ix >= 0; ix--)  {
+    				int iy = iOrd - ix;
+    				rez.push_back(tmp2d[ix][iy]);
+    			}
+
+    		}
+    	} break;
+    	case 3 :
+    	{
+    		// First generate all monomials in conventional order
+    		NumVector3D tmp3d(order_ + 1, NumVector2D(order_ + 1, NumVector1D(order_ + 1, 1.0)));
+    		for (int ix = 1; ix <= order_; ix++)  { tmp3d[ix][0][0] = tmp3d[ix - 1][0][0] * local[0]; }
+    		for (int ix = 0; ix <= order_; ix++)  {
+    			for (int iy = 1; iy <= order_ - ix; iy++)  { tmp3d[ix][iy][0] = tmp3d[ix][iy - 1][0] * local[1]; }
+        		for (int iy = 0; iy <= order_ - ix; iy++)  {
+            		for (int iz = 1; iz <= order_ - ix - iy; iz++)  { tmp3d[ix][iy][iz] = tmp3d[ix][iy][iz - 1] * local[2]; }
+        		}
+    		}
+
+    		// Then convert them to hierarchical order
+    		for (int iOrd = 1; iOrd <= order_; iOrd++)  {
+    			for (int ix = iOrd; ix >= 0; ix--)  {
+        			for (int iy = iOrd - ix; iy >= 0; iy--)  {
+        				int iz = iOrd - ix - iy;
+        				rez.push_back(tmp3d[ix][iy][iz]);
+        			}
+    			}
+    		}
+    	} break;
+
+    	}
+
+    	//std::cout << "order = " << order_ << "cdim = " << cdim << ";   expected = " << dofPerOrder() << " got " << rez.size() << std::endl;
+    	assert(rez.size() == dofPerOrder());
+
+
+    	return rez;
+	}
+
+
+    /** \brief  Lagrange LocalPolynomial corresponding to a given vertex, evaluated at local reference coordinates (U[0][1],U[1][1],U[2][1])
+     *  \param[in]  vertexIndex		The internal index of the associated interpolatory vertex
+     *  \param[in]  local		The local coordinate to evaluate the polynomial
+     *
+     *  IMPORTANT: This method is inefficient. When multiple Lagrange Polynomials are needed for a single coordinate, pre-compute power vector.
+     *
+     *  note: there is one lagrange polynomial corresponding to each interpolatory vertex, therefore it makes sense to have the same index for polynomials and vertices
+     */
+    double lagrangePolynomial(InternalIndexType vertexIndex, const NumVector1D & M) const
+    {
+    	assert(mydim > 0);
+        if (!type().isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: lagrangePolynomial() only implemented for Simplex geometries at the moment"); }
+
+        double rez = 0;
+
+        switch (mydim) {
+        case 1:  rez = lagrangePolynomialEdge       (vertexIndex, M);   break;
+        case 2:  rez = lagrangePolynomialTriangle   (vertexIndex, M);   break;
+        case 3:  rez = lagrangePolynomialTetrahedron(vertexIndex, M);   break;
+        }
+
+        return rez;
+    }
+
+
+
     /** \brief  Lagrange polynomial for edge
      *  \param[in]  vertexIndex		The internal index of the associated interpolatory vertex
-     *  \param[in]  u			first local coordinate
+     *  \param[in]  U[0][1]			first local coordinate
      */
-    double lagrangePolynomialEdge(InternalIndexType vertexIndex, double u) const {
-        double u2; double u3; double u4; double u5;
-
+    double lagrangePolynomialEdge(InternalIndexType vertexIndex, const NumVector1D & M) const {
         switch (order_)
         {
         case 1:
             switch (vertexIndex)
             {
-            case 0    :     return -u + 1;   break;
-            case 1    :     return u;   break;
+            case 0    :     return -M[1] + 1;   break;
+            case 1    :     return M[1];   break;
             } break;
         case 2:
-            u2 = pow(u,2);
-
             switch (vertexIndex)
             {
-            case 0    :     return 2*u2 - 3*u + 1;   break;
-            case 1    :     return -4*u2 + 4*u;   break;
-            case 2    :     return 2*u2 - u;   break;
+            case 0    :     return 2*M[2] - 3*M[1] + 1;   break;
+            case 1    :     return -4*M[2] + 4*M[1];   break;
+            case 2    :     return 2*M[2] - M[1];   break;
             } break;
         case 3:
-            u2 = pow(u,2);  u3 = pow(u,3);
-
               switch (vertexIndex)
                {
-               case 0    :     return -9.0/2*u3 + 9*u2 - 11.0/2*u + 1;   break;
-               case 1    :     return 27.0/2*u3 - 45.0/2*u2 + 9*u;   break;
-               case 2    :     return -27.0/2*u3 + 18*u2 - 9.0/2*u;   break;
-               case 3    :     return 9.0/2*u3 - 9.0/2*u2 + u;   break;
+               case 0    :     return -9.0/2*M[3] + 9*M[2] - 11.0/2*M[1] + 1;   break;
+               case 1    :     return 27.0/2*M[3] - 45.0/2*M[2] + 9*M[1];   break;
+               case 2    :     return -27.0/2*M[3] + 18*M[2] - 9.0/2*M[1];   break;
+               case 3    :     return 9.0/2*M[3] - 9.0/2*M[2] + M[1];   break;
                } break;
         case 4:
-            u2 = pow(u,2);  u3 = pow(u,3); u4 = pow(u,4);
-
               switch (vertexIndex)
             {
-               case 0    :     return 32.0/3*u4 - 80.0/3*u3 + 70.0/3*u2 - 25.0/3*u + 1;   break;
-               case 1    :     return -128.0/3*u4 + 96*u3 - 208.0/3*u2 + 16*u;    break;
-               case 2    :     return 64*u4 - 128*u3 + 76*u2 - 12*u;    break;
-               case 3    :     return -128.0/3*u4 + 224.0/3*u3 - 112.0/3*u2 + 16.0/3*u;   break;
-               case 4    :     return 32.0/3*u4 - 16*u3 + 22.0/3*u2 - u;    break;
+               case 0    :     return 32.0/3*M[4] - 80.0/3*M[3] + 70.0/3*M[2] - 25.0/3*M[1] + 1;   break;
+               case 1    :     return -128.0/3*M[4] + 96*M[3] - 208.0/3*M[2] + 16*M[1];    break;
+               case 2    :     return 64*M[4] - 128*M[3] + 76*M[2] - 12*M[1];    break;
+               case 3    :     return -128.0/3*M[4] + 224.0/3*M[3] - 112.0/3*M[2] + 16.0/3*M[1];   break;
+               case 4    :     return 32.0/3*M[4] - 16*M[3] + 22.0/3*M[2] - M[1];    break;
                } break;
         case 5:
-            u2 = pow(u,2);  u3 = pow(u,3); u4 = pow(u,4); u5 = pow(u,5);
-
               switch (vertexIndex)
             {
-               case 0    :     return -625.0/24*u5 + 625.0/8*u4 - 2125.0/24*u3 + 375.0/8*u2 - 137.0/12*u + 1;   break;
-               case 1    :     return 3125.0/24*u5 - 4375.0/12*u4 + 8875.0/24*u3 - 1925.0/12*u2 + 25*u;    break;
-               case 2    :     return -3125.0/12*u5 + 8125.0/12*u4 - 7375.0/12*u3 + 2675.0/12*u2 - 25*u;    break;
-               case 3    :     return 3125.0/12*u5 - 625*u4 + 6125.0/12*u3 - 325.0/2*u2 + 50.0/3*u;    break;
-               case 4    :     return -3125.0/24*u5 + 6875.0/24*u4 - 5125.0/24*u3 + 1525.0/24*u2 - 25.0/4*u;   break;
-               case 5    :     return 625.0/24*u5 - 625.0/12*u4 + 875.0/24*u3 - 125.0/12*u2 + u;   break;
+               case 0    :     return -625.0/24*M[5] + 625.0/8*M[4] - 2125.0/24*M[3] + 375.0/8*M[2] - 137.0/12*M[1] + 1;   break;
+               case 1    :     return 3125.0/24*M[5] - 4375.0/12*M[4] + 8875.0/24*M[3] - 1925.0/12*M[2] + 25*M[1];    break;
+               case 2    :     return -3125.0/12*M[5] + 8125.0/12*M[4] - 7375.0/12*M[3] + 2675.0/12*M[2] - 25*M[1];    break;
+               case 3    :     return 3125.0/12*M[5] - 625*M[4] + 6125.0/12*M[3] - 325.0/2*M[2] + 50.0/3*M[1];    break;
+               case 4    :     return -3125.0/24*M[5] + 6875.0/24*M[4] - 5125.0/24*M[3] + 1525.0/24*M[2] - 25.0/4*M[1];   break;
+               case 5    :     return 625.0/24*M[5] - 625.0/12*M[4] + 875.0/24*M[3] - 125.0/12*M[2] + M[1];   break;
                } break;
         }
     }
@@ -310,284 +389,247 @@ class CurvilinearElementInterpolator {
 
     /** \brief  Lagrange polynomial for triangle
      *  \param[in]  vertexIndex		The internal index of the associated interpolatory vertex
-     *  \param[in]  u			first local coordinate
-     *  \param[in]  v			second local coordinate
+     *  \param[in]  U[0][1]			first local coordinate
+     *  \param[in]  U[1][1]			second local coordinate
      */
-    double lagrangePolynomialTriangle(InternalIndexType vertexIndex, double u, double v) const {
-        double u2; double u3; double u4; double u5;
-        double v2; double v3; double v4; double v5;
-
-
-      switch(order_)
-      {
-      case 1 :
-          switch (vertexIndex)
-          {
-        case 0    :    return -u - v + 1;    break;
-        case 1    :    return u;        break;
-        case 2    :    return v;        break;
-          }    break;
-      case 2:
-          u2 = pow(u,2);  v2 = pow(v,2);
-
-          switch (vertexIndex)
-          {
-        case 0    :    return 2*u2 + 4*u*v + 2*v2 - 3*u - 3*v + 1;    break;
-        case 1    :    return -4*u2 - 4*u*v + 4*u;            break;
-        case 2    :    return 2*u2 - u;                break;
-        case 3    :    return -4*u*v - 4*v2 + 4*v;            break;
-        case 4    :    return 4*u*v;                    break;
-        case 5    :    return 2*v2 - v;                break;
-          }    break;
-      case 3:
-          u2 = pow(u,2);  v2 = pow(v,2);
-          u3 = pow(u,3);  v3 = pow(v,3);
-
-          switch (vertexIndex)
-          {
-        case 0    :    return -9.0/2*u3 - 27.0/2*u2*v - 27.0/2*u*v2 - 9.0/2*v3 + 9*u2 + 18*u*v + 9*v2 - 11.0/2*u - 11.0/2*v + 1;    break;
-        case 1    :    return 27.0/2*u3 + 27*u2*v + 27.0/2*u*v2 - 45.0/2*u2 - 45.0/2*u*v + 9*u;                    break;
-        case 2    :    return -27.0/2*u3 - 27.0/2*u2*v + 18*u2 + 9.0/2*u*v - 9.0/2*u;                            break;
-        case 3    :    return 9.0/2*u3 - 9.0/2*u2 + u;                                            break;
-        case 4    :    return 27.0/2*u2*v + 27*u*v2 + 27.0/2*v3 - 45.0/2*u*v - 45.0/2*v2 + 9*v;                    break;
-        case 5    :    return -27*u2*v - 27*u*v2 + 27*u*v;                                        break;
-        case 6    :    return 27.0/2*u2*v - 9.0/2*u*v;                                            break;
-        case 7    :    return -27.0/2*u*v2 - 27.0/2*v3 + 9.0/2*u*v + 18*v2 - 9.0/2*v;                            break;
-        case 8    :    return 27.0/2*u*v2 - 9.0/2*u*v;                                            break;
-        case 9    :    return 9.0/2*v3 - 9.0/2*v2 + v;                                            break;
-          }    break;
-      case 4:
-            u2 = pow(u,2);  v2 = pow(v,2);
-            u3 = pow(u,3);  v3 = pow(v,3);
-            u4 = pow(u,4);  v4 = pow(v,4);
-
-          switch (vertexIndex)
-          {
-        case 0    :    return 32.0/3*u4 + 128.0/3*u3*v + 64*u2*v2 + 128.0/3*u*v3 + 32.0/3*v4 - 80.0/3*u3 - 80*u2*v - 80*u*v2 - 80.0/3*v3 + 70.0/3*u2 + 140.0/3*u*v + 70.0/3*v2 - 25.0/3*u - 25.0/3*v + 1;    break;
-        case 1    :    return -128.0/3*u4 - 128*u3*v - 128*u2*v2 - 128.0/3*u*v3 + 96*u3 + 192*u2*v + 96*u*v2 - 208.0/3*u2 - 208.0/3*u*v + 16*u;                                break;
-        case 2    :    return 64*u4 + 128*u3*v + 64*u2*v2 - 128*u3 - 144*u2*v - 16*u*v2 + 76*u2 + 28*u*v - 12*u;                                                break;
-        case 3    :    return -128.0/3*u4 - 128.0/3*u3*v + 224.0/3*u3 + 32*u2*v - 112.0/3*u2 - 16.0/3*u*v + 16.0/3*u;                                                break;
-        case 4    :    return 32.0/3*u4 - 16*u3 + 22.0/3*u2 - u;                                                                        break;
-        case 5    :    return -128.0/3*u3*v - 128*u2*v2 - 128*u*v3 - 128.0/3*v4 + 96*u2*v + 192*u*v2 + 96*v3 - 208.0/3*u*v - 208.0/3*v2 + 16*v;                                break;
-        case 6    :    return 128*u3*v + 256*u2*v2 + 128*u*v3 - 224*u2*v - 224*u*v2 + 96*u*v;                                                            break;
-        case 7    :    return -128*u3*v - 128*u2*v2 + 160*u2*v + 32*u*v2 - 32*u*v;                                                                break;
-        case 8    :    return 128.0/3*u3*v - 32*u2*v + 16.0/3*u*v;                                                                        break;
-        case 9    :    return 64*u2*v2 + 128*u*v3 + 64*v4 - 16*u2*v - 144*u*v2 - 128*v3 + 28*u*v + 76*v2 - 12*v;                                                break;
-        case 10   :    return -128*u2*v2 - 128*u*v3 + 32*u2*v + 160*u*v2 - 32*u*v;                                                                break;
-        case 11   :    return 64*u2*v2 - 16*u2*v - 16*u*v2 + 4*u*v;                                                                        break;
-        case 12   :    return -128.0/3*u*v3 - 128.0/3*v4 + 32*u*v2 + 224.0/3*v3 - 16.0/3*u*v - 112.0/3*v2 + 16.0/3*v;                                                break;
-        case 13   :    return 128.0/3*u*v3 - 32*u*v2 + 16.0/3*u*v;                                                                        break;
-        case 14   :    return 32.0/3*v4 - 16*v3 + 22.0/3*v2 - v;                                                                        break;
-          }    break;
-      case 5:
-          u2 = pow(u,2);  v2 = pow(v,2);
-          u3 = pow(u,3);  v3 = pow(v,3);
-          u4 = pow(u,4);  v4 = pow(v,4);
-          u5 = pow(u,5);  v5 = pow(v,5);
-
-          switch (vertexIndex)
-          {
-        case 0    :    return -625.0/24*u5 - 3125.0/24*u4*v - 3125.0/12*u3*v2 - 3125.0/12*u2*v3 - 3125.0/24*u*v4 - 625.0/24*v5 + 625.0/8*u4 + 625.0/2*u3*v + 1875.0/4*u2*v2 + 625.0/2*u*v3 + 625.0/8*v4 - 2125.0/24*u3 - 2125.0/8*u2*v - 2125.0/8*u*v2 - 2125.0/24*v3 + 375.0/8*u2 + 375.0/4*u*v + 375.0/8*v2 - 137.0/12*u - 137.0/12*v + 1;    break;
-        case 1    :    return 3125.0/24*u5 + 3125.0/6*u4*v + 3125.0/4*u3*v2 + 3125.0/6*u2*v3 + 3125.0/24*u*v4 - 4375.0/12*u4 - 4375.0/4*u3*v - 4375.0/4*u2*v2 - 4375.0/12*u*v3 + 8875.0/24*u3 + 8875.0/12*u2*v + 8875.0/24*u*v2 - 1925.0/12*u2 - 1925.0/12*u*v + 25*u;                                        break;
-        case 2    :    return -3125.0/12*u5 - 3125.0/4*u4*v - 3125.0/4*u3*v2 - 3125.0/12*u2*v3 + 8125.0/12*u4 + 5625.0/4*u3*v + 3125.0/4*u2*v2 + 625.0/12*u*v3 - 7375.0/12*u3 - 8875.0/12*u2*v - 125*u*v2 + 2675.0/12*u2 + 1175.0/12*u*v - 25*u;                                                break;
-        case 3    :    return 3125.0/12*u5 + 3125.0/6*u4*v + 3125.0/12*u3*v2 - 625*u4 - 3125.0/4*u3*v - 625.0/4*u2*v2 + 6125.0/12*u3 + 3875.0/12*u2*v + 125.0/6*u*v2 - 325.0/2*u2 - 75.0/2*u*v + 50.0/3*u;                                                                    break;
-        case 4    :    return -3125.0/24*u5 - 3125.0/24*u4*v + 6875.0/24*u4 + 625.0/4*u3*v - 5125.0/24*u3 - 1375.0/24*u2*v + 1525.0/24*u2 + 25.0/4*u*v - 25.0/4*u;                                                                                        break;
-        case 5    :    return 625.0/24*u5 - 625.0/12*u4 + 875.0/24*u3 - 125.0/12*u2 + u;                                                                                                                            break;
-        case 6    :    return 3125.0/24*u4*v + 3125.0/6*u3*v2 + 3125.0/4*u2*v3 + 3125.0/6*u*v4 + 3125.0/24*v5 - 4375.0/12*u3*v - 4375.0/4*u2*v2 - 4375.0/4*u*v3 - 4375.0/12*v4 + 8875.0/24*u2*v + 8875.0/12*u*v2 + 8875.0/24*v3 - 1925.0/12*u*v - 1925.0/12*v2 + 25*v;                                        break;
-        case 7    :    return -3125.0/6*u4*v - 3125.0/2*u3*v2 - 3125.0/2*u2*v3 - 3125.0/6*u*v4 + 1250*u3*v + 2500*u2*v2 + 1250*u*v3 - 5875.0/6*u2*v - 5875.0/6*u*v2 + 250*u*v;                                                                                    break;
-        case 8    :    return 3125.0/4*u4*v + 3125.0/2*u3*v2 + 3125.0/4*u2*v3 - 3125.0/2*u3*v - 6875.0/4*u2*v2 - 625.0/4*u*v3 + 3625.0/4*u2*v + 1125.0/4*u*v2 - 125*u*v;                                                                                    break;
-        case 9    :    return -3125.0/6*u4*v - 3125.0/6*u3*v2 + 2500.0/3*u3*v + 625.0/2*u2*v2 - 2125.0/6*u2*v - 125.0/3*u*v2 + 125.0/3*u*v;                                                                                                    break;
-        case 10   :    return 3125.0/24*u4*v - 625.0/4*u3*v + 1375.0/24*u2*v - 25.0/4*u*v;                                                                                                                            break;
-        case 11   :    return -3125.0/12*u3*v2 - 3125.0/4*u2*v3 - 3125.0/4*u*v4 - 3125.0/12*v5 + 625.0/12*u3*v + 3125.0/4*u2*v2 + 5625.0/4*u*v3 + 8125.0/12*v4 - 125*u2*v - 8875.0/12*u*v2 - 7375.0/12*v3 + 1175.0/12*u*v + 2675.0/12*v2 - 25*v;                                                break;
-        case 12   :    return 3125.0/4*u3*v2 + 3125.0/2*u2*v3 + 3125.0/4*u*v4 - 625.0/4*u3*v - 6875.0/4*u2*v2 - 3125.0/2*u*v3 + 1125.0/4*u2*v + 3625.0/4*u*v2 - 125*u*v;                                                                                    break;
-        case 13   :    return -3125.0/4*u3*v2 - 3125.0/4*u2*v3 + 625.0/4*u3*v + 4375.0/4*u2*v2 + 625.0/4*u*v3 - 375.0/2*u2*v - 375.0/2*u*v2 + 125.0/4*u*v;                                                                                            break;
-        case 14   :    return 3125.0/12*u3*v2 - 625.0/12*u3*v - 625.0/4*u2*v2 + 125.0/4*u2*v + 125.0/6*u*v2 - 25.0/6*u*v;                                                                                                            break;
-        case 15   :    return 3125.0/12*u2*v3 + 3125.0/6*u*v4 + 3125.0/12*v5 - 625.0/4*u2*v2 - 3125.0/4*u*v3 - 625*v4 + 125.0/6*u2*v + 3875.0/12*u*v2 + 6125.0/12*v3 - 75.0/2*u*v - 325.0/2*v2 + 50.0/3*v;                                                                    break;
-        case 16   :    return -3125.0/6*u2*v3 - 3125.0/6*u*v4 + 625.0/2*u2*v2 + 2500.0/3*u*v3 - 125.0/3*u2*v - 2125.0/6*u*v2 + 125.0/3*u*v;                                                                                                    break;
-        case 17   :    return 3125.0/12*u2*v3 - 625.0/4*u2*v2 - 625.0/12*u*v3 + 125.0/6*u2*v + 125.0/4*u*v2 - 25.0/6*u*v;                                                                                                            break;
-        case 18   :    return -3125.0/24*u*v4 - 3125.0/24*v5 + 625.0/4*u*v3 + 6875.0/24*v4 - 1375.0/24*u*v2 - 5125.0/24*v3 + 25.0/4*u*v + 1525.0/24*v2 - 25.0/4*v;                                                                                        break;
-        case 19   :    return 3125.0/24*u*v4 - 625.0/4*u*v3 + 1375.0/24*u*v2 - 25.0/4*u*v;                                                                                                                            break;
-        case 20   :    return 625.0/24*v5 - 625.0/12*v4 + 875.0/24*v3 - 125.0/12*v2 + v;                                                                                                                            break;
-          }    break;
-      }
+    double lagrangePolynomialTriangle(InternalIndexType vertexIndex, const NumVector1D & M) const {
+    	switch(order_)
+    	{
+    	case 1 :
+    		switch (vertexIndex)
+    		{
+    	   		case 0    :    return -M[1] - M[2] + 1;    break;
+    	   		case 1    :    return M[1];        break;
+    	   		case 2    :    return M[2];        break;
+    		}    break;
+    	case 2:
+    		switch (vertexIndex)
+    		{
+    	   		case 0    :    return 2*M[3] + 4*M[4] + 2*M[5] - 3*M[1] - 3*M[2] + 1;    break;
+    	   		case 1    :    return -4*M[3] - 4*M[4] + 4*M[1];            break;
+    	   		case 2    :    return 2*M[3] - M[1];                break;
+    	   		case 3    :    return -4*M[4] - 4*M[5] + 4*M[2];            break;
+    	   		case 4    :    return 4*M[4];                    break;
+    	   		case 5    :    return 2*M[5] - M[2];                break;
+    	   	}    break;
+    	case 3:
+    		switch (vertexIndex)
+    		{
+    			case 0    :    return -9.0/2*M[6] - 27.0/2*M[7] - 27.0/2*M[8] - 9.0/2*M[9] + 9*M[3] + 18*M[4] + 9*M[5] - 11.0/2*M[1] - 11.0/2*M[2] + 1;    break;
+    			case 1    :    return 27.0/2*M[6] + 27*M[7] + 27.0/2*M[8] - 45.0/2*M[3] - 45.0/2*M[4] + 9*M[1];                    break;
+    			case 2    :    return -27.0/2*M[6] - 27.0/2*M[7] + 18*M[3] + 9.0/2*M[4] - 9.0/2*M[1];                            break;
+    			case 3    :    return 9.0/2*M[6] - 9.0/2*M[3] + M[1];                                            break;
+    			case 4    :    return 27.0/2*M[7] + 27*M[8] + 27.0/2*M[9] - 45.0/2*M[4] - 45.0/2*M[5] + 9*M[2];                    break;
+    			case 5    :    return -27*M[7] - 27*M[8] + 27*M[4];                                        break;
+    			case 6    :    return 27.0/2*M[7] - 9.0/2*M[4];                                            break;
+    			case 7    :    return -27.0/2*M[8] - 27.0/2*M[9] + 9.0/2*M[4] + 18*M[5] - 9.0/2*M[2];                            break;
+    			case 8    :    return 27.0/2*M[8] - 9.0/2*M[4];                                            break;
+    			case 9    :    return 9.0/2*M[9] - 9.0/2*M[5] + M[2];                                            break;
+    		}    break;
+    	case 4:
+    		switch (vertexIndex)
+    		{
+    		case 0    :    return 32.0/3*M[10] + 128.0/3*M[11] + 64*M[12] + 128.0/3*M[13] + 32.0/3*M[14] - 80.0/3*M[6] - 80*M[7] - 80*M[8] - 80.0/3*M[9] + 70.0/3*M[3] + 140.0/3*M[4] + 70.0/3*M[5] - 25.0/3*M[1] - 25.0/3*M[2] + 1;    break;
+    		case 1    :    return -128.0/3*M[10] - 128*M[11] - 128*M[12] - 128.0/3*M[13] + 96*M[6] + 192*M[7] + 96*M[8] - 208.0/3*M[3] - 208.0/3*M[4] + 16*M[1];                                break;
+    		case 2    :    return 64*M[10] + 128*M[11] + 64*M[12] - 128*M[6] - 144*M[7] - 16*M[8] + 76*M[3] + 28*M[4] - 12*M[1];                                                break;
+    		case 3    :    return -128.0/3*M[10] - 128.0/3*M[11] + 224.0/3*M[6] + 32*M[7] - 112.0/3*M[3] - 16.0/3*M[4] + 16.0/3*M[1];                                                break;
+    		case 4    :    return 32.0/3*M[10] - 16*M[6] + 22.0/3*M[3] - M[1];                                                                        break;
+    		case 5    :    return -128.0/3*M[11] - 128*M[12] - 128*M[13] - 128.0/3*M[14] + 96*M[7] + 192*M[8] + 96*M[9] - 208.0/3*M[4] - 208.0/3*M[5] + 16*M[2];                                break;
+    		case 6    :    return 128*M[11] + 256*M[12] + 128*M[13] - 224*M[7] - 224*M[8] + 96*M[4];                                                            break;
+    		case 7    :    return -128*M[11] - 128*M[12] + 160*M[7] + 32*M[8] - 32*M[4];                                                                break;
+    		case 8    :    return 128.0/3*M[11] - 32*M[7] + 16.0/3*M[4];                                                                        break;
+    		case 9    :    return 64*M[12] + 128*M[13] + 64*M[14] - 16*M[7] - 144*M[8] - 128*M[9] + 28*M[4] + 76*M[5] - 12*M[2];                                                break;
+    		case 10   :    return -128*M[12] - 128*M[13] + 32*M[7] + 160*M[8] - 32*M[4];                                                                break;
+    		case 11   :    return 64*M[12] - 16*M[7] - 16*M[8] + 4*M[4];                                                                        break;
+    		case 12   :    return -128.0/3*M[13] - 128.0/3*M[14] + 32*M[8] + 224.0/3*M[9] - 16.0/3*M[4] - 112.0/3*M[5] + 16.0/3*M[2];                                                break;
+    		case 13   :    return 128.0/3*M[13] - 32*M[8] + 16.0/3*M[4];                                                                        break;
+    		case 14   :    return 32.0/3*M[14] - 16*M[9] + 22.0/3*M[5] - M[2];                                                                        break;
+    		}    break;
+    	case 5:
+    		switch (vertexIndex)
+    		{
+    		case 0    :    return -625.0/24*M[15] - 3125.0/24*M[16] - 3125.0/12*M[17] - 3125.0/12*M[18] - 3125.0/24*M[19] - 625.0/24*M[20] + 625.0/8*M[10] + 625.0/2*M[11] + 1875.0/4*M[12] + 625.0/2*M[13] + 625.0/8*M[14] - 2125.0/24*M[6] - 2125.0/8*M[7] - 2125.0/8*M[8] - 2125.0/24*M[9] + 375.0/8*M[3] + 375.0/4*M[4] + 375.0/8*M[5] - 137.0/12*M[1] - 137.0/12*M[2] + 1;    break;
+    		case 1    :    return 3125.0/24*M[15] + 3125.0/6*M[16] + 3125.0/4*M[17] + 3125.0/6*M[18] + 3125.0/24*M[19] - 4375.0/12*M[10] - 4375.0/4*M[11] - 4375.0/4*M[12] - 4375.0/12*M[13] + 8875.0/24*M[6] + 8875.0/12*M[7] + 8875.0/24*M[8] - 1925.0/12*M[3] - 1925.0/12*M[4] + 25*M[1];                                        break;
+    		case 2    :    return -3125.0/12*M[15] - 3125.0/4*M[16] - 3125.0/4*M[17] - 3125.0/12*M[18] + 8125.0/12*M[10] + 5625.0/4*M[11] + 3125.0/4*M[12] + 625.0/12*M[13] - 7375.0/12*M[6] - 8875.0/12*M[7] - 125*M[8] + 2675.0/12*M[3] + 1175.0/12*M[4] - 25*M[1];                                                break;
+    		case 3    :    return 3125.0/12*M[15] + 3125.0/6*M[16] + 3125.0/12*M[17] - 625*M[10] - 3125.0/4*M[11] - 625.0/4*M[12] + 6125.0/12*M[6] + 3875.0/12*M[7] + 125.0/6*M[8] - 325.0/2*M[3] - 75.0/2*M[4] + 50.0/3*M[1];                                                                    break;
+    		case 4    :    return -3125.0/24*M[15] - 3125.0/24*M[16] + 6875.0/24*M[10] + 625.0/4*M[11] - 5125.0/24*M[6] - 1375.0/24*M[7] + 1525.0/24*M[3] + 25.0/4*M[4] - 25.0/4*M[1];                                                                                        break;
+    		case 5    :    return 625.0/24*M[15] - 625.0/12*M[10] + 875.0/24*M[6] - 125.0/12*M[3] + M[1];                                                                                                                            break;
+    		case 6    :    return 3125.0/24*M[16] + 3125.0/6*M[17] + 3125.0/4*M[18] + 3125.0/6*M[19] + 3125.0/24*M[20] - 4375.0/12*M[11] - 4375.0/4*M[12] - 4375.0/4*M[13] - 4375.0/12*M[14] + 8875.0/24*M[7] + 8875.0/12*M[8] + 8875.0/24*M[9] - 1925.0/12*M[4] - 1925.0/12*M[5] + 25*M[2];                                        break;
+    		case 7    :    return -3125.0/6*M[16] - 3125.0/2*M[17] - 3125.0/2*M[18] - 3125.0/6*M[19] + 1250*M[11] + 2500*M[12] + 1250*M[13] - 5875.0/6*M[7] - 5875.0/6*M[8] + 250*M[4];                                                                                    break;
+    		case 8    :    return 3125.0/4*M[16] + 3125.0/2*M[17] + 3125.0/4*M[18] - 3125.0/2*M[11] - 6875.0/4*M[12] - 625.0/4*M[13] + 3625.0/4*M[7] + 1125.0/4*M[8] - 125*M[4];                                                                                    break;
+    		case 9    :    return -3125.0/6*M[16] - 3125.0/6*M[17] + 2500.0/3*M[11] + 625.0/2*M[12] - 2125.0/6*M[7] - 125.0/3*M[8] + 125.0/3*M[4];                                                                                                    break;
+    		case 10   :    return 3125.0/24*M[16] - 625.0/4*M[11] + 1375.0/24*M[7] - 25.0/4*M[4];                                                                                                                            break;
+    		case 11   :    return -3125.0/12*M[17] - 3125.0/4*M[18] - 3125.0/4*M[19] - 3125.0/12*M[20] + 625.0/12*M[11] + 3125.0/4*M[12] + 5625.0/4*M[13] + 8125.0/12*M[14] - 125*M[7] - 8875.0/12*M[8] - 7375.0/12*M[9] + 1175.0/12*M[4] + 2675.0/12*M[5] - 25*M[2];                                                break;
+    		case 12   :    return 3125.0/4*M[17] + 3125.0/2*M[18] + 3125.0/4*M[19] - 625.0/4*M[11] - 6875.0/4*M[12] - 3125.0/2*M[13] + 1125.0/4*M[7] + 3625.0/4*M[8] - 125*M[4];                                                                                    break;
+    		case 13   :    return -3125.0/4*M[17] - 3125.0/4*M[18] + 625.0/4*M[11] + 4375.0/4*M[12] + 625.0/4*M[13] - 375.0/2*M[7] - 375.0/2*M[8] + 125.0/4*M[4];                                                                                            break;
+    		case 14   :    return 3125.0/12*M[17] - 625.0/12*M[11] - 625.0/4*M[12] + 125.0/4*M[7] + 125.0/6*M[8] - 25.0/6*M[4];                                                                                                            break;
+    		case 15   :    return 3125.0/12*M[18] + 3125.0/6*M[19] + 3125.0/12*M[20] - 625.0/4*M[12] - 3125.0/4*M[13] - 625*M[14] + 125.0/6*M[7] + 3875.0/12*M[8] + 6125.0/12*M[9] - 75.0/2*M[4] - 325.0/2*M[5] + 50.0/3*M[2];                                                                    break;
+    		case 16   :    return -3125.0/6*M[18] - 3125.0/6*M[19] + 625.0/2*M[12] + 2500.0/3*M[13] - 125.0/3*M[7] - 2125.0/6*M[8] + 125.0/3*M[4];                                                                                                    break;
+    		case 17   :    return 3125.0/12*M[18] - 625.0/4*M[12] - 625.0/12*M[13] + 125.0/6*M[7] + 125.0/4*M[8] - 25.0/6*M[4];                                                                                                            break;
+    		case 18   :    return -3125.0/24*M[19] - 3125.0/24*M[20] + 625.0/4*M[13] + 6875.0/24*M[14] - 1375.0/24*M[8] - 5125.0/24*M[9] + 25.0/4*M[4] + 1525.0/24*M[5] - 25.0/4*M[2];                                                                                        break;
+    		case 19   :    return 3125.0/24*M[19] - 625.0/4*M[13] + 1375.0/24*M[8] - 25.0/4*M[4];                                                                                                                            break;
+    		case 20   :    return 625.0/24*M[20] - 625.0/12*M[14] + 875.0/24*M[9] - 125.0/12*M[5] + M[2];                                                                                                                            break;
+    	   	}    break;
+    	}
     }
 
 
     /** \brief  Lagrange polynomial for tetrahedron
      *  \param[in]  vertexIndex		The internal index of the associated interpolatory vertex
      *  \param[in]  u			first local coordinate
-     *  \param[in]  v			second local coordinate
-     *  \param[in]  w			third local coordinate
+     *  \param[in]  U[1][1]			second local coordinate
+     *  \param[in]  U[2][1]			third local coordinate
      */
-    double lagrangePolynomialTetrahedron(InternalIndexType vertexIndex, double u, double v, double w) const {
-      double u2; double u3; double u4; double u5;
-      double v2; double v3; double v4; double v5;
-      double w2; double w3; double w4; double w5;
-
-
-    switch(order_)
-    {
-    case 1 :
-        switch (vertexIndex)
-        {
-      case 0    :    return -u - v - w + 1;    break;
-      case 1    :    return u;        break;
-      case 2    :    return v;        break;
-      case 3    :    return w;        break;
-        }    break;
-    case 2:
-        u2 = pow(u,2);  v2 = pow(v,2);  w2 = pow(w,2);
-
-        switch (vertexIndex)
-        {
-      case 0    :    return 2*u2 + 4*u*v + 2*v2 + 4*u*w + 4*v*w + 2*w2 - 3*u - 3*v - 3*w + 1;    break;
-      case 1    :    return -4*u2 - 4*u*v - 4*u*w + 4*u;                        break;
-      case 2    :    return 2*u2 - u;                                break;
-      case 3    :    return -4*u*v - 4*v2 - 4*v*w + 4*v;                        break;
-      case 4    :    return 4*u*v;                                    break;
-      case 5    :    return 2*v2 - v;                                break;
-      case 6    :    return -4*u*w - 4*v*w - 4*w2 + 4*w;                        break;
-      case 7    :    return 4*u*w;                                    break;
-      case 8    :    return 4*v*w;                                    break;
-      case 9    :    return 2*w2 - w;                                break;
-        }    break;
-    case 3:
-        u2 = pow(u,2);  v2 = pow(v,2);  w2 = pow(w,2);
-        u3 = pow(u,3);  v3 = pow(v,3);  w3 = pow(w,3);
-
-        switch (vertexIndex)
-        {
-      case 0    :    return -9.0/2*u3 - 27.0/2*u2*v - 27.0/2*u*v2 - 9.0/2*v3 - 27.0/2*u2*w - 27*u*v*w - 27.0/2*v2*w - 27.0/2*u*w2 - 27.0/2*v*w2 - 9.0/2*w3 + 9*u2 + 18*u*v + 9*v2 + 18*u*w + 18*v*w + 9*w2 - 11.0/2*u - 11.0/2*v - 11.0/2*w + 1;    break;
-      case 1    :    return 27.0/2*u3 + 27*u2*v + 27.0/2*u*v2 + 27*u2*w + 27*u*v*w + 27.0/2*u*w2 - 45.0/2*u2 - 45.0/2*u*v - 45.0/2*u*w + 9*u;                                                    break;
-      case 2    :    return -27.0/2*u3 - 27.0/2*u2*v - 27.0/2*u2*w + 18*u2 + 9.0/2*u*v + 9.0/2*u*w - 9.0/2*u;                                                                    break;
-      case 3    :    return 9.0/2*u3 - 9.0/2*u2 + u;                                                                                                    break;
-      case 4    :    return 27.0/2*u2*v + 27*u*v2 + 27.0/2*v3 + 27*u*v*w + 27*v2*w + 27.0/2*v*w2 - 45.0/2*u*v - 45.0/2*v2 - 45.0/2*v*w + 9*v;                                                    break;
-      case 5    :    return -27*u2*v - 27*u*v2 - 27*u*v*w + 27*u*v;                                                                                            break;
-      case 6    :    return 27.0/2*u2*v - 9.0/2*u*v;                                                                                                    break;
-      case 7    :    return -27.0/2*u*v2 - 27.0/2*v3 - 27.0/2*v2*w + 9.0/2*u*v + 18*v2 + 9.0/2*v*w - 9.0/2*v;                                                                    break;
-      case 8    :    return 27.0/2*u*v2 - 9.0/2*u*v;                                                                                                    break;
-      case 9    :    return 9.0/2*v3 - 9.0/2*v2 + v;                                                                                                    break;
-      case 10    :    return 27.0/2*u2*w + 27*u*v*w + 27.0/2*v2*w + 27*u*w2 + 27*v*w2 + 27.0/2*w3 - 45.0/2*u*w - 45.0/2*v*w - 45.0/2*w2 + 9*w;                                                    break;
-      case 11    :    return -27*u2*w - 27*u*v*w - 27*u*w2 + 27*u*w;                                                                                            break;
-      case 12    :    return 27.0/2*u2*w - 9.0/2*u*w;                                                                                                    break;
-      case 13    :    return -27*u*v*w - 27*v2*w - 27*v*w2 + 27*v*w;                                                                                            break;
-      case 14    :    return 27*u*v*w;                                                                                                        break;
-      case 15    :    return 27.0/2*v2*w - 9.0/2*v*w;                                                                                                    break;
-      case 16    :    return -27.0/2*u*w2 - 27.0/2*v*w2 - 27.0/2*w3 + 9.0/2*u*w + 9.0/2*v*w + 18*w2 - 9.0/2*w;                                                                    break;
-      case 17    :    return 27.0/2*u*w2 - 9.0/2*u*w;                                                                                                    break;
-      case 18    :    return 27.0/2*v*w2 - 9.0/2*v*w;                                                                                                    break;
-      case 19    :    return 9.0/2*w3 - 9.0/2*w2 + w;                                                                                                    break;
-        }    break;
-    case 4:
-        u2 = pow(u,2);  v2 = pow(v,2);  w2 = pow(w,2);
-        u3 = pow(u,3);  v3 = pow(v,3);  w3 = pow(w,3);
-        u4 = pow(u,4);  v4 = pow(v,4);  w4 = pow(w,4);
-
-        switch (vertexIndex)
-        {
-      case 0    :    return 32.0/3*u4 + 128.0/3*u3*v + 64*u2*v2 + 128.0/3*u*v3 + 32.0/3*v4 + 128.0/3*u3*w + 128*u2*v*w + 128*u*v2*w + 128.0/3*v3*w + 64*u2*w2 + 128*u*v*w2 + 64*v2*w2 + 128.0/3*u*w3 + 128.0/3*v*w3 + 32.0/3*w4 - 80.0/3*u3 - 80*u2*v - 80*u*v2 - 80.0/3*v3 - 80*u2*w - 160*u*v*w - 80*v2*w - 80*u*w2 - 80*v*w2 - 80.0/3*w3 + 70.0/3*u2 + 140.0/3*u*v + 70.0/3*v2 + 140.0/3*u*w + 140.0/3*v*w + 70.0/3*w2 - 25.0/3*u - 25.0/3*v - 25.0/3*w + 1;    break;
-      case 1    :    return -128.0/3*u4 - 128*u3*v - 128*u2*v2 - 128.0/3*u*v3 - 128*u3*w - 256*u2*v*w - 128*u*v2*w - 128*u2*w2 - 128*u*v*w2 - 128.0/3*u*w3 + 96*u3 + 192*u2*v + 96*u*v2 + 192*u2*w + 192*u*v*w + 96*u*w2 - 208.0/3*u2 - 208.0/3*u*v - 208.0/3*u*w + 16*u;                                                                                                break;
-      case 2    :    return 64*u4 + 128*u3*v + 64*u2*v2 + 128*u3*w + 128*u2*v*w + 64*u2*w2 - 128*u3 - 144*u2*v - 16*u*v2 - 144*u2*w - 32*u*v*w - 16*u*w2 + 76*u2 + 28*u*v + 28*u*w - 12*u;                                                                                                                                        break;
-      case 3    :    return -128.0/3*u4 - 128.0/3*u3*v - 128.0/3*u3*w + 224.0/3*u3 + 32*u2*v + 32*u2*w - 112.0/3*u2 - 16.0/3*u*v - 16.0/3*u*w + 16.0/3*u;                                                                                                                                                        break;
-      case 4    :    return 32.0/3*u4 - 16*u3 + 22.0/3*u2 - u;                                                                                                                                                                                                    break;
-      case 5    :    return -128.0/3*u3*v - 128*u2*v2 - 128*u*v3 - 128.0/3*v4 - 128*u2*v*w - 256*u*v2*w - 128*v3*w - 128*u*v*w2 - 128*v2*w2 - 128.0/3*v*w3 + 96*u2*v + 192*u*v2 + 96*v3 + 192*u*v*w + 192*v2*w + 96*v*w2 - 208.0/3*u*v - 208.0/3*v2 - 208.0/3*v*w + 16*v;                                                                                                break;
-      case 6    :    return 128*u3*v + 256*u2*v2 + 128*u*v3 + 256*u2*v*w + 256*u*v2*w + 128*u*v*w2 - 224*u2*v - 224*u*v2 - 224*u*v*w + 96*u*v;                                                                                                                                                            break;
-      case 7    :    return -128*u3*v - 128*u2*v2 - 128*u2*v*w + 160*u2*v + 32*u*v2 + 32*u*v*w - 32*u*v;                                                                                                                                                                                break;
-      case 8    :    return 128.0/3*u3*v - 32*u2*v + 16.0/3*u*v;                                                                                                                                                                                                    break;
-      case 9    :    return 64*u2*v2 + 128*u*v3 + 64*v4 + 128*u*v2*w + 128*v3*w + 64*v2*w2 - 16*u2*v - 144*u*v2 - 128*v3 - 32*u*v*w - 144*v2*w - 16*v*w2 + 28*u*v + 76*v2 + 28*v*w - 12*v;                                                                                                                                        break;
-      case 10    :    return -128*u2*v2 - 128*u*v3 - 128*u*v2*w + 32*u2*v + 160*u*v2 + 32*u*v*w - 32*u*v;                                                                                                                                                                                break;
-      case 11    :    return 64*u2*v2 - 16*u2*v - 16*u*v2 + 4*u*v;                                                                                                                                                                                                    break;
-      case 12    :    return -128.0/3*u*v3 - 128.0/3*v4 - 128.0/3*v3*w + 32*u*v2 + 224.0/3*v3 + 32*v2*w - 16.0/3*u*v - 112.0/3*v2 - 16.0/3*v*w + 16.0/3*v;                                                                                                                                                        break;
-      case 13    :    return 128.0/3*u*v3 - 32*u*v2 + 16.0/3*u*v;                                                                                                                                                                                                    break;
-      case 14    :    return 32.0/3*v4 - 16*v3 + 22.0/3*v2 - v;                                                                                                                                                                                                    break;
-      case 15    :    return -128.0/3*u3*w - 128*u2*v*w - 128*u*v2*w - 128.0/3*v3*w - 128*u2*w2 - 256*u*v*w2 - 128*v2*w2 - 128*u*w3 - 128*v*w3 - 128.0/3*w4 + 96*u2*w + 192*u*v*w + 96*v2*w + 192*u*w2 + 192*v*w2 + 96*w3 - 208.0/3*u*w - 208.0/3*v*w - 208.0/3*w2 + 16*w;                                                                                                break;
-      case 16    :    return 128*u3*w + 256*u2*v*w + 128*u*v2*w + 256*u2*w2 + 256*u*v*w2 + 128*u*w3 - 224*u2*w - 224*u*v*w - 224*u*w2 + 96*u*w;                                                                                                                                                            break;
-      case 17    :    return -128*u3*w - 128*u2*v*w - 128*u2*w2 + 160*u2*w + 32*u*v*w + 32*u*w2 - 32*u*w;                                                                                                                                                                                break;
-      case 18    :    return 128.0/3*u3*w - 32*u2*w + 16.0/3*u*w;                                                                                                                                                                                                    break;
-      case 19    :    return 128*u2*v*w + 256*u*v2*w + 128*v3*w + 256*u*v*w2 + 256*v2*w2 + 128*v*w3 - 224*u*v*w - 224*v2*w - 224*v*w2 + 96*v*w;                                                                                                                                                            break;
-      case 20    :    return -256*u2*v*w - 256*u*v2*w - 256*u*v*w2 + 256*u*v*w;                                                                                                                                                                                            break;
-      case 21    :    return 128*u2*v*w - 32*u*v*w;                                                                                                                                                                                                            break;
-      case 22    :    return -128*u*v2*w - 128*v3*w - 128*v2*w2 + 32*u*v*w + 160*v2*w + 32*v*w2 - 32*v*w;                                                                                                                                                                                break;
-      case 23 :    return 128*u*v2*w - 32*u*v*w;                                                                                                                                                                                                            break;
-      case 24    :    return 128.0/3*v3*w - 32*v2*w + 16.0/3*v*w;                                                                                                                                                                                                    break;
-      case 25    :    return 64*u2*w2 + 128*u*v*w2 + 64*v2*w2 + 128*u*w3 + 128*v*w3 + 64*w4 - 16*u2*w - 32*u*v*w - 16*v2*w - 144*u*w2 - 144*v*w2 - 128*w3 + 28*u*w + 28*v*w + 76*w2 - 12*w;                                                                                                                                        break;
-      case 26    :    return -128*u2*w2 - 128*u*v*w2 - 128*u*w3 + 32*u2*w + 32*u*v*w + 160*u*w2 - 32*u*w;                                                                                                                                                                                break;
-      case 27    :    return 64*u2*w2 - 16*u2*w - 16*u*w2 + 4*u*w;                                                                                                                                                                                                    break;
-      case 28    :    return -128*u*v*w2 - 128*v2*w2 - 128*v*w3 + 32*u*v*w + 32*v2*w + 160*v*w2 - 32*v*w;                                                                                                                                                                                break;
-      case 29    :    return 128*u*v*w2 - 32*u*v*w;    break;
-      case 30    :    return 64*v2*w2 - 16*v2*w - 16*v*w2 + 4*v*w;    break;
-      case 31    :    return -128.0/3*u*w3 - 128.0/3*v*w3 - 128.0/3*w4 + 32*u*w2 + 32*v*w2 + 224.0/3*w3 - 16.0/3*u*w - 16.0/3*v*w - 112.0/3*w2 + 16.0/3*w;    break;
-      case 32    :    return 128.0/3*u*w3 - 32*u*w2 + 16.0/3*u*w;    break;
-      case 33    :    return 128.0/3*v*w3 - 32*v*w2 + 16.0/3*v*w;    break;
-      case 34    :    return 32.0/3*w4 - 16*w3 + 22.0/3*w2 - w;    break;
-        }    break;
-    case 5:
-        u2 = pow(u,2);  v2 = pow(v,2);  w2 = pow(w,2);
-        u3 = pow(u,3);  v3 = pow(v,3);  w3 = pow(w,3);
-        u4 = pow(u,4);  v4 = pow(v,4);  w4 = pow(w,4);
-        u5 = pow(u,5);  v5 = pow(v,5);  w5 = pow(w,5);
-
-        switch (vertexIndex)
-        {
-      case 0    :    return -625.0/24*u5 - 3125.0/24*u4*v - 3125.0/12*u3*v2 - 3125.0/12*u2*v3 - 3125.0/24*u*v4 - 625.0/24*v5 - 3125.0/24*u4*w - 3125.0/6*u3*v*w - 3125.0/4*u2*v2*w - 3125.0/6*u*v3*w - 3125.0/24*v4*w - 3125.0/12*u3*w2 - 3125.0/4*u2*v*w2 - 3125.0/4*u*v2*w2 - 3125.0/12*v3*w2 - 3125.0/12*u2*w3 - 3125.0/6*u*v*w3 - 3125.0/12*v2*w3 - 3125.0/24*u*w4 - 3125.0/24*v*w4 - 625.0/24*w5 + 625.0/8*u4 + 625.0/2*u3*v + 1875.0/4*u2*v2 + 625.0/2*u*v3 + 625.0/8*v4 + 625.0/2*u3*w + 1875.0/2*u2*v*w + 1875.0/2*u*v2*w + 625.0/2*v3*w + 1875.0/4*u2*w2 + 1875.0/2*u*v*w2 + 1875.0/4*v2*w2 + 625.0/2*u*w3 + 625.0/2*v*w3 + 625.0/8*w4 - 2125.0/24*u3 - 2125.0/8*u2*v - 2125.0/8*u*v2 - 2125.0/24*v3 - 2125.0/8*u2*w - 2125.0/4*u*v*w - 2125.0/8*v2*w - 2125.0/8*u*w2 - 2125.0/8*v*w2 - 2125.0/24*w3 + 375.0/8*u2 + 375.0/4*u*v + 375.0/8*v2 + 375.0/4*u*w + 375.0/4*v*w + 375.0/8*w2 - 137.0/12*u - 137.0/12*v - 137.0/12*w + 1;    break;
-      case 1    :    return 3125.0/24*u5 + 3125.0/6*u4*v + 3125.0/4*u3*v2 + 3125.0/6*u2*v3 + 3125.0/24*u*v4 + 3125.0/6*u4*w + 3125.0/2*u3*v*w + 3125.0/2*u2*v2*w + 3125.0/6*u*v3*w + 3125.0/4*u3*w2 + 3125.0/2*u2*v*w2 + 3125.0/4*u*v2*w2 + 3125.0/6*u2*w3 + 3125.0/6*u*v*w3 + 3125.0/24*u*w4 - 4375.0/12*u4 - 4375.0/4*u3*v - 4375.0/4*u2*v2 - 4375.0/12*u*v3 - 4375.0/4*u3*w - 4375.0/2*u2*v*w - 4375.0/4*u*v2*w - 4375.0/4*u2*w2 - 4375.0/4*u*v*w2 - 4375.0/12*u*w3 + 8875.0/24*u3 + 8875.0/12*u2*v + 8875.0/24*u*v2 + 8875.0/12*u2*w + 8875.0/12*u*v*w + 8875.0/24*u*w2 - 1925.0/12*u2 - 1925.0/12*u*v - 1925.0/12*u*w + 25*u;    break;
-      case 2    :    return -3125.0/12*u5 - 3125.0/4*u4*v - 3125.0/4*u3*v2 - 3125.0/12*u2*v3 - 3125.0/4*u4*w - 3125.0/2*u3*v*w - 3125.0/4*u2*v2*w - 3125.0/4*u3*w2 - 3125.0/4*u2*v*w2 - 3125.0/12*u2*w3 + 8125.0/12*u4 + 5625.0/4*u3*v + 3125.0/4*u2*v2 + 625.0/12*u*v3 + 5625.0/4*u3*w + 3125.0/2*u2*v*w + 625.0/4*u*v2*w + 3125.0/4*u2*w2 + 625.0/4*u*v*w2 + 625.0/12*u*w3 - 7375.0/12*u3 - 8875.0/12*u2*v - 125*u*v2 - 8875.0/12*u2*w - 250*u*v*w - 125*u*w2 + 2675.0/12*u2 + 1175.0/12*u*v + 1175.0/12*u*w - 25*u;    break;
-      case 3    :    return 3125.0/12*u5 + 3125.0/6*u4*v + 3125.0/12*u3*v2 + 3125.0/6*u4*w + 3125.0/6*u3*v*w + 3125.0/12*u3*w2 - 625*u4 - 3125.0/4*u3*v - 625.0/4*u2*v2 - 3125.0/4*u3*w - 625.0/2*u2*v*w - 625.0/4*u2*w2 + 6125.0/12*u3 + 3875.0/12*u2*v + 125.0/6*u*v2 + 3875.0/12*u2*w + 125.0/3*u*v*w + 125.0/6*u*w2 - 325.0/2*u2 - 75.0/2*u*v - 75.0/2*u*w + 50.0/3*u;    break;
-      case 4    :    return -3125.0/24*u5 - 3125.0/24*u4*v - 3125.0/24*u4*w + 6875.0/24*u4 + 625.0/4*u3*v + 625.0/4*u3*w - 5125.0/24*u3 - 1375.0/24*u2*v - 1375.0/24*u2*w + 1525.0/24*u2 + 25.0/4*u*v + 25.0/4*u*w - 25.0/4*u;    break;
-      case 5    :    return 625.0/24*u5 - 625.0/12*u4 + 875.0/24*u3 - 125.0/12*u2 + u;    break;
-      case 6    :    return 3125.0/24*u4*v + 3125.0/6*u3*v2 + 3125.0/4*u2*v3 + 3125.0/6*u*v4 + 3125.0/24*v5 + 3125.0/6*u3*v*w + 3125.0/2*u2*v2*w + 3125.0/2*u*v3*w + 3125.0/6*v4*w + 3125.0/4*u2*v*w2 + 3125.0/2*u*v2*w2 + 3125.0/4*v3*w2 + 3125.0/6*u*v*w3 + 3125.0/6*v2*w3 + 3125.0/24*v*w4 - 4375.0/12*u3*v - 4375.0/4*u2*v2 - 4375.0/4*u*v3 - 4375.0/12*v4 - 4375.0/4*u2*v*w - 4375.0/2*u*v2*w - 4375.0/4*v3*w - 4375.0/4*u*v*w2 - 4375.0/4*v2*w2 - 4375.0/12*v*w3 + 8875.0/24*u2*v + 8875.0/12*u*v2 + 8875.0/24*v3 + 8875.0/12*u*v*w + 8875.0/12*v2*w + 8875.0/24*v*w2 - 1925.0/12*u*v - 1925.0/12*v2 - 1925.0/12*v*w + 25*v;    break;
-      case 7    :    return -3125.0/6*u4*v - 3125.0/2*u3*v2 - 3125.0/2*u2*v3 - 3125.0/6*u*v4 - 3125.0/2*u3*v*w - 3125*u2*v2*w - 3125.0/2*u*v3*w - 3125.0/2*u2*v*w2 - 3125.0/2*u*v2*w2 - 3125.0/6*u*v*w3 + 1250*u3*v + 2500*u2*v2 + 1250*u*v3 + 2500*u2*v*w + 2500*u*v2*w + 1250*u*v*w2 - 5875.0/6*u2*v - 5875.0/6*u*v2 - 5875.0/6*u*v*w + 250*u*v;    break;
-      case 8    :    return 3125.0/4*u4*v + 3125.0/2*u3*v2 + 3125.0/4*u2*v3 + 3125.0/2*u3*v*w + 3125.0/2*u2*v2*w + 3125.0/4*u2*v*w2 - 3125.0/2*u3*v - 6875.0/4*u2*v2 - 625.0/4*u*v3 - 6875.0/4*u2*v*w - 625.0/2*u*v2*w - 625.0/4*u*v*w2 + 3625.0/4*u2*v + 1125.0/4*u*v2 + 1125.0/4*u*v*w - 125*u*v;    break;
-      case 9    :    return -3125.0/6*u4*v - 3125.0/6*u3*v2 - 3125.0/6*u3*v*w + 2500.0/3*u3*v + 625.0/2*u2*v2 + 625.0/2*u2*v*w - 2125.0/6*u2*v - 125.0/3*u*v2 - 125.0/3*u*v*w + 125.0/3*u*v;    break;
-      case 10    :    return 3125.0/24*u4*v - 625.0/4*u3*v + 1375.0/24*u2*v - 25.0/4*u*v;    break;
-      case 11    :    return -3125.0/12*u3*v2 - 3125.0/4*u2*v3 - 3125.0/4*u*v4 - 3125.0/12*v5 - 3125.0/4*u2*v2*w - 3125.0/2*u*v3*w - 3125.0/4*v4*w - 3125.0/4*u*v2*w2 - 3125.0/4*v3*w2 - 3125.0/12*v2*w3 + 625.0/12*u3*v + 3125.0/4*u2*v2 + 5625.0/4*u*v3 + 8125.0/12*v4 + 625.0/4*u2*v*w + 3125.0/2*u*v2*w + 5625.0/4*v3*w + 625.0/4*u*v*w2 + 3125.0/4*v2*w2 + 625.0/12*v*w3 - 125*u2*v - 8875.0/12*u*v2 - 7375.0/12*v3 - 250*u*v*w - 8875.0/12*v2*w - 125*v*w2 + 1175.0/12*u*v + 2675.0/12*v2 + 1175.0/12*v*w - 25*v;    break;
-      case 12    :    return 3125.0/4*u3*v2 + 3125.0/2*u2*v3 + 3125.0/4*u*v4 + 3125.0/2*u2*v2*w + 3125.0/2*u*v3*w + 3125.0/4*u*v2*w2 - 625.0/4*u3*v - 6875.0/4*u2*v2 - 3125.0/2*u*v3 - 625.0/2*u2*v*w - 6875.0/4*u*v2*w - 625.0/4*u*v*w2 + 1125.0/4*u2*v + 3625.0/4*u*v2 + 1125.0/4*u*v*w - 125*u*v;    break;
-      case 13    :    return -3125.0/4*u3*v2 - 3125.0/4*u2*v3 - 3125.0/4*u2*v2*w + 625.0/4*u3*v + 4375.0/4*u2*v2 + 625.0/4*u*v3 + 625.0/4*u2*v*w + 625.0/4*u*v2*w - 375.0/2*u2*v - 375.0/2*u*v2 - 125.0/4*u*v*w + 125.0/4*u*v;    break;
-      case 14    :    return 3125.0/12*u3*v2 - 625.0/12*u3*v - 625.0/4*u2*v2 + 125.0/4*u2*v + 125.0/6*u*v2 - 25.0/6*u*v;    break;
-      case 15    :    return 3125.0/12*u2*v3 + 3125.0/6*u*v4 + 3125.0/12*v5 + 3125.0/6*u*v3*w + 3125.0/6*v4*w + 3125.0/12*v3*w2 - 625.0/4*u2*v2 - 3125.0/4*u*v3 - 625*v4 - 625.0/2*u*v2*w - 3125.0/4*v3*w - 625.0/4*v2*w2 + 125.0/6*u2*v + 3875.0/12*u*v2 + 6125.0/12*v3 + 125.0/3*u*v*w + 3875.0/12*v2*w + 125.0/6*v*w2 - 75.0/2*u*v - 325.0/2*v2 - 75.0/2*v*w + 50.0/3*v;    break;
-      case 16    :    return -3125.0/6*u2*v3 - 3125.0/6*u*v4 - 3125.0/6*u*v3*w + 625.0/2*u2*v2 + 2500.0/3*u*v3 + 625.0/2*u*v2*w - 125.0/3*u2*v - 2125.0/6*u*v2 - 125.0/3*u*v*w + 125.0/3*u*v;    break;
-      case 17    :    return 3125.0/12*u2*v3 - 625.0/4*u2*v2 - 625.0/12*u*v3 + 125.0/6*u2*v + 125.0/4*u*v2 - 25.0/6*u*v;    break;
-      case 18    :    return -3125.0/24*u*v4 - 3125.0/24*v5 - 3125.0/24*v4*w + 625.0/4*u*v3 + 6875.0/24*v4 + 625.0/4*v3*w - 1375.0/24*u*v2 - 5125.0/24*v3 - 1375.0/24*v2*w + 25.0/4*u*v + 1525.0/24*v2 + 25.0/4*v*w - 25.0/4*v;    break;
-      case 19    :    return 3125.0/24*u*v4 - 625.0/4*u*v3 + 1375.0/24*u*v2 - 25.0/4*u*v;    break;
-      case 20    :    return 625.0/24*v5 - 625.0/12*v4 + 875.0/24*v3 - 125.0/12*v2 + v;    break;
-      case 21    :    return 3125.0/24*u4*w + 3125.0/6*u3*v*w + 3125.0/4*u2*v2*w + 3125.0/6*u*v3*w + 3125.0/24*v4*w + 3125.0/6*u3*w2 + 3125.0/2*u2*v*w2 + 3125.0/2*u*v2*w2 + 3125.0/6*v3*w2 + 3125.0/4*u2*w3 + 3125.0/2*u*v*w3 + 3125.0/4*v2*w3 + 3125.0/6*u*w4 + 3125.0/6*v*w4 + 3125.0/24*w5 - 4375.0/12*u3*w - 4375.0/4*u2*v*w - 4375.0/4*u*v2*w - 4375.0/12*v3*w - 4375.0/4*u2*w2 - 4375.0/2*u*v*w2 - 4375.0/4*v2*w2 - 4375.0/4*u*w3 - 4375.0/4*v*w3 - 4375.0/12*w4 + 8875.0/24*u2*w + 8875.0/12*u*v*w + 8875.0/24*v2*w + 8875.0/12*u*w2 + 8875.0/12*v*w2 + 8875.0/24*w3 - 1925.0/12*u*w - 1925.0/12*v*w - 1925.0/12*w2 + 25*w;    break;
-      case 22    :    return -3125.0/6*u4*w - 3125.0/2*u3*v*w - 3125.0/2*u2*v2*w - 3125.0/6*u*v3*w - 3125.0/2*u3*w2 - 3125*u2*v*w2 - 3125.0/2*u*v2*w2 - 3125.0/2*u2*w3 - 3125.0/2*u*v*w3 - 3125.0/6*u*w4 + 1250*u3*w + 2500*u2*v*w + 1250*u*v2*w + 2500*u2*w2 + 2500*u*v*w2 + 1250*u*w3 - 5875.0/6*u2*w - 5875.0/6*u*v*w - 5875.0/6*u*w2 + 250*u*w;    break;
-      case 23    :    return 3125.0/4*u4*w + 3125.0/2*u3*v*w + 3125.0/4*u2*v2*w + 3125.0/2*u3*w2 + 3125.0/2*u2*v*w2 + 3125.0/4*u2*w3 - 3125.0/2*u3*w - 6875.0/4*u2*v*w - 625.0/4*u*v2*w - 6875.0/4*u2*w2 - 625.0/2*u*v*w2 - 625.0/4*u*w3 + 3625.0/4*u2*w + 1125.0/4*u*v*w + 1125.0/4*u*w2 - 125*u*w;    break;
-      case 24    :    return -3125.0/6*u4*w - 3125.0/6*u3*v*w - 3125.0/6*u3*w2 + 2500.0/3*u3*w + 625.0/2*u2*v*w + 625.0/2*u2*w2 - 2125.0/6*u2*w - 125.0/3*u*v*w - 125.0/3*u*w2 + 125.0/3*u*w;    break;
-      case 25    :    return 3125.0/24*u4*w - 625.0/4*u3*w + 1375.0/24*u2*w - 25.0/4*u*w;    break;
-      case 26    :    return -3125.0/6*u3*v*w - 3125.0/2*u2*v2*w - 3125.0/2*u*v3*w - 3125.0/6*v4*w - 3125.0/2*u2*v*w2 - 3125*u*v2*w2 - 3125.0/2*v3*w2 - 3125.0/2*u*v*w3 - 3125.0/2*v2*w3 - 3125.0/6*v*w4 + 1250*u2*v*w + 2500*u*v2*w + 1250*v3*w + 2500*u*v*w2 + 2500*v2*w2 + 1250*v*w3 - 5875.0/6*u*v*w - 5875.0/6*v2*w - 5875.0/6*v*w2 + 250*v*w;    break;
-      case 27    :    return 3125.0/2*u3*v*w + 3125*u2*v2*w + 3125.0/2*u*v3*w + 3125*u2*v*w2 + 3125*u*v2*w2 + 3125.0/2*u*v*w3 - 5625.0/2*u2*v*w - 5625.0/2*u*v2*w - 5625.0/2*u*v*w2 + 1250*u*v*w;    break;
-      case 28    :    return -3125.0/2*u3*v*w - 3125.0/2*u2*v2*w - 3125.0/2*u2*v*w2 + 1875*u2*v*w + 625.0/2*u*v2*w + 625.0/2*u*v*w2 - 625.0/2*u*v*w;    break;
-      case 29    :    return 3125.0/6*u3*v*w - 625.0/2*u2*v*w + 125.0/3*u*v*w;    break;
-      case 30    :    return 3125.0/4*u2*v2*w + 3125.0/2*u*v3*w + 3125.0/4*v4*w + 3125.0/2*u*v2*w2 + 3125.0/2*v3*w2 + 3125.0/4*v2*w3 - 625.0/4*u2*v*w - 6875.0/4*u*v2*w - 3125.0/2*v3*w - 625.0/2*u*v*w2 - 6875.0/4*v2*w2 - 625.0/4*v*w3 + 1125.0/4*u*v*w + 3625.0/4*v2*w + 1125.0/4*v*w2 - 125*v*w;    break;
-      case 31    :    return -3125.0/2*u2*v2*w - 3125.0/2*u*v3*w - 3125.0/2*u*v2*w2 + 625.0/2*u2*v*w + 1875*u*v2*w + 625.0/2*u*v*w2 - 625.0/2*u*v*w;    break;
-      case 32    :    return 3125.0/4*u2*v2*w - 625.0/4*u2*v*w - 625.0/4*u*v2*w + 125.0/4*u*v*w;    break;
-      case 33    :    return -3125.0/6*u*v3*w - 3125.0/6*v4*w - 3125.0/6*v3*w2 + 625.0/2*u*v2*w + 2500.0/3*v3*w + 625.0/2*v2*w2 - 125.0/3*u*v*w - 2125.0/6*v2*w - 125.0/3*v*w2 + 125.0/3*v*w;    break;
-      case 34    :    return 3125.0/6*u*v3*w - 625.0/2*u*v2*w + 125.0/3*u*v*w;    break;
-      case 35    :    return 3125.0/24*v4*w - 625.0/4*v3*w + 1375.0/24*v2*w - 25.0/4*v*w;    break;
-      case 36    :    return -3125.0/12*u3*w2 - 3125.0/4*u2*v*w2 - 3125.0/4*u*v2*w2 - 3125.0/12*v3*w2 - 3125.0/4*u2*w3 - 3125.0/2*u*v*w3 - 3125.0/4*v2*w3 - 3125.0/4*u*w4 - 3125.0/4*v*w4 - 3125.0/12*w5 + 625.0/12*u3*w + 625.0/4*u2*v*w + 625.0/4*u*v2*w + 625.0/12*v3*w + 3125.0/4*u2*w2 + 3125.0/2*u*v*w2 + 3125.0/4*v2*w2 + 5625.0/4*u*w3 + 5625.0/4*v*w3 + 8125.0/12*w4 - 125*u2*w - 250*u*v*w - 125*v2*w - 8875.0/12*u*w2 - 8875.0/12*v*w2 - 7375.0/12*w3 + 1175.0/12*u*w + 1175.0/12*v*w + 2675.0/12*w2 - 25*w;    break;
-      case 37    :    return 3125.0/4*u3*w2 + 3125.0/2*u2*v*w2 + 3125.0/4*u*v2*w2 + 3125.0/2*u2*w3 + 3125.0/2*u*v*w3 + 3125.0/4*u*w4 - 625.0/4*u3*w - 625.0/2*u2*v*w - 625.0/4*u*v2*w - 6875.0/4*u2*w2 - 6875.0/4*u*v*w2 - 3125.0/2*u*w3 + 1125.0/4*u2*w + 1125.0/4*u*v*w + 3625.0/4*u*w2 - 125*u*w;    break;
-      case 38    :    return -3125.0/4*u3*w2 - 3125.0/4*u2*v*w2 - 3125.0/4*u2*w3 + 625.0/4*u3*w + 625.0/4*u2*v*w + 4375.0/4*u2*w2 + 625.0/4*u*v*w2 + 625.0/4*u*w3 - 375.0/2*u2*w - 125.0/4*u*v*w - 375.0/2*u*w2 + 125.0/4*u*w;    break;
-      case 39    :    return 3125.0/12*u3*w2 - 625.0/12*u3*w - 625.0/4*u2*w2 + 125.0/4*u2*w + 125.0/6*u*w2 - 25.0/6*u*w;    break;
-      case 40    :    return 3125.0/4*u2*v*w2 + 3125.0/2*u*v2*w2 + 3125.0/4*v3*w2 + 3125.0/2*u*v*w3 + 3125.0/2*v2*w3 + 3125.0/4*v*w4 - 625.0/4*u2*v*w - 625.0/2*u*v2*w - 625.0/4*v3*w - 6875.0/4*u*v*w2 - 6875.0/4*v2*w2 - 3125.0/2*v*w3 + 1125.0/4*u*v*w + 1125.0/4*v2*w + 3625.0/4*v*w2 - 125*v*w;    break;
-      case 41    :    return -3125.0/2*u2*v*w2 - 3125.0/2*u*v2*w2 - 3125.0/2*u*v*w3 + 625.0/2*u2*v*w + 625.0/2*u*v2*w + 1875*u*v*w2 - 625.0/2*u*v*w;    break;
-      case 42    :    return 3125.0/4*u2*v*w2 - 625.0/4*u2*v*w - 625.0/4*u*v*w2 + 125.0/4*u*v*w;    break;
-      case 43    :    return -3125.0/4*u*v2*w2 - 3125.0/4*v3*w2 - 3125.0/4*v2*w3 + 625.0/4*u*v2*w + 625.0/4*v3*w + 625.0/4*u*v*w2 + 4375.0/4*v2*w2 + 625.0/4*v*w3 - 125.0/4*u*v*w - 375.0/2*v2*w - 375.0/2*v*w2 + 125.0/4*v*w;    break;
-      case 44    :    return 3125.0/4*u*v2*w2 - 625.0/4*u*v2*w - 625.0/4*u*v*w2 + 125.0/4*u*v*w;    break;
-      case 45    :    return 3125.0/12*v3*w2 - 625.0/12*v3*w - 625.0/4*v2*w2 + 125.0/4*v2*w + 125.0/6*v*w2 - 25.0/6*v*w;    break;
-      case 46    :    return 3125.0/12*u2*w3 + 3125.0/6*u*v*w3 + 3125.0/12*v2*w3 + 3125.0/6*u*w4 + 3125.0/6*v*w4 + 3125.0/12*w5 - 625.0/4*u2*w2 - 625.0/2*u*v*w2 - 625.0/4*v2*w2 - 3125.0/4*u*w3 - 3125.0/4*v*w3 - 625*w4 + 125.0/6*u2*w + 125.0/3*u*v*w + 125.0/6*v2*w + 3875.0/12*u*w2 + 3875.0/12*v*w2 + 6125.0/12*w3 - 75.0/2*u*w - 75.0/2*v*w - 325.0/2*w2 + 50.0/3*w;    break;
-      case 47    :    return -3125.0/6*u2*w3 - 3125.0/6*u*v*w3 - 3125.0/6*u*w4 + 625.0/2*u2*w2 + 625.0/2*u*v*w2 + 2500.0/3*u*w3 - 125.0/3*u2*w - 125.0/3*u*v*w - 2125.0/6*u*w2 + 125.0/3*u*w;    break;
-      case 48    :    return 3125.0/12*u2*w3 - 625.0/4*u2*w2 - 625.0/12*u*w3 + 125.0/6*u2*w + 125.0/4*u*w2 - 25.0/6*u*w;    break;
-      case 49    :    return -3125.0/6*u*v*w3 - 3125.0/6*v2*w3 - 3125.0/6*v*w4 + 625.0/2*u*v*w2 + 625.0/2*v2*w2 + 2500.0/3*v*w3 - 125.0/3*u*v*w - 125.0/3*v2*w - 2125.0/6*v*w2 + 125.0/3*v*w;    break;
-      case 50    :    return 3125.0/6*u*v*w3 - 625.0/2*u*v*w2 + 125.0/3*u*v*w;    break;
-      case 51    :    return 3125.0/12*v2*w3 - 625.0/4*v2*w2 - 625.0/12*v*w3 + 125.0/6*v2*w + 125.0/4*v*w2 - 25.0/6*v*w;    break;
-      case 52    :    return -3125.0/24*u*w4 - 3125.0/24*v*w4 - 3125.0/24*w5 + 625.0/4*u*w3 + 625.0/4*v*w3 + 6875.0/24*w4 - 1375.0/24*u*w2 - 1375.0/24*v*w2 - 5125.0/24*w3 + 25.0/4*u*w + 25.0/4*v*w + 1525.0/24*w2 - 25.0/4*w;    break;
-      case 53    :    return 3125.0/24*u*w4 - 625.0/4*u*w3 + 1375.0/24*u*w2 - 25.0/4*u*w;    break;
-      case 54    :    return 3125.0/24*v*w4 - 625.0/4*v*w3 + 1375.0/24*v*w2 - 25.0/4*v*w;    break;
-      case 55    :    return 625.0/24*w5 - 625.0/12*w4 + 875.0/24*w3 - 125.0/12*w2 + w;    break;
-        }    break;
+    double lagrangePolynomialTetrahedron(InternalIndexType vertexIndex, const NumVector1D & M) const {
+    	switch(order_)
+    	{
+    	    case 1 :
+    	        switch (vertexIndex)
+    	        {
+    	      case 0    :    return -M[1] - M[2] - M[3] + 1;    break;
+    	      case 1    :    return M[1];        break;
+    	      case 2    :    return M[2];        break;
+    	      case 3    :    return M[3];        break;
+    	        }    break;
+    	    case 2:
+    	        switch (vertexIndex)
+    	        {
+    	      case 0    :    return 2*M[4] + 4*M[5] + 2*M[7] + 4*M[6] + 4*M[8] + 2*M[9] - 3*M[1] - 3*M[2] - 3*M[3] + 1;    break;
+    	      case 1    :    return -4*M[4] - 4*M[5] - 4*M[6] + 4*M[1];                        break;
+    	      case 2    :    return 2*M[4] - M[1];                                break;
+    	      case 3    :    return -4*M[5] - 4*M[7] - 4*M[8] + 4*M[2];                        break;
+    	      case 4    :    return 4*M[5];                                    break;
+    	      case 5    :    return 2*M[7] - M[2];                                break;
+    	      case 6    :    return -4*M[6] - 4*M[8] - 4*M[9] + 4*M[3];                        break;
+    	      case 7    :    return 4*M[6];                                    break;
+    	      case 8    :    return 4*M[8];                                    break;
+    	      case 9    :    return 2*M[9] - M[3];                                break;
+    	        }    break;
+    	    case 3:
+    	        switch (vertexIndex)
+    	        {
+    	      case 0    :    return -9.0/2*M[10] - 27.0/2*M[11] - 27.0/2*M[13] - 9.0/2*M[16] - 27.0/2*M[12] - 27*M[14] - 27.0/2*M[17] - 27.0/2*M[15] - 27.0/2*M[18] - 9.0/2*M[19] + 9*M[4] + 18*M[5] + 9*M[7] + 18*M[6] + 18*M[8] + 9*M[9] - 11.0/2*M[1] - 11.0/2*M[2] - 11.0/2*M[3] + 1;    break;
+    	      case 1    :    return 27.0/2*M[10] + 27*M[11] + 27.0/2*M[13] + 27*M[12] + 27*M[14] + 27.0/2*M[15] - 45.0/2*M[4] - 45.0/2*M[5] - 45.0/2*M[6] + 9*M[1];                                                    break;
+    	      case 2    :    return -27.0/2*M[10] - 27.0/2*M[11] - 27.0/2*M[12] + 18*M[4] + 9.0/2*M[5] + 9.0/2*M[6] - 9.0/2*M[1];                                                                    break;
+    	      case 3    :    return 9.0/2*M[10] - 9.0/2*M[4] + M[1];                                                                                                    break;
+    	      case 4    :    return 27.0/2*M[11] + 27*M[13] + 27.0/2*M[16] + 27*M[14] + 27*M[17] + 27.0/2*M[18] - 45.0/2*M[5] - 45.0/2*M[7] - 45.0/2*M[8] + 9*M[2];                                                    break;
+    	      case 5    :    return -27*M[11] - 27*M[13] - 27*M[14] + 27*M[5];                                                                                            break;
+    	      case 6    :    return 27.0/2*M[11] - 9.0/2*M[5];                                                                                                    break;
+    	      case 7    :    return -27.0/2*M[13] - 27.0/2*M[16] - 27.0/2*M[17] + 9.0/2*M[5] + 18*M[7] + 9.0/2*M[8] - 9.0/2*M[2];                                                                    break;
+    	      case 8    :    return 27.0/2*M[13] - 9.0/2*M[5];                                                                                                    break;
+    	      case 9    :    return 9.0/2*M[16] - 9.0/2*M[7] + M[2];                                                                                                    break;
+    	      case 10    :    return 27.0/2*M[12] + 27*M[14] + 27.0/2*M[17] + 27*M[15] + 27*M[18] + 27.0/2*M[19] - 45.0/2*M[6] - 45.0/2*M[8] - 45.0/2*M[9] + 9*M[3];                                                    break;
+    	      case 11    :    return -27*M[12] - 27*M[14] - 27*M[15] + 27*M[6];                                                                                            break;
+    	      case 12    :    return 27.0/2*M[12] - 9.0/2*M[6];                                                                                                    break;
+    	      case 13    :    return -27*M[14] - 27*M[17] - 27*M[18] + 27*M[8];                                                                                            break;
+    	      case 14    :    return 27*M[14];                                                                                                        break;
+    	      case 15    :    return 27.0/2*M[17] - 9.0/2*M[8];                                                                                                    break;
+    	      case 16    :    return -27.0/2*M[15] - 27.0/2*M[18] - 27.0/2*M[19] + 9.0/2*M[6] + 9.0/2*M[8] + 18*M[9] - 9.0/2*M[3];                                                                    break;
+    	      case 17    :    return 27.0/2*M[15] - 9.0/2*M[6];                                                                                                    break;
+    	      case 18    :    return 27.0/2*M[18] - 9.0/2*M[8];                                                                                                    break;
+    	      case 19    :    return 9.0/2*M[19] - 9.0/2*M[9] + M[3];                                                                                                    break;
+    	        }    break;
+    	    case 4:
+    	        switch (vertexIndex)
+    	        {
+    	      case 0    :    return 32.0/3*M[20] + 128.0/3*M[21] + 64*M[23] + 128.0/3*M[26] + 32.0/3*M[30] + 128.0/3*M[22] + 128*M[24] + 128*M[27] + 128.0/3*M[31] + 64*M[25] + 128*M[28] + 64*M[32] + 128.0/3*M[29] + 128.0/3*M[33] + 32.0/3*M[34] - 80.0/3*M[10] - 80*M[11] - 80*M[13] - 80.0/3*M[16] - 80*M[12] - 160*M[14] - 80*M[17] - 80*M[15] - 80*M[18] - 80.0/3*M[19] + 70.0/3*M[4] + 140.0/3*M[5] + 70.0/3*M[7] + 140.0/3*M[6] + 140.0/3*M[8] + 70.0/3*M[9] - 25.0/3*M[1] - 25.0/3*M[2] - 25.0/3*M[3] + 1;    break;
+    	      case 1    :    return -128.0/3*M[20] - 128*M[21] - 128*M[23] - 128.0/3*M[26] - 128*M[22] - 256*M[24] - 128*M[27] - 128*M[25] - 128*M[28] - 128.0/3*M[29] + 96*M[10] + 192*M[11] + 96*M[13] + 192*M[12] + 192*M[14] + 96*M[15] - 208.0/3*M[4] - 208.0/3*M[5] - 208.0/3*M[6] + 16*M[1];                                                                                                break;
+    	      case 2    :    return 64*M[20] + 128*M[21] + 64*M[23] + 128*M[22] + 128*M[24] + 64*M[25] - 128*M[10] - 144*M[11] - 16*M[13] - 144*M[12] - 32*M[14] - 16*M[15] + 76*M[4] + 28*M[5] + 28*M[6] - 12*M[1];                                                                                                                                        break;
+    	      case 3    :    return -128.0/3*M[20] - 128.0/3*M[21] - 128.0/3*M[22] + 224.0/3*M[10] + 32*M[11] + 32*M[12] - 112.0/3*M[4] - 16.0/3*M[5] - 16.0/3*M[6] + 16.0/3*M[1];                                                                                                                                                        break;
+    	      case 4    :    return 32.0/3*M[20] - 16*M[10] + 22.0/3*M[4] - M[1];                                                                                                                                                                                                    break;
+    	      case 5    :    return -128.0/3*M[21] - 128*M[23] - 128*M[26] - 128.0/3*M[30] - 128*M[24] - 256*M[27] - 128*M[31] - 128*M[28] - 128*M[32] - 128.0/3*M[33] + 96*M[11] + 192*M[13] + 96*M[16] + 192*M[14] + 192*M[17] + 96*M[18] - 208.0/3*M[5] - 208.0/3*M[7] - 208.0/3*M[8] + 16*M[2];                                                                                                break;
+    	      case 6    :    return 128*M[21] + 256*M[23] + 128*M[26] + 256*M[24] + 256*M[27] + 128*M[28] - 224*M[11] - 224*M[13] - 224*M[14] + 96*M[5];                                                                                                                                                            break;
+    	      case 7    :    return -128*M[21] - 128*M[23] - 128*M[24] + 160*M[11] + 32*M[13] + 32*M[14] - 32*M[5];                                                                                                                                                                                break;
+    	      case 8    :    return 128.0/3*M[21] - 32*M[11] + 16.0/3*M[5];                                                                                                                                                                                                    break;
+    	      case 9    :    return 64*M[23] + 128*M[26] + 64*M[30] + 128*M[27] + 128*M[31] + 64*M[32] - 16*M[11] - 144*M[13] - 128*M[16] - 32*M[14] - 144*M[17] - 16*M[18] + 28*M[5] + 76*M[7] + 28*M[8] - 12*M[2];                                                                                                                                        break;
+    	      case 10    :    return -128*M[23] - 128*M[26] - 128*M[27] + 32*M[11] + 160*M[13] + 32*M[14] - 32*M[5];                                                                                                                                                                                break;
+    	      case 11    :    return 64*M[23] - 16*M[11] - 16*M[13] + 4*M[5];                                                                                                                                                                                                    break;
+    	      case 12    :    return -128.0/3*M[26] - 128.0/3*M[30] - 128.0/3*M[31] + 32*M[13] + 224.0/3*M[16] + 32*M[17] - 16.0/3*M[5] - 112.0/3*M[7] - 16.0/3*M[8] + 16.0/3*M[2];                                                                                                                                                        break;
+    	      case 13    :    return 128.0/3*M[26] - 32*M[13] + 16.0/3*M[5];                                                                                                                                                                                                    break;
+    	      case 14    :    return 32.0/3*M[30] - 16*M[16] + 22.0/3*M[7] - M[2];                                                                                                                                                                                                    break;
+    	      case 15    :    return -128.0/3*M[22] - 128*M[24] - 128*M[27] - 128.0/3*M[31] - 128*M[25] - 256*M[28] - 128*M[32] - 128*M[29] - 128*M[33] - 128.0/3*M[34] + 96*M[12] + 192*M[14] + 96*M[17] + 192*M[15] + 192*M[18] + 96*M[19] - 208.0/3*M[6] - 208.0/3*M[8] - 208.0/3*M[9] + 16*M[3];                                                                                                break;
+    	      case 16    :    return 128*M[22] + 256*M[24] + 128*M[27] + 256*M[25] + 256*M[28] + 128*M[29] - 224*M[12] - 224*M[14] - 224*M[15] + 96*M[6];                                                                                                                                                            break;
+    	      case 17    :    return -128*M[22] - 128*M[24] - 128*M[25] + 160*M[12] + 32*M[14] + 32*M[15] - 32*M[6];                                                                                                                                                                                break;
+    	      case 18    :    return 128.0/3*M[22] - 32*M[12] + 16.0/3*M[6];                                                                                                                                                                                                    break;
+    	      case 19    :    return 128*M[24] + 256*M[27] + 128*M[31] + 256*M[28] + 256*M[32] + 128*M[33] - 224*M[14] - 224*M[17] - 224*M[18] + 96*M[8];                                                                                                                                                            break;
+    	      case 20    :    return -256*M[24] - 256*M[27] - 256*M[28] + 256*M[14];                                                                                                                                                                                            break;
+    	      case 21    :    return 128*M[24] - 32*M[14];                                                                                                                                                                                                            break;
+    	      case 22    :    return -128*M[27] - 128*M[31] - 128*M[32] + 32*M[14] + 160*M[17] + 32*M[18] - 32*M[8];                                                                                                                                                                                break;
+    	      case 23 :    return 128*M[27] - 32*M[14];                                                                                                                                                                                                            break;
+    	      case 24    :    return 128.0/3*M[31] - 32*M[17] + 16.0/3*M[8];                                                                                                                                                                                                    break;
+    	      case 25    :    return 64*M[25] + 128*M[28] + 64*M[32] + 128*M[29] + 128*M[33] + 64*M[34] - 16*M[12] - 32*M[14] - 16*M[17] - 144*M[15] - 144*M[18] - 128*M[19] + 28*M[6] + 28*M[8] + 76*M[9] - 12*M[3];                                                                                                                                        break;
+    	      case 26    :    return -128*M[25] - 128*M[28] - 128*M[29] + 32*M[12] + 32*M[14] + 160*M[15] - 32*M[6];                                                                                                                                                                                break;
+    	      case 27    :    return 64*M[25] - 16*M[12] - 16*M[15] + 4*M[6];                                                                                                                                                                                                    break;
+    	      case 28    :    return -128*M[28] - 128*M[32] - 128*M[33] + 32*M[14] + 32*M[17] + 160*M[18] - 32*M[8];                                                                                                                                                                                break;
+    	      case 29    :    return 128*M[28] - 32*M[14];    break;
+    	      case 30    :    return 64*M[32] - 16*M[17] - 16*M[18] + 4*M[8];    break;
+    	      case 31    :    return -128.0/3*M[29] - 128.0/3*M[33] - 128.0/3*M[34] + 32*M[15] + 32*M[18] + 224.0/3*M[19] - 16.0/3*M[6] - 16.0/3*M[8] - 112.0/3*M[9] + 16.0/3*M[3];    break;
+    	      case 32    :    return 128.0/3*M[29] - 32*M[15] + 16.0/3*M[6];    break;
+    	      case 33    :    return 128.0/3*M[33] - 32*M[18] + 16.0/3*M[8];    break;
+    	      case 34    :    return 32.0/3*M[34] - 16*M[19] + 22.0/3*M[9] - M[3];    break;
+    	        }    break;
+    	    case 5:
+    	        switch (vertexIndex)
+    	        {
+    	      case 0    :    return -625.0/24*M[35] - 3125.0/24*M[36] - 3125.0/12*M[38] - 3125.0/12*M[41] - 3125.0/24*M[45] - 625.0/24*M[50] - 3125.0/24*M[37] - 3125.0/6*M[39] - 3125.0/4*M[42] - 3125.0/6*M[46] - 3125.0/24*M[51] - 3125.0/12*M[40] - 3125.0/4*M[43] - 3125.0/4*M[47] - 3125.0/12*M[52] - 3125.0/12*M[44] - 3125.0/6*M[48] - 3125.0/12*M[53] - 3125.0/24*M[49] - 3125.0/24*M[54] - 625.0/24*M[55] + 625.0/8*M[20] + 625.0/2*M[21] + 1875.0/4*M[23] + 625.0/2*M[26] + 625.0/8*M[30] + 625.0/2*M[22] + 1875.0/2*M[24] + 1875.0/2*M[27] + 625.0/2*M[31] + 1875.0/4*M[25] + 1875.0/2*M[28] + 1875.0/4*M[32] + 625.0/2*M[29] + 625.0/2*M[33] + 625.0/8*M[34] - 2125.0/24*M[10] - 2125.0/8*M[11] - 2125.0/8*M[13] - 2125.0/24*M[16] - 2125.0/8*M[12] - 2125.0/4*M[14] - 2125.0/8*M[17] - 2125.0/8*M[15] - 2125.0/8*M[18] - 2125.0/24*M[19] + 375.0/8*M[4] + 375.0/4*M[5] + 375.0/8*M[7] + 375.0/4*M[6] + 375.0/4*M[8] + 375.0/8*M[9] - 137.0/12*M[1] - 137.0/12*M[2] - 137.0/12*M[3] + 1;    break;
+    	      case 1    :    return 3125.0/24*M[35] + 3125.0/6*M[36] + 3125.0/4*M[38] + 3125.0/6*M[41] + 3125.0/24*M[45] + 3125.0/6*M[37] + 3125.0/2*M[39] + 3125.0/2*M[42] + 3125.0/6*M[46] + 3125.0/4*M[40] + 3125.0/2*M[43] + 3125.0/4*M[47] + 3125.0/6*M[44] + 3125.0/6*M[48] + 3125.0/24*M[49] - 4375.0/12*M[20] - 4375.0/4*M[21] - 4375.0/4*M[23] - 4375.0/12*M[26] - 4375.0/4*M[22] - 4375.0/2*M[24] - 4375.0/4*M[27] - 4375.0/4*M[25] - 4375.0/4*M[28] - 4375.0/12*M[29] + 8875.0/24*M[10] + 8875.0/12*M[11] + 8875.0/24*M[13] + 8875.0/12*M[12] + 8875.0/12*M[14] + 8875.0/24*M[15] - 1925.0/12*M[4] - 1925.0/12*M[5] - 1925.0/12*M[6] + 25*M[1];    break;
+    	      case 2    :    return -3125.0/12*M[35] - 3125.0/4*M[36] - 3125.0/4*M[38] - 3125.0/12*M[41] - 3125.0/4*M[37] - 3125.0/2*M[39] - 3125.0/4*M[42] - 3125.0/4*M[40] - 3125.0/4*M[43] - 3125.0/12*M[44] + 8125.0/12*M[20] + 5625.0/4*M[21] + 3125.0/4*M[23] + 625.0/12*M[26] + 5625.0/4*M[22] + 3125.0/2*M[24] + 625.0/4*M[27] + 3125.0/4*M[25] + 625.0/4*M[28] + 625.0/12*M[29] - 7375.0/12*M[10] - 8875.0/12*M[11] - 125*M[13] - 8875.0/12*M[12] - 250*M[14] - 125*M[15] + 2675.0/12*M[4] + 1175.0/12*M[5] + 1175.0/12*M[6] - 25*M[1];    break;
+    	      case 3    :    return 3125.0/12*M[35] + 3125.0/6*M[36] + 3125.0/12*M[38] + 3125.0/6*M[37] + 3125.0/6*M[39] + 3125.0/12*M[40] - 625*M[20] - 3125.0/4*M[21] - 625.0/4*M[23] - 3125.0/4*M[22] - 625.0/2*M[24] - 625.0/4*M[25] + 6125.0/12*M[10] + 3875.0/12*M[11] + 125.0/6*M[13] + 3875.0/12*M[12] + 125.0/3*M[14] + 125.0/6*M[15] - 325.0/2*M[4] - 75.0/2*M[5] - 75.0/2*M[6] + 50.0/3*M[1];    break;
+    	      case 4    :    return -3125.0/24*M[35] - 3125.0/24*M[36] - 3125.0/24*M[37] + 6875.0/24*M[20] + 625.0/4*M[21] + 625.0/4*M[22] - 5125.0/24*M[10] - 1375.0/24*M[11] - 1375.0/24*M[12] + 1525.0/24*M[4] + 25.0/4*M[5] + 25.0/4*M[6] - 25.0/4*M[1];    break;
+    	      case 5    :    return 625.0/24*M[35] - 625.0/12*M[20] + 875.0/24*M[10] - 125.0/12*M[4] + M[1];    break;
+    	      case 6    :    return 3125.0/24*M[36] + 3125.0/6*M[38] + 3125.0/4*M[41] + 3125.0/6*M[45] + 3125.0/24*M[50] + 3125.0/6*M[39] + 3125.0/2*M[42] + 3125.0/2*M[46] + 3125.0/6*M[51] + 3125.0/4*M[43] + 3125.0/2*M[47] + 3125.0/4*M[52] + 3125.0/6*M[48] + 3125.0/6*M[53] + 3125.0/24*M[54] - 4375.0/12*M[21] - 4375.0/4*M[23] - 4375.0/4*M[26] - 4375.0/12*M[30] - 4375.0/4*M[24] - 4375.0/2*M[27] - 4375.0/4*M[31] - 4375.0/4*M[28] - 4375.0/4*M[32] - 4375.0/12*M[33] + 8875.0/24*M[11] + 8875.0/12*M[13] + 8875.0/24*M[16] + 8875.0/12*M[14] + 8875.0/12*M[17] + 8875.0/24*M[18] - 1925.0/12*M[5] - 1925.0/12*M[7] - 1925.0/12*M[8] + 25*M[2];    break;
+    	      case 7    :    return -3125.0/6*M[36] - 3125.0/2*M[38] - 3125.0/2*M[41] - 3125.0/6*M[45] - 3125.0/2*M[39] - 3125*M[42] - 3125.0/2*M[46] - 3125.0/2*M[43] - 3125.0/2*M[47] - 3125.0/6*M[48] + 1250*M[21] + 2500*M[23] + 1250*M[26] + 2500*M[24] + 2500*M[27] + 1250*M[28] - 5875.0/6*M[11] - 5875.0/6*M[13] - 5875.0/6*M[14] + 250*M[5];    break;
+    	      case 8    :    return 3125.0/4*M[36] + 3125.0/2*M[38] + 3125.0/4*M[41] + 3125.0/2*M[39] + 3125.0/2*M[42] + 3125.0/4*M[43] - 3125.0/2*M[21] - 6875.0/4*M[23] - 625.0/4*M[26] - 6875.0/4*M[24] - 625.0/2*M[27] - 625.0/4*M[28] + 3625.0/4*M[11] + 1125.0/4*M[13] + 1125.0/4*M[14] - 125*M[5];    break;
+    	      case 9    :    return -3125.0/6*M[36] - 3125.0/6*M[38] - 3125.0/6*M[39] + 2500.0/3*M[21] + 625.0/2*M[23] + 625.0/2*M[24] - 2125.0/6*M[11] - 125.0/3*M[13] - 125.0/3*M[14] + 125.0/3*M[5];    break;
+    	      case 10    :    return 3125.0/24*M[36] - 625.0/4*M[21] + 1375.0/24*M[11] - 25.0/4*M[5];    break;
+    	      case 11    :    return -3125.0/12*M[38] - 3125.0/4*M[41] - 3125.0/4*M[45] - 3125.0/12*M[50] - 3125.0/4*M[42] - 3125.0/2*M[46] - 3125.0/4*M[51] - 3125.0/4*M[47] - 3125.0/4*M[52] - 3125.0/12*M[53] + 625.0/12*M[21] + 3125.0/4*M[23] + 5625.0/4*M[26] + 8125.0/12*M[30] + 625.0/4*M[24] + 3125.0/2*M[27] + 5625.0/4*M[31] + 625.0/4*M[28] + 3125.0/4*M[32] + 625.0/12*M[33] - 125*M[11] - 8875.0/12*M[13] - 7375.0/12*M[16] - 250*M[14] - 8875.0/12*M[17] - 125*M[18] + 1175.0/12*M[5] + 2675.0/12*M[7] + 1175.0/12*M[8] - 25*M[2];    break;
+    	      case 12    :    return 3125.0/4*M[38] + 3125.0/2*M[41] + 3125.0/4*M[45] + 3125.0/2*M[42] + 3125.0/2*M[46] + 3125.0/4*M[47] - 625.0/4*M[21] - 6875.0/4*M[23] - 3125.0/2*M[26] - 625.0/2*M[24] - 6875.0/4*M[27] - 625.0/4*M[28] + 1125.0/4*M[11] + 3625.0/4*M[13] + 1125.0/4*M[14] - 125*M[5];    break;
+    	      case 13    :    return -3125.0/4*M[38] - 3125.0/4*M[41] - 3125.0/4*M[42] + 625.0/4*M[21] + 4375.0/4*M[23] + 625.0/4*M[26] + 625.0/4*M[24] + 625.0/4*M[27] - 375.0/2*M[11] - 375.0/2*M[13] - 125.0/4*M[14] + 125.0/4*M[5];    break;
+    	      case 14    :    return 3125.0/12*M[38] - 625.0/12*M[21] - 625.0/4*M[23] + 125.0/4*M[11] + 125.0/6*M[13] - 25.0/6*M[5];    break;
+    	      case 15    :    return 3125.0/12*M[41] + 3125.0/6*M[45] + 3125.0/12*M[50] + 3125.0/6*M[46] + 3125.0/6*M[51] + 3125.0/12*M[52] - 625.0/4*M[23] - 3125.0/4*M[26] - 625*M[30] - 625.0/2*M[27] - 3125.0/4*M[31] - 625.0/4*M[32] + 125.0/6*M[11] + 3875.0/12*M[13] + 6125.0/12*M[16] + 125.0/3*M[14] + 3875.0/12*M[17] + 125.0/6*M[18] - 75.0/2*M[5] - 325.0/2*M[7] - 75.0/2*M[8] + 50.0/3*M[2];    break;
+    	      case 16    :    return -3125.0/6*M[41] - 3125.0/6*M[45] - 3125.0/6*M[46] + 625.0/2*M[23] + 2500.0/3*M[26] + 625.0/2*M[27] - 125.0/3*M[11] - 2125.0/6*M[13] - 125.0/3*M[14] + 125.0/3*M[5];    break;
+    	      case 17    :    return 3125.0/12*M[41] - 625.0/4*M[23] - 625.0/12*M[26] + 125.0/6*M[11] + 125.0/4*M[13] - 25.0/6*M[5];    break;
+    	      case 18    :    return -3125.0/24*M[45] - 3125.0/24*M[50] - 3125.0/24*M[51] + 625.0/4*M[26] + 6875.0/24*M[30] + 625.0/4*M[31] - 1375.0/24*M[13] - 5125.0/24*M[16] - 1375.0/24*M[17] + 25.0/4*M[5] + 1525.0/24*M[7] + 25.0/4*M[8] - 25.0/4*M[2];    break;
+    	      case 19    :    return 3125.0/24*M[45] - 625.0/4*M[26] + 1375.0/24*M[13] - 25.0/4*M[5];    break;
+    	      case 20    :    return 625.0/24*M[50] - 625.0/12*M[30] + 875.0/24*M[16] - 125.0/12*M[7] + M[2];    break;
+    	      case 21    :    return 3125.0/24*M[37] + 3125.0/6*M[39] + 3125.0/4*M[42] + 3125.0/6*M[46] + 3125.0/24*M[51] + 3125.0/6*M[40] + 3125.0/2*M[43] + 3125.0/2*M[47] + 3125.0/6*M[52] + 3125.0/4*M[44] + 3125.0/2*M[48] + 3125.0/4*M[53] + 3125.0/6*M[49] + 3125.0/6*M[54] + 3125.0/24*M[55] - 4375.0/12*M[22] - 4375.0/4*M[24] - 4375.0/4*M[27] - 4375.0/12*M[31] - 4375.0/4*M[25] - 4375.0/2*M[28] - 4375.0/4*M[32] - 4375.0/4*M[29] - 4375.0/4*M[33] - 4375.0/12*M[34] + 8875.0/24*M[12] + 8875.0/12*M[14] + 8875.0/24*M[17] + 8875.0/12*M[15] + 8875.0/12*M[18] + 8875.0/24*M[19] - 1925.0/12*M[6] - 1925.0/12*M[8] - 1925.0/12*M[9] + 25*M[3];    break;
+    	      case 22    :    return -3125.0/6*M[37] - 3125.0/2*M[39] - 3125.0/2*M[42] - 3125.0/6*M[46] - 3125.0/2*M[40] - 3125*M[43] - 3125.0/2*M[47] - 3125.0/2*M[44] - 3125.0/2*M[48] - 3125.0/6*M[49] + 1250*M[22] + 2500*M[24] + 1250*M[27] + 2500*M[25] + 2500*M[28] + 1250*M[29] - 5875.0/6*M[12] - 5875.0/6*M[14] - 5875.0/6*M[15] + 250*M[6];    break;
+    	      case 23    :    return 3125.0/4*M[37] + 3125.0/2*M[39] + 3125.0/4*M[42] + 3125.0/2*M[40] + 3125.0/2*M[43] + 3125.0/4*M[44] - 3125.0/2*M[22] - 6875.0/4*M[24] - 625.0/4*M[27] - 6875.0/4*M[25] - 625.0/2*M[28] - 625.0/4*M[29] + 3625.0/4*M[12] + 1125.0/4*M[14] + 1125.0/4*M[15] - 125*M[6];    break;
+    	      case 24    :    return -3125.0/6*M[37] - 3125.0/6*M[39] - 3125.0/6*M[40] + 2500.0/3*M[22] + 625.0/2*M[24] + 625.0/2*M[25] - 2125.0/6*M[12] - 125.0/3*M[14] - 125.0/3*M[15] + 125.0/3*M[6];    break;
+    	      case 25    :    return 3125.0/24*M[37] - 625.0/4*M[22] + 1375.0/24*M[12] - 25.0/4*M[6];    break;
+    	      case 26    :    return -3125.0/6*M[39] - 3125.0/2*M[42] - 3125.0/2*M[46] - 3125.0/6*M[51] - 3125.0/2*M[43] - 3125*M[47] - 3125.0/2*M[52] - 3125.0/2*M[48] - 3125.0/2*M[53] - 3125.0/6*M[54] + 1250*M[24] + 2500*M[27] + 1250*M[31] + 2500*M[28] + 2500*M[32] + 1250*M[33] - 5875.0/6*M[14] - 5875.0/6*M[17] - 5875.0/6*M[18] + 250*M[8];    break;
+    	      case 27    :    return 3125.0/2*M[39] + 3125*M[42] + 3125.0/2*M[46] + 3125*M[43] + 3125*M[47] + 3125.0/2*M[48] - 5625.0/2*M[24] - 5625.0/2*M[27] - 5625.0/2*M[28] + 1250*M[14];    break;
+    	      case 28    :    return -3125.0/2*M[39] - 3125.0/2*M[42] - 3125.0/2*M[43] + 1875*M[24] + 625.0/2*M[27] + 625.0/2*M[28] - 625.0/2*M[14];    break;
+    	      case 29    :    return 3125.0/6*M[39] - 625.0/2*M[24] + 125.0/3*M[14];    break;
+    	      case 30    :    return 3125.0/4*M[42] + 3125.0/2*M[46] + 3125.0/4*M[51] + 3125.0/2*M[47] + 3125.0/2*M[52] + 3125.0/4*M[53] - 625.0/4*M[24] - 6875.0/4*M[27] - 3125.0/2*M[31] - 625.0/2*M[28] - 6875.0/4*M[32] - 625.0/4*M[33] + 1125.0/4*M[14] + 3625.0/4*M[17] + 1125.0/4*M[18] - 125*M[8];    break;
+    	      case 31    :    return -3125.0/2*M[42] - 3125.0/2*M[46] - 3125.0/2*M[47] + 625.0/2*M[24] + 1875*M[27] + 625.0/2*M[28] - 625.0/2*M[14];    break;
+    	      case 32    :    return 3125.0/4*M[42] - 625.0/4*M[24] - 625.0/4*M[27] + 125.0/4*M[14];    break;
+    	      case 33    :    return -3125.0/6*M[46] - 3125.0/6*M[51] - 3125.0/6*M[52] + 625.0/2*M[27] + 2500.0/3*M[31] + 625.0/2*M[32] - 125.0/3*M[14] - 2125.0/6*M[17] - 125.0/3*M[18] + 125.0/3*M[8];    break;
+    	      case 34    :    return 3125.0/6*M[46] - 625.0/2*M[27] + 125.0/3*M[14];    break;
+    	      case 35    :    return 3125.0/24*M[51] - 625.0/4*M[31] + 1375.0/24*M[17] - 25.0/4*M[8];    break;
+    	      case 36    :    return -3125.0/12*M[40] - 3125.0/4*M[43] - 3125.0/4*M[47] - 3125.0/12*M[52] - 3125.0/4*M[44] - 3125.0/2*M[48] - 3125.0/4*M[53] - 3125.0/4*M[49] - 3125.0/4*M[54] - 3125.0/12*M[55] + 625.0/12*M[22] + 625.0/4*M[24] + 625.0/4*M[27] + 625.0/12*M[31] + 3125.0/4*M[25] + 3125.0/2*M[28] + 3125.0/4*M[32] + 5625.0/4*M[29] + 5625.0/4*M[33] + 8125.0/12*M[34] - 125*M[12] - 250*M[14] - 125*M[17] - 8875.0/12*M[15] - 8875.0/12*M[18] - 7375.0/12*M[19] + 1175.0/12*M[6] + 1175.0/12*M[8] + 2675.0/12*M[9] - 25*M[3];    break;
+    	      case 37    :    return 3125.0/4*M[40] + 3125.0/2*M[43] + 3125.0/4*M[47] + 3125.0/2*M[44] + 3125.0/2*M[48] + 3125.0/4*M[49] - 625.0/4*M[22] - 625.0/2*M[24] - 625.0/4*M[27] - 6875.0/4*M[25] - 6875.0/4*M[28] - 3125.0/2*M[29] + 1125.0/4*M[12] + 1125.0/4*M[14] + 3625.0/4*M[15] - 125*M[6];    break;
+    	      case 38    :    return -3125.0/4*M[40] - 3125.0/4*M[43] - 3125.0/4*M[44] + 625.0/4*M[22] + 625.0/4*M[24] + 4375.0/4*M[25] + 625.0/4*M[28] + 625.0/4*M[29] - 375.0/2*M[12] - 125.0/4*M[14] - 375.0/2*M[15] + 125.0/4*M[6];    break;
+    	      case 39    :    return 3125.0/12*M[40] - 625.0/12*M[22] - 625.0/4*M[25] + 125.0/4*M[12] + 125.0/6*M[15] - 25.0/6*M[6];    break;
+    	      case 40    :    return 3125.0/4*M[43] + 3125.0/2*M[47] + 3125.0/4*M[52] + 3125.0/2*M[48] + 3125.0/2*M[53] + 3125.0/4*M[54] - 625.0/4*M[24] - 625.0/2*M[27] - 625.0/4*M[31] - 6875.0/4*M[28] - 6875.0/4*M[32] - 3125.0/2*M[33] + 1125.0/4*M[14] + 1125.0/4*M[17] + 3625.0/4*M[18] - 125*M[8];    break;
+    	      case 41    :    return -3125.0/2*M[43] - 3125.0/2*M[47] - 3125.0/2*M[48] + 625.0/2*M[24] + 625.0/2*M[27] + 1875*M[28] - 625.0/2*M[14];    break;
+    	      case 42    :    return 3125.0/4*M[43] - 625.0/4*M[24] - 625.0/4*M[28] + 125.0/4*M[14];    break;
+    	      case 43    :    return -3125.0/4*M[47] - 3125.0/4*M[52] - 3125.0/4*M[53] + 625.0/4*M[27] + 625.0/4*M[31] + 625.0/4*M[28] + 4375.0/4*M[32] + 625.0/4*M[33] - 125.0/4*M[14] - 375.0/2*M[17] - 375.0/2*M[18] + 125.0/4*M[8];    break;
+    	      case 44    :    return 3125.0/4*M[47] - 625.0/4*M[27] - 625.0/4*M[28] + 125.0/4*M[14];    break;
+    	      case 45    :    return 3125.0/12*M[52] - 625.0/12*M[31] - 625.0/4*M[32] + 125.0/4*M[17] + 125.0/6*M[18] - 25.0/6*M[8];    break;
+    	      case 46    :    return 3125.0/12*M[44] + 3125.0/6*M[48] + 3125.0/12*M[53] + 3125.0/6*M[49] + 3125.0/6*M[54] + 3125.0/12*M[55] - 625.0/4*M[25] - 625.0/2*M[28] - 625.0/4*M[32] - 3125.0/4*M[29] - 3125.0/4*M[33] - 625*M[34] + 125.0/6*M[12] + 125.0/3*M[14] + 125.0/6*M[17] + 3875.0/12*M[15] + 3875.0/12*M[18] + 6125.0/12*M[19] - 75.0/2*M[6] - 75.0/2*M[8] - 325.0/2*M[9] + 50.0/3*M[3];    break;
+    	      case 47    :    return -3125.0/6*M[44] - 3125.0/6*M[48] - 3125.0/6*M[49] + 625.0/2*M[25] + 625.0/2*M[28] + 2500.0/3*M[29] - 125.0/3*M[12] - 125.0/3*M[14] - 2125.0/6*M[15] + 125.0/3*M[6];    break;
+    	      case 48    :    return 3125.0/12*M[44] - 625.0/4*M[25] - 625.0/12*M[29] + 125.0/6*M[12] + 125.0/4*M[15] - 25.0/6*M[6];    break;
+    	      case 49    :    return -3125.0/6*M[48] - 3125.0/6*M[53] - 3125.0/6*M[54] + 625.0/2*M[28] + 625.0/2*M[32] + 2500.0/3*M[33] - 125.0/3*M[14] - 125.0/3*M[17] - 2125.0/6*M[18] + 125.0/3*M[8];    break;
+    	      case 50    :    return 3125.0/6*M[48] - 625.0/2*M[28] + 125.0/3*M[14];    break;
+    	      case 51    :    return 3125.0/12*M[53] - 625.0/4*M[32] - 625.0/12*M[33] + 125.0/6*M[17] + 125.0/4*M[18] - 25.0/6*M[8];    break;
+    	      case 52    :    return -3125.0/24*M[49] - 3125.0/24*M[54] - 3125.0/24*M[55] + 625.0/4*M[29] + 625.0/4*M[33] + 6875.0/24*M[34] - 1375.0/24*M[15] - 1375.0/24*M[18] - 5125.0/24*M[19] + 25.0/4*M[6] + 25.0/4*M[8] + 1525.0/24*M[9] - 25.0/4*M[3];    break;
+    	      case 53    :    return 3125.0/24*M[49] - 625.0/4*M[29] + 1375.0/24*M[15] - 25.0/4*M[6];    break;
+    	      case 54    :    return 3125.0/24*M[54] - 625.0/4*M[33] + 1375.0/24*M[18] - 25.0/4*M[8];    break;
+    	      case 55    :    return 625.0/24*M[55] - 625.0/12*M[34] + 875.0/24*M[19] - 125.0/12*M[9] + M[3];    break;
+    	        }    break;
+    	}
     }
-  }
 
 
     /** \brief  Analytic map from local to global coordinates, given explicitly by the polynomial class. Implementation for simplex  */

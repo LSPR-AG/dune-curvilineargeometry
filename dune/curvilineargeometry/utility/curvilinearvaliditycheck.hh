@@ -29,15 +29,24 @@ bool SelfIntersection(
 	typedef typename CurvGeom::LocalCoordinate     LocalCoordinate;
 	typedef typename std::vector<LocalCoordinate>  LocalCoordinateSet;
 
+	LocalPolynomial  detjacP = curvgeom.JacobianDeterminantAnalytical();
 	LocalCoordinateSet samplePoints = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<ctype, mydimension>(sampleOrder);
 
-	ctype detJacMin = 10000;
-	ctype detJacMax = -10000;
+	ctype detJacMin = 1.0e+20;
+	ctype detJacMax = -1.0e+20;
 
 	for (unsigned int i = 0; i < samplePoints.size(); i++)
 	{
-		LocalPolynomial  detjacP = Dune::DifferentialHelper::JacobianDeterminantAnalytical<CurvGeom, coorddimension, mydimension>::eval(curvgeom);
-		ctype            detjac = detjacP.evaluate(samplePoints[i]);
+		ctype detjac   = detjacP.evaluate(samplePoints[i]);
+		ctype detjacv2 = curvgeom.integrationElement (samplePoints[i]);
+		ctype err = fabs(detjac - detjacv2);
+
+		if (err > 1.0e-8)
+		{
+			std::cout << "DetJac evaluated analytically = " << detjac << " and the semi-numerical one = " << detjacv2 << " did not match! Error = " << err << std::endl;
+			//DUNE_THROW(Dune::IOError, "__ERROR: CheckSelfIntersection test says that detJac evaluation unstable");
+		}
+
 		detJacMin = std::min(detJacMin, detjac);
 		detJacMax = std::max(detJacMax, detjac);
 
@@ -54,7 +63,12 @@ bool SelfIntersection(
 		}
 	}
 
-	std::cout << "SelfIntersectionTest: detjac min/max ratio = " << detJacMin / detJacMax << std::endl;
+	if (detJacMin / detJacMax < 0.5)  { std::cout << "SelfIntersectionTest: detjac min/max ratio = " << detJacMin / detJacMax << std::endl;
+		if (curvgeom.order() == 1)  {
+			std::cout << "Unexpected for linear jacobian determinant: " << detjacP.to_string() << std::endl;
+			DUNE_THROW(Dune::IOError, "__ERROR: CheckSelfIntersection finds that detJ varies over a linear element");
+		}
+	}
 }
 
 

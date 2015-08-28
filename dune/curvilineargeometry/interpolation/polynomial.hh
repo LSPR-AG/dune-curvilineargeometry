@@ -38,6 +38,10 @@
 
 namespace Dune {
 
+
+const double POLYNOMIAL_ZERO_VALUE_EFFECTIVE = 1.0e-25;  // The accuracy below which all numbers will be approximated by 0
+
+
 template<class ctype>
 struct PolynomialTraits
 {
@@ -146,6 +150,9 @@ public:
   mutable std::vector<int>     orderdim_;        // Max monomial order for a given dimension
 
 
+
+
+
   // Empty polynomial
   Polynomial() :
 	  cached_(false),     // Cache is always empty unless the user explicitly asks for it
@@ -229,7 +236,7 @@ public:
   LocalPolynomial & operator*=(const ctype c)
   {
     // If we multiply by zero, return zero Polynomial
-    if (fabs(c) < 1.0e-25)  { poly_ = SummandVector(1, zeroMonomial()); }
+    if (fabs(c) < POLYNOMIAL_ZERO_VALUE_EFFECTIVE)  { poly_ = SummandVector(1, zeroMonomial()); }
     else
     {
         for (uint i = 0; i < poly_.size(); i++) { poly_[i].pref_ *= c; }

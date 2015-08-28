@@ -42,6 +42,7 @@ class IntegralHelper
 	      JacobianFunctor(const LocalPolynomial & integration_element_g) :
 	          integration_element_generalised_ (integration_element_g)
 	      {
+	    	  // Optimize polynomial for faster evaluation
 	    	  integration_element_generalised_.cache();
 	      }
 
@@ -76,7 +77,9 @@ class IntegralHelper
 	      typedef typename std::vector<ctype>  ResultType;
 
 
-	      PolynomialFunctor(const LocalPolynomial & p) : p_(p) {}
+	      PolynomialFunctor(const LocalPolynomial & p) : p_(p) {
+	    	  p_.cache();
+	      }
 
 	      ResultType operator()(const LocalCoordinate & x) const { return ResultType(1, p_.evaluate(x)); }
 
