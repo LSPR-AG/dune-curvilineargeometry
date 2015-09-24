@@ -1,6 +1,9 @@
 #install headers
 set(HEADERS
-  numericalrecursiveinterpolationintegrator.hh)
+  adaptiveintegrator.hh
+  integrationhelper.hh
+  quadratureintegrator.hh
+  quadraturerelativeerror.hh)
 
 install(FILES ${HEADERS}
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/curvilineargeometry/integration)

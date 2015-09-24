@@ -25,8 +25,8 @@
 #include <dune/curvilineargeometry/interpolation/polynomial.hh>
 #include <dune/curvilineargeometry/interpolation/differentialhelper.hh>
 #include <dune/curvilineargeometry/interpolation/curvilineargeometryhelper.hh>
-#include <dune/curvilineargeometry/interpolation/curvilinearelementinterpolator.hh>
-#include <dune/curvilineargeometry/integration/numericalrecursiveinterpolationintegrator.hh>
+#include <dune/curvilineargeometry/interpolation/lagrangeinterpolator.hh>
+#include <dune/curvilineargeometry/integration/adaptiveintegrator.hh>
 
 #include <dune/curvilineargeometry/curvilineargeometry.hh>
 

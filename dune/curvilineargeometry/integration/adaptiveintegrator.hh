@@ -18,8 +18,8 @@
  *******************************************************************/
 
 
-#ifndef DUNE_NUMERICALRECURSIVEINTERPOLATIONINTEGRATOR_HH
-#define DUNE_NUMERICALRECURSIVEINTERPOLATIONINTEGRATOR_HH
+#ifndef DUNE_ADAPTIVE_INTEGRATOR_HH
+#define DUNE_ADAPTIVE_INTEGRATOR_HH
 
 
 #include <iostream>
@@ -38,7 +38,8 @@
 #include <dune/geometry/type.hh>
 
 #include <dune/curvilineargeometry/interpolation/polynomial.hh>
-#include <dune/curvilineargeometry/interpolation/curvilinearelementinterpolator.hh>
+#include <dune/curvilineargeometry/interpolation/curvilineargeometryhelper.hh>
+#include <dune/curvilineargeometry/interpolation/lagrangeinterpolator.hh>
 
 
 
@@ -53,10 +54,10 @@ class ElementTwoOrders {
     typedef std::vector< GlobalVector > GlobalVectorVector;
     typedef std::vector< CompositeVector > CompositeVectorVector;
     typedef std::vector<ct> sampleVector;
-    typedef polynomial<ct, mydim> Polynomial;
-    typedef std::vector<Polynomial> PolynomialVector;
+    typedef Polynomial<ct, mydim> LocalPolynomial;
+    typedef std::vector<LocalPolynomial> PolynomialVector;
     typedef Function<GlobalVector, ct> GlobalFunction;
-    typedef CurvilinearElementInterpolator<double, mydim, mydim + 1> CompositeInterpolator;
+    typedef LagrangeInterpolator<double, mydim, mydim + 1> CompositeInterpolator;
 
 private:
     GlobalVectorVector vertexSet_;
@@ -89,8 +90,8 @@ public:
         PolynomialVector intPoly_global_O1 = intPoly_composite_O1;      intPoly_global_O1.erase(intPoly_global_O1.end());
         PolynomialVector intPoly_global_O2 = intPoly_composite_O2;      intPoly_global_O2.erase(intPoly_global_O2.end());
 
-        Polynomial J_O1 = JacobianDeterminantAnalytical(intPoly_global_O1);
-        Polynomial J_O2 = JacobianDeterminantAnalytical(intPoly_global_O2);
+        LocalPolynomial J_O1 = JacobianDeterminantAnalytical(intPoly_global_O1);
+        LocalPolynomial J_O2 = JacobianDeterminantAnalytical(intPoly_global_O2);
 
         integralO1_    = (intPoly_composite_O1[mydim] * J_O1).integrateRefSimplex();
         integralO2_ = (intPoly_composite_O2[mydim] * J_O2).integrateRefSimplex();
@@ -129,9 +130,9 @@ private:
         return rez;
     }
 
-    Polynomial JacobianDeterminantAnalytical(const PolynomialVector & analyticalMap) const
+    LocalPolynomial JacobianDeterminantAnalytical(const PolynomialVector & analyticalMap) const
     {
-        Polynomial rez;
+        LocalPolynomial rez;
         GlobalVector mid;
         switch(mydim)
         {
@@ -145,16 +146,16 @@ private:
             mid[1] = 0.1;
             break;
         case 3:
-            rez.mergeTo( analyticalMap[0].derivative(0) * ( analyticalMap[1].derivative(1) * analyticalMap[2].derivative(2) - analyticalMap[1].derivative(2) * analyticalMap[2].derivative(1) ) );
-            rez.mergeTo( analyticalMap[0].derivative(1) * ( analyticalMap[1].derivative(2) * analyticalMap[2].derivative(0) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(2) ) );
-            rez.mergeTo( analyticalMap[0].derivative(2) * ( analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[1].derivative(1) * analyticalMap[2].derivative(0) ) );
+            rez += analyticalMap[0].derivative(0) * ( analyticalMap[1].derivative(1) * analyticalMap[2].derivative(2) - analyticalMap[1].derivative(2) * analyticalMap[2].derivative(1) );
+            rez += analyticalMap[0].derivative(1) * ( analyticalMap[1].derivative(2) * analyticalMap[2].derivative(0) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(2) );
+            rez += analyticalMap[0].derivative(2) * ( analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[1].derivative(1) * analyticalMap[2].derivative(0) );
             mid[0] = 0.1;
             mid[1] = 0.1;
             mid[2] = 0.1;
             break;
         }
         // Change sign if determinant is negative
-        if (rez.evaluate(mid) < 0) { rez.multScalar(-1); }
+        if (rez.evaluate(mid) < 0) { rez *= -1; }
 
         return rez;
     }
@@ -163,7 +164,7 @@ private:
 
 
 template<class ct, int mydim>
-class NumericalRecursiveInterpolationIntegrator {
+class AdaptiveIntegrator {
     typedef FieldVector< ct, mydim > GlobalVector;
     typedef std::vector< GlobalVector > GlobalVectorVector;
 
@@ -171,7 +172,6 @@ class NumericalRecursiveInterpolationIntegrator {
     typedef std::vector<Element> ElementVector;
 
     typedef Function<GlobalVector, ct> GlobalFunction;
-    typedef CurvilinearElementInterpolator<double, mydim, mydim> CurvilinearInterpolatorMethods;
 
     typedef Dune::ReferenceElement< ct, mydim > ReferenceElement;
     typedef Dune::ReferenceElements< ct, mydim > ReferenceElements;
@@ -370,8 +370,8 @@ protected:
 
   template<typename Functor>
   Element referenceElementRefined(int order1, int order2, const Functor & f) const {
-      GlobalVectorVector vertices_O1 = CurvilinearInterpolatorMethods::simplexGridCoordinateSet(order1);
-      GlobalVectorVector vertices_O2 = CurvilinearInterpolatorMethods::simplexGridCoordinateSet(order2);
+      GlobalVectorVector vertices_O1 = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<ct, mydim>(order1);
+      GlobalVectorVector vertices_O2 = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<ct, mydim>(order2);
 
       std::vector<double> values_O1;
       std::vector<double> values_O2;
@@ -400,6 +400,7 @@ protected:
       // If not, because of too small tolerance, then this is a computationally infeasible request.
       bool feasible_expected_error = ( expected_err > 1e-20 );
 
+      // Check if relative error within tolerance (aka finish if err/val <= tolerance)
       bool feasible_error = (totalError > expected_err);
 
       // For now, also limit maximum number of iterations such that the computation time does not explode
@@ -410,7 +411,7 @@ protected:
 
 public:
 
-  NumericalElementIntegrator(Dune::GeometryType gt) : refElement_( &ReferenceElements::general( gt ) ) {  }
+  AdaptiveIntegrator(Dune::GeometryType gt) : refElement_( &ReferenceElements::general( gt ) ) {  }
 
   /** \brief obtain the name of the reference element */
   Dune::GeometryType type () const { return refElement_->type(); }
@@ -490,4 +491,4 @@ protected:
 
 } // Namespace Dune
 
-#endif /** DUNE_NUMERICALRECURSIVEINTERPOLATIONINTEGRATOR_HH **/
+#endif /** DUNE_ADAPTIVE_INTEGRATOR_HH **/

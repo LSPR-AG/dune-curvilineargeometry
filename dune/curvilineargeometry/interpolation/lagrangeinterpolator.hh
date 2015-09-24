@@ -17,8 +17,8 @@
 
 
 
-#ifndef DUNE_CURVILINEARELEMENTINTERPOLATOR_HH
-#define DUNE_CURVILINEARELEMENTINTERPOLATOR_HH
+#ifndef DUNE_LAGRANGE_INTERPOLATOR_HH
+#define DUNE_LAGRANGE_INTERPOLATOR_HH
 
 #include <cstdarg>
 #include <cstdio>
@@ -48,7 +48,7 @@ namespace Dune {
 
 
 template<class ctype, int mydim, int cdim>
-class CurvilinearElementInterpolator {
+class LagrangeInterpolator {
   protected:
     static const int mydimension= mydim;
     static const int coorddimension = cdim;
@@ -80,7 +80,7 @@ class CurvilinearElementInterpolator {
   public:
 
     /** \brief Empty constructor. Used mostly as a patch, please use the other two constructors for actual interpolators */
-    CurvilinearElementInterpolator() {}
+    LagrangeInterpolator() {}
 
     
     /** \brief Constructor
@@ -90,7 +90,7 @@ class CurvilinearElementInterpolator {
      *  \param[in] order	the interpolation order of this element
      *
      */
-    CurvilinearElementInterpolator (
+    LagrangeInterpolator (
     		const ReferenceElement &refElement,
     		const std::vector<GlobalVector> & point,
     		InterpolatoryOrderType order) :
@@ -108,7 +108,7 @@ class CurvilinearElementInterpolator {
      *  \param[in] order	the interpolation order of this element
      *
      */  
-    CurvilinearElementInterpolator (
+    LagrangeInterpolator (
     		Dune::GeometryType gt,
     		const std::vector<GlobalVector> & point,
     		InterpolatoryOrderType order) :
@@ -184,7 +184,7 @@ class CurvilinearElementInterpolator {
      * 
      *  note: the map is given by linear superposition of lagrange polynomials with interpolatory vertex coordinates
      */
-    GlobalVector realCoordinate(const LocalVector &local) const
+    GlobalVector global(const LocalVector &local) const
     {
     	// In case of 0-dim geometry, a 0-dim vector is mapped to a single point defining the geometry
     	if (mydim == 0) { return point_[0]; }
@@ -215,7 +215,7 @@ class CurvilinearElementInterpolator {
      *  \param[in]  subentityNo		Subentity internal index inside the element
      */
     template<int subdim>
-    CurvilinearElementInterpolator< ctype, subdim, cdim > SubentityInterpolator(InternalIndexType subentityNo) const
+    LagrangeInterpolator< ctype, subdim, cdim > SubentityInterpolator(InternalIndexType subentityNo) const
     {
         if (!type().isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: SubentityInterpolator() only implemented for Simplex geometries at the moment"); }
         if ((subentityNo < 0)||(subentityNo >= nSubentity(mydim - subdim)))
@@ -226,7 +226,7 @@ class CurvilinearElementInterpolator {
         // Vertex subentity can not be lower than a vertex itself
         if (mydim == 0)  {
         	assert(subdim == 0);
-        	return CurvilinearElementInterpolator< ctype, subdim, cdim > (type(), point_, order_);
+        	return LagrangeInterpolator< ctype, subdim, cdim > (type(), point_, order_);
         }
 
         std::vector<InternalIndexType> subentityIndex = Dune::CurvilinearGeometryHelper::subentityInternalCoordinateSet<ctype, mydim>(type(), order_, mydim - subdim, subentityNo);
@@ -236,7 +236,7 @@ class CurvilinearElementInterpolator {
 
         Dune::GeometryType subentityType;
         subentityType.makeSimplex(subdim);
-        return CurvilinearElementInterpolator< ctype, subdim, cdim > (subentityType, subentityPoint, order_);
+        return LagrangeInterpolator< ctype, subdim, cdim > (subentityType, subentityPoint, order_);
     }
 
   private:
@@ -710,4 +710,4 @@ class CurvilinearElementInterpolator {
 
 } // Namespace Dune
 
-#endif /** DUNE_CURVILINEARELEMENTINTERPOLATOR_HH **/
+#endif /** DUNE_LAGRANGE_INTERPOLATOR_HH **/

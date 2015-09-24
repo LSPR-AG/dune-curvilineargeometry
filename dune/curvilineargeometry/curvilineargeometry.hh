@@ -33,7 +33,7 @@
 
 #include <dune/curvilineargeometry/interpolation/polynomial.hh>
 #include <dune/curvilineargeometry/interpolation/curvilineargeometryhelper.hh>
-#include <dune/curvilineargeometry/interpolation/curvilinearelementinterpolator.hh>
+#include <dune/curvilineargeometry/interpolation/lagrangeinterpolator.hh>
 #include <dune/curvilineargeometry/interpolation/differentialhelper.hh>
 #include <dune/curvilineargeometry/interpolation/pointlocation.hh>
 #include <dune/curvilineargeometry/integration/integrationhelper.hh>
@@ -143,7 +143,7 @@ namespace Dune
     typedef Dune::ReferenceElement< ctype, mydimension > ReferenceElement;
 
     //! type of element interpolator
-    typedef CurvilinearElementInterpolator <ct, mydim, cdim> ElementInterpolator;
+    typedef LagrangeInterpolator <ct, mydim, cdim> ElementInterpolator;
 
 
     // Define Polynomial and associated classes
@@ -275,7 +275,7 @@ namespace Dune
     GlobalCoordinate global ( const LocalCoordinate &local ) const
     {
         //std::cout << " requested global from local " << local << " of dim " << local.size() << " for global size " << coorddimension << "at interpvert size " << vertexSet().size()  << std::endl;
-        return elementInterpolator_.realCoordinate(local);
+        return elementInterpolator_.global(local);
     }
 
     /** \brief Construct CurvilinearGeometry classes for all mydim-1 subentities of this element
@@ -285,7 +285,7 @@ namespace Dune
     template<int subdim>
     CurvilinearGeometry< ctype, subdim, cdim>  subentityGeometry(InternalIndexType subentityIndex) const
     {
-        CurvilinearElementInterpolator <ct, subdim, cdim> interp = elementInterpolator_.template SubentityInterpolator<subdim>(subentityIndex);
+        LagrangeInterpolator <ct, subdim, cdim> interp = elementInterpolator_.template SubentityInterpolator<subdim>(subentityIndex);
         return CurvilinearGeometry< ctype, subdim, cdim> (interp);
     }
 
@@ -768,7 +768,7 @@ namespace Dune
 
   public:
 
-    typedef CurvilinearElementInterpolator <ct, mydim, cdim> ElementInterpolator;
+    typedef LagrangeInterpolator <ct, mydim, cdim> ElementInterpolator;
 
     typedef typename Dune::CurvilinearGeometryHelper::InternalIndexType         InternalIndexType;
     typedef typename Dune::CurvilinearGeometryHelper::InterpolatoryOrderType    InterpolatoryOrderType;

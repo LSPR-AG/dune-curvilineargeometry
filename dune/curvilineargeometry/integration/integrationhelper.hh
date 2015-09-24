@@ -4,7 +4,7 @@
 #include <assert.h>
 
 #include <dune/curvilineargeometry/integration/quadratureintegrator.hh>
-#include <dune/curvilineargeometry/integration/numericalrecursiveinterpolationintegrator.hh>
+#include <dune/curvilineargeometry/integration/adaptiveintegrator.hh>
 
 namespace Dune
 {
@@ -218,7 +218,7 @@ protected:
         	return QuadratureIntegrator::template integrateRecursive<JacobiFunctor, Functor, NORM_TYPE>(curvgeom.type(), f, jacobiDet, RELATIVE_TOLERANCE, ACCURACY_GOAL, suggestedOrder).second;
         }
 
-        //NumericalRecursiveInterpolationIntegrator<ct, mydimension> NInt( type() );
+        //AdaptiveIntegrator<ct, mydimension> NInt( type() );
         //return NInt.integrate( g, tolerance);
     }
 

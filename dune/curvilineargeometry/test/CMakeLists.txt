@@ -1,23 +1,23 @@
 set(TESTS
   test_polynomial
-  test_curvilinearelementinterpolation
-  test_recursiveinterpolationintegration
+  test_lagrangeinterpolation
+  test_adaptiveintegration
   test_quadratureintegration
   test_quadratureintegration-matrix
   test_quadratureintegration-speed
   test_curvilineargeometry)
 
 add_executable(test_polynomial test-polynomial.cc)
-add_executable(test_curvilinearelementinterpolation test-curvilinearelementinterpolation.cc)
-add_executable(test_recursiveinterpolationintegration test-recursiveinterpolationintegration.cc)
+add_executable(test_lagrangeinterpolation test-lagrangeinterpolation.cc)
+add_executable(test_adaptiveintegration test-adaptiveintegration.cc)
 add_executable(test_quadratureintegration test-quadratureintegration.cc)
 add_executable(test_quadratureintegration-matrix test-quadratureintegration-matrix.cc)
 add_executable(test_quadratureintegration-speed test-quadratureintegration-speed.cc)
 add_executable(test_curvilineargeometry test-curvilineargeometry.cc)
 
 
-target_link_libraries(test_curvilinearelementinterpolation dunecommon dunegeometry)
-target_link_libraries(test_recursiveinterpolationintegration dunecommon dunegeometry)
+target_link_libraries(test_lagrangeinterpolation dunecommon dunegeometry)
+target_link_libraries(test_adaptiveintegration dunecommon dunegeometry)
 target_link_libraries(test_quadratureintegration dunecommon dunegeometry)
 target_link_libraries(test_quadratureintegration-matrix dunecommon dunegeometry)
 target_link_libraries(test_quadratureintegration-speed dunecommon dunegeometry)

@@ -3,7 +3,7 @@
 
 
 #include <dune/curvilineargeometry/interpolation/polynomial.hh>
-#include <dune/curvilineargeometry/interpolation/curvilinearelementinterpolator.hh>
+#include <dune/curvilineargeometry/interpolation/lagrangeinterpolator.hh>
 
 
 namespace Dune
@@ -63,7 +63,7 @@ struct BarycentricTest<CurvGeom, DIM2D, DIM2D>
 	typedef typename CurvGeom::ctype              ctype;
 	typedef typename CurvGeom::GlobalCoordinate   GlobalCoordinate;
 
-    typedef Dune::CurvilinearElementInterpolator< ctype, DIM1D, DIM2D >  SubentityInterpolator;
+    typedef Dune::LagrangeInterpolator< ctype, DIM1D, DIM2D >  SubentityInterpolator;
     typedef std::vector< SubentityInterpolator >                         SubentityInterpolatorVector;
     typedef Dune::Polynomial<ctype, DIM1D>                               SubentityPolynomial;
     typedef std::vector<SubentityPolynomial>                             SubentityPolynomialVector;
@@ -106,7 +106,7 @@ struct BarycentricTest<CurvGeom, DIM3D, DIM3D>
 	typedef typename CurvGeom::ctype              ctype;
 	typedef typename CurvGeom::GlobalCoordinate   GlobalCoordinate;
 
-    typedef Dune::CurvilinearElementInterpolator< ctype, DIM2D, DIM3D >  SubentityInterpolator;
+    typedef Dune::LagrangeInterpolator< ctype, DIM2D, DIM3D >  SubentityInterpolator;
     typedef std::vector< SubentityInterpolator >                         SubentityInterpolatorVector;
     typedef Dune::Polynomial<ctype, DIM2D>                               SubentityPolynomial;
     typedef std::vector<SubentityPolynomial>                             SubentityPolynomialVector;

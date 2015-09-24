@@ -19,7 +19,7 @@
 #include <dune/geometry/referenceelements.hh>
 #include <dune/geometry/type.hh>
 
-#include <dune/curvilineargeometry/integration/numericalrecursiveinterpolationintegrator.hh>
+#include <dune/curvilineargeometry/integration/adaptiveintegrator.hh>
 
 
 using namespace Dune;
@@ -56,8 +56,8 @@ int main ()
   Dune::GeometryType faceGeometry;   faceGeometry.makeSimplex(2);
 
 
-  NumericalRecursiveInterpolationIntegrator<double, 1> funIntegrator1D(edgeGeometry);
-  NumericalRecursiveInterpolationIntegrator<double, 2> funIntegrator2D(faceGeometry);
+  AdaptiveIntegrator<double, 1> funIntegrator1D(edgeGeometry);
+  AdaptiveIntegrator<double, 2> funIntegrator2D(faceGeometry);
 
   std::cout << "started 1" << std::endl;    double rez1D_1 = funIntegrator1D.integrate(function1d1(), 1.0e-5);
   std::cout << "started 2" << std::endl;    double rez1D_2 = funIntegrator1D.integrate(function1d2(), 1.0e-5);

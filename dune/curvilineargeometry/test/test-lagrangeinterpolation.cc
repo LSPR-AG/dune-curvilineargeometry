@@ -21,7 +21,7 @@
 
 #include <dune/curvilineargeometry/interpolation/polynomial.hh>
 #include <dune/curvilineargeometry/interpolation/curvilineargeometryhelper.hh>
-#include <dune/curvilineargeometry/integration/numericalrecursiveinterpolationintegrator.hh>
+#include <dune/curvilineargeometry/interpolation/lagrangeinterpolator.hh>
 
 
 using namespace Dune;
@@ -125,10 +125,10 @@ std::vector<FieldVector< double, dimworld > > evaluateFunction(
 template <int dim, int dimworld>
 std::vector<FieldVector< double, dimworld > > evaluateInterpolatorNumerical(
         std::vector<FieldVector< double, dim > > & localsample,
-        CurvilinearElementInterpolator<double, dim, dimworld> & interp )
+        LagrangeInterpolator<double, dim, dimworld> & interp )
 {
     std::vector<FieldVector< double, dimworld > > rez;
-    for (int i = 0; i < localsample.size(); i++) {rez.push_back(interp.realCoordinate(localsample[i])); }
+    for (int i = 0; i < localsample.size(); i++) {rez.push_back(interp.global(localsample[i])); }
     return rez;
 }
 
@@ -210,7 +210,7 @@ void print(std::vector<FieldVector< double, dim >> xVec) {
 template <typename Functor>
 void edgeTest3D(Functor f)
 {
-    CurvilinearElementInterpolator<double, 1, 3> interps[5];
+    LagrangeInterpolator<double, 1, 3> interps[5];
     std::vector<Polynomial<double, 1> > analytics[5];
 
     FieldVectorVector1D random1D_20 = sampleRandom<1>(20);
@@ -223,7 +223,7 @@ void edgeTest3D(Functor f)
     {
         FieldVectorVector1D grid1D = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, 1>(i+1);
         FieldVectorVector3D sample_real_3D_line_gridtest = evaluateFunction<1,3, Functor>(grid1D, f);
-        interps[i] = CurvilinearElementInterpolator<double, 1, 3>(edgeGeometry, sample_real_3D_line_gridtest, i + 1);
+        interps[i] = LagrangeInterpolator<double, 1, 3>(edgeGeometry, sample_real_3D_line_gridtest, i + 1);
         analytics[i] = interps[i].interpolatoryVectorAnalytical();
 
         FieldVectorVector3D sample_numerical_3D_line_gridtest = evaluateInterpolatorNumerical<1,3>(grid1D, interps[i]);
@@ -256,7 +256,7 @@ void edgeTest3D(Functor f)
 template <typename Functor>
 void surfaceTest3D(Functor f)
 {
-    CurvilinearElementInterpolator<double, 2, 3> interps[5];
+    LagrangeInterpolator<double, 2, 3> interps[5];
     std::vector<Polynomial<double, 2> > analytics[5];
 
     FieldVectorVector2D random2D_20 = sampleRandom<2>(20);
@@ -269,7 +269,7 @@ void surfaceTest3D(Functor f)
     {
         FieldVectorVector2D grid2D = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, 2>(i+1);
         FieldVectorVector3D sample_real_3D_surface_gridtest = evaluateFunction<2,3>(grid2D, f);
-        interps[i] = CurvilinearElementInterpolator<double, 2, 3>(triangleGeometry, sample_real_3D_surface_gridtest, i + 1);
+        interps[i] = LagrangeInterpolator<double, 2, 3>(triangleGeometry, sample_real_3D_surface_gridtest, i + 1);
         analytics[i] = interps[i].interpolatoryVectorAnalytical();
 
         FieldVectorVector3D sample_numerical_3D_surface_gridtest = evaluateInterpolatorNumerical<2,3>(grid2D, interps[i]);
@@ -300,7 +300,7 @@ void surfaceTest3D(Functor f)
 template <typename Functor>
 void volumeTest3D(Functor f)
 {
-    CurvilinearElementInterpolator<double, 3, 3> interps[5];
+    LagrangeInterpolator<double, 3, 3> interps[5];
     std::vector<Polynomial<double, 3> > analytics[5];
 
     FieldVectorVector3D random3D_20 = sampleRandom<3>(20);
@@ -313,7 +313,7 @@ void volumeTest3D(Functor f)
     {
         FieldVectorVector3D grid3D = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, 3>(i+1);
         FieldVectorVector3D sample_real_3D_volume_gridtest = evaluateFunction<3,3>(grid3D, f);
-        interps[i] = CurvilinearElementInterpolator<double, 3, 3>(tetrahedronGeometry, sample_real_3D_volume_gridtest, i + 1);
+        interps[i] = LagrangeInterpolator<double, 3, 3>(tetrahedronGeometry, sample_real_3D_volume_gridtest, i + 1);
         analytics[i] = interps[i].interpolatoryVectorAnalytical();
 
         FieldVectorVector3D sample_numerical_3D_volume_gridtest = evaluateInterpolatorNumerical<3,3>(grid3D, interps[i]);
