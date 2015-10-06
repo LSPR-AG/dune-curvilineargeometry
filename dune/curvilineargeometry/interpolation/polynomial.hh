@@ -159,8 +159,7 @@ public:
   	  order_(0)
   {
 	  factorial_ = std::vector<double> {1, 1};  // Initialize the first two members of the factorial
-	  poly_.push_back(zeroMonomial());
-
+	  //poly_.push_back(zeroMonomial());
   }
 
 
@@ -191,7 +190,7 @@ public:
   }
 
 
-  Monomial zeroMonomial()  { return Monomial(0.0, std::vector<int> (dim, 0)); }
+  Monomial zeroMonomial() const { return Monomial(0.0, std::vector<int> (dim, 0)); }
 
 
   /** \brief Add a summand to a Polynomial
@@ -407,6 +406,10 @@ public:
       // Only add this monomial if it does not differentiate to 0
       if (poly_[i].power_[paramNo] > 0)  { newPoly += poly_[i].derivative(paramNo); }
     }
+
+    // If we differentiate to zero, return a valid zero-polynomial
+    if (newPoly.size() == 0)  { return LocalPolynomial(zeroMonomial()); }
+
     return newPoly;
   }
 

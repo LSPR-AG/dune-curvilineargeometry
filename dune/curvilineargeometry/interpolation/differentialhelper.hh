@@ -27,7 +27,108 @@ const int DIM2D = 2;
 const int DIM3D = 3;
 
 
+/***********************************************************************************************************/
+/** \brief Calculates Determinant of a matrix                                                              */
+/** FIXME This functionality sort of available in MatrixHelper, but it throws asserts I can not deal with  */
+/***********************************************************************************************************/
+template <class ctype, int dim>
+struct MatrixDeterminant
+{
+	template <class Matrix>
+	static ctype eval(const Matrix & M)  { DUNE_THROW(NotImplemented, "Called generic method of DifferentialHelper::MatrixDeterminant"); }
+};
 
+template <class ctype>
+struct MatrixDeterminant<ctype, DIM1D>
+{
+	template <class Matrix>
+	static ctype eval(const Matrix & M)  { return M[0][0]; }
+};
+
+template <class ctype>
+struct MatrixDeterminant<ctype, DIM2D>
+{
+	template <class Matrix>
+	static ctype eval(const Matrix & M)  { return M[0][0] * M[1][1] - M[0][1] * M[1][0]; }
+};
+
+template <class ctype>
+struct MatrixDeterminant<ctype, DIM3D>
+{
+	template <class Matrix>
+	static ctype eval(const Matrix & M)  {
+        return M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1])
+             + M[0][1] * (M[1][2] * M[2][0] - M[1][0] * M[2][2])
+             + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+	}
+};
+
+
+
+
+
+/*****************************************************************************************************/
+/** \brief Calculates Jacobian of element mapping Analytically for all combinations of mydim, codim  */
+/*****************************************************************************************************/
+
+template <class CurvGeom>
+struct JacobianTransposeAnalytical
+{
+	static const int mydimension    = CurvGeom::mydimension;
+	static const int coorddimension = CurvGeom::coorddimension;
+
+	typedef typename CurvGeom::PolynomialGlobalCoordinate     PolynomialGlobalCoordinate;
+	typedef typename CurvGeom::PolynomialJacobianTransposed   PolynomialJacobianTransposed;
+
+	static PolynomialJacobianTransposed eval( const PolynomialGlobalCoordinate & analyticalMap )
+    {
+		PolynomialJacobianTransposed polyjt;
+
+        for (int i = 0; i < coorddimension; i++)
+        {
+            for (int j = 0; j < mydimension; j++)
+            {
+            	polyjt[j][i] = (analyticalMap[i].derivative(j));
+            }
+        }
+
+      return polyjt;
+    }
+};
+
+
+/*****************************************************************************************************/
+/** \brief Calculates Hessian of a given polynomial analytically for any local dimension mydim       */
+/*****************************************************************************************************/
+template <class CurvGeom>
+struct HessianTransposeAnalytical
+{
+	static const int mydimension    = CurvGeom::mydimension;
+
+	typedef typename CurvGeom::LocalPolynomial                LocalPolynomial;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate     PolynomialLocalCoordinate;
+	typedef typename CurvGeom::PolynomialHessianTransposed    PolynomialHessianTransposed;
+
+	static PolynomialHessianTransposed eval( const LocalPolynomial & f )
+    {
+		PolynomialLocalCoordinate grad;
+		PolynomialHessianTransposed polyht;
+
+		// Pre-compute gradient to reduce number of derivatives
+		for (int j = 0; j < mydimension; j++)  { grad[j] = f.derivative(j); }
+
+		// Compute Hessian Transposed
+        for (int i = 0; i < mydimension; i++)
+        {
+            for (int j = 0; j < mydimension; j++)
+            {
+            	polyht[j][i] = (grad[i].derivative(j));
+            }
+        }
+
+      return polyht;
+    }
+};
 
 
 /*****************************************************************************************************/
@@ -37,10 +138,10 @@ const int DIM3D = 3;
 template <class CurvGeom, int cdim, int mydim>
 struct JacobianDeterminantAnalytical
 {
-	typedef typename CurvGeom::LocalPolynomial  LocalPolynomial;
-	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
+	typedef typename CurvGeom::LocalPolynomial             LocalPolynomial;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate  PolynomialGlobalCoordinate;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & analyticalMap)
 	{
 		DUNE_THROW(NotImplemented, "Called generic method of DifferentialHelper::JacobianDeterminantAnalytical");
 	    return LocalPolynomial();
@@ -52,14 +153,11 @@ template <class CurvGeom>
 struct JacobianDeterminantAnalytical<CurvGeom, DIM1D, DIM1D>
 {
 	typedef typename CurvGeom::LocalPolynomial   LocalPolynomial;
-	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate  PolynomialGlobalCoordinate;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & analyticalMap)
 	{
 	    LocalPolynomial rez = analyticalMap[0].derivative(0);
-
-	    // Clean-up in case some summands summed up to 0
-	    rez.cleanUp();
 
 	    // Change sign if determinant is negative
 	    if (rez.evaluate(curvgeom.refElement().position( 0, 0 )) < 0) { rez *= -1; }
@@ -73,9 +171,9 @@ template <class CurvGeom>
 struct JacobianDeterminantAnalytical<CurvGeom, DIM2D, DIM2D>
 {
 	typedef typename CurvGeom::LocalPolynomial   LocalPolynomial;
-	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate  PolynomialGlobalCoordinate;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & analyticalMap)
 	{
 	    LocalPolynomial rez = analyticalMap[0].derivative(0) * analyticalMap[1].derivative(1) - analyticalMap[0].derivative(1) * analyticalMap[1].derivative(0);
 
@@ -94,9 +192,9 @@ template <class CurvGeom>
 struct JacobianDeterminantAnalytical<CurvGeom, DIM3D, DIM3D>
 {
 	typedef typename CurvGeom::LocalPolynomial   LocalPolynomial;
-	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate  PolynomialGlobalCoordinate;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & analyticalMap)
 	{
 	    LocalPolynomial rez;
 
@@ -123,12 +221,12 @@ struct JacobianDeterminantAnalytical<CurvGeom, DIM3D, DIM3D>
 template <class CurvGeom, int cdim, int mydim>
 struct NormalIntegrationElementAnalytical
 {
-	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate  PolynomialGlobalCoordinate;
 
-	static PolynomialVector eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
+	static PolynomialGlobalCoordinate eval(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & analyticalMap)
 	{
 		DUNE_THROW(NotImplemented, "Called generic method of DifferentialHelper::NormalIntegrationElementAnalytical");
-	    PolynomialVector rez;
+		PolynomialGlobalCoordinate rez;
 	    return rez;
 	}
 };
@@ -138,14 +236,14 @@ struct NormalIntegrationElementAnalytical
 template <class CurvGeom>
 struct NormalIntegrationElementAnalytical<CurvGeom, DIM2D, DIM1D>
 {
-	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate  PolynomialGlobalCoordinate;
 
-	static PolynomialVector eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
+	static PolynomialGlobalCoordinate eval(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & analyticalMap)
 	{
-	    PolynomialVector rez;
+	    PolynomialGlobalCoordinate rez;
 
-	    rez.push_back(analyticalMap[1].derivative(0));
-	    rez.push_back(analyticalMap[0].derivative(0) * (-1));
+	    rez[0] = analyticalMap[1].derivative(0);
+	    rez[1] = analyticalMap[0].derivative(0) * (-1);
 
 	    return rez;
 	}
@@ -156,15 +254,15 @@ struct NormalIntegrationElementAnalytical<CurvGeom, DIM2D, DIM1D>
 template <class CurvGeom>
 struct NormalIntegrationElementAnalytical<CurvGeom, DIM3D, DIM2D>
 {
-	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate  PolynomialGlobalCoordinate;
 
-	static PolynomialVector eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
+	static PolynomialGlobalCoordinate eval(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & analyticalMap)
 	{
-	    PolynomialVector rez;
+	    PolynomialGlobalCoordinate rez;
 
-	    rez.push_back(analyticalMap[2].derivative(0) * analyticalMap[1].derivative(1) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1));
-	    rez.push_back(analyticalMap[0].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[2].derivative(0) * analyticalMap[0].derivative(1));
-	    rez.push_back(analyticalMap[1].derivative(0) * analyticalMap[0].derivative(1) - analyticalMap[0].derivative(0) * analyticalMap[1].derivative(1));
+	    rez[0] = analyticalMap[2].derivative(0) * analyticalMap[1].derivative(1) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1);
+	    rez[1] = analyticalMap[0].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[2].derivative(0) * analyticalMap[0].derivative(1);
+	    rez[2] = analyticalMap[1].derivative(0) * analyticalMap[0].derivative(1) - analyticalMap[0].derivative(0) * analyticalMap[1].derivative(1);
 
 	    return rez;
 	}
@@ -181,9 +279,9 @@ template <class CurvGeom, int cdim, int mydim>
 struct IntegrationElementSquaredAnalytical
 {
 	typedef typename CurvGeom::LocalPolynomial  LocalPolynomial;
-	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate  PolynomialGlobalCoordinate;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & analyticalMap)
 	{
 		DUNE_THROW(NotImplemented, "Called generic method of DifferentialHelper::IntegrationElementSquaredAnalytical");
 	    LocalPolynomial rez;
@@ -197,9 +295,9 @@ template <class CurvGeom, int cdim>
 struct IntegrationElementSquaredAnalytical<CurvGeom, cdim, DIM1D>
 {
 	typedef typename CurvGeom::LocalPolynomial  LocalPolynomial;
-	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate  PolynomialGlobalCoordinate;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & analyticalMap)
 	{
 		LocalPolynomial rez;
 
@@ -217,13 +315,13 @@ template <class CurvGeom>
 struct IntegrationElementSquaredAnalytical<CurvGeom, DIM3D, DIM2D>
 {
 	typedef typename CurvGeom::LocalPolynomial   LocalPolynomial;
-	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate  PolynomialGlobalCoordinate;
 
-	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialVector & analyticalMap)
+	static LocalPolynomial eval(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & analyticalMap)
 	{
 		LocalPolynomial rez;
 
-	    PolynomialVector normalIntegrationElement = NormalIntegrationElementAnalytical<CurvGeom, DIM3D, DIM2D>::eval(curvgeom, analyticalMap);
+	    PolynomialGlobalCoordinate normalIntegrationElement = NormalIntegrationElementAnalytical<CurvGeom, DIM3D, DIM2D>::eval(curvgeom, analyticalMap);
 	    for (int i = 0; i < DIM3D; i++) {
 	        rez += normalIntegrationElement[i] * normalIntegrationElement[i];
 	    }

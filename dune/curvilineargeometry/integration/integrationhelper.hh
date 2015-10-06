@@ -22,7 +22,7 @@ class IntegralHelper
     typedef typename CurvGeom::GlobalCoordinate  GlobalCoordinate;
 
 	typedef typename CurvGeom::LocalPolynomial   LocalPolynomial;
-	typedef typename CurvGeom::PolynomialVector  PolynomialVector;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate  PolynomialGlobalCoordinate;
 
 
 
@@ -162,9 +162,9 @@ public:
 	 *  \note (!) This operation only has meaning to elements which have normals - edges in 2D and faces in 3D
 	 *  \note (!) At the moment only capable of integrating over a Simplex
 	 */
-	static ctype integrateAnalyticalDot(const CurvGeom & curvgeom, const PolynomialVector & PVec)
+	static ctype integrateAnalyticalDot(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & PVec)
 	{
-		PolynomialVector nintelem = curvgeom.NormalIntegrationElementAnalytical();
+		PolynomialGlobalCoordinate nintelem = curvgeom.NormalIntegrationElementAnalytical();
 	    return integrateAnalyticalDot(PVec, nintelem);
 	}
 
@@ -179,7 +179,7 @@ public:
 	 *  TODO: NOT IMPLEMENTED YET
 	 */
 
-	static GlobalCoordinate integrateAnalyticalTimes(const CurvGeom & curvgeom, const PolynomialVector & PVec)
+	static GlobalCoordinate integrateAnalyticalTimes(const CurvGeom & curvgeom, const PolynomialGlobalCoordinate & PVec)
 	{
 	    GlobalCoordinate rez;
 
@@ -232,7 +232,7 @@ protected:
 
 
     /** \brief performs analytical surface integral of dot(f, n) */
-    static ctype integrateAnalyticalDot(const PolynomialVector & PVec, const PolynomialVector & normalIntegrationElement )
+    static ctype integrateAnalyticalDot(const PolynomialGlobalCoordinate & PVec, const PolynomialGlobalCoordinate & normalIntegrationElement )
     {
         assert(mydimension > 0);
         // Construct boundary integration element normal polynomial vector

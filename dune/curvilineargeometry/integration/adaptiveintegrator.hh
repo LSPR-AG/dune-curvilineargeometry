@@ -40,6 +40,7 @@
 #include <dune/curvilineargeometry/interpolation/polynomial.hh>
 #include <dune/curvilineargeometry/interpolation/curvilineargeometryhelper.hh>
 #include <dune/curvilineargeometry/interpolation/lagrangeinterpolator.hh>
+#include <dune/curvilineargeometry/interpolation/differentialhelper.hh>
 
 
 
@@ -49,14 +50,15 @@ namespace Dune {
 template<class ct, int mydim, int order1, int order2>
 class ElementTwoOrders {
 
-    typedef FieldVector< ct, mydim > GlobalVector;
-    typedef FieldVector< ct, mydim + 1 > CompositeVector;
-    typedef std::vector< GlobalVector > GlobalVectorVector;
-    typedef std::vector< CompositeVector > CompositeVectorVector;
-    typedef std::vector<ct> sampleVector;
-    typedef Polynomial<ct, mydim> LocalPolynomial;
-    typedef std::vector<LocalPolynomial> PolynomialVector;
-    typedef Function<GlobalVector, ct> GlobalFunction;
+    typedef FieldVector< ct, mydim >         GlobalVector;
+    typedef FieldVector< ct, mydim + 1 >     CompositeVector;
+    typedef std::vector< GlobalVector >      GlobalVectorVector;
+    typedef std::vector< CompositeVector >   CompositeVectorVector;
+    //typedef std::vector<ct>                  SampleVector;
+    typedef Polynomial<ct, mydim>            LocalPolynomial;
+
+    typedef FieldVector<LocalPolynomial, mydim>            PolynomialLocalCoordinate;
+    typedef FieldVector<LocalPolynomial, mydim + 1>        PolynomialCompositeCoordinate;
     typedef LagrangeInterpolator<double, mydim, mydim + 1> CompositeInterpolator;
 
 private:
@@ -78,23 +80,26 @@ public:
         value_ = valuesO2;
 
         // Merge vertices and values to one single vector of vertices of dimension cdim+1
-        CompositeVectorVector composite_verticesO1 = compositeVertices(verticesO1, valuesO1);
-        CompositeVectorVector composite_verticesO2 = compositeVertices(verticesO2, valuesO2);
+        CompositeVectorVector compositeVerticesO1 = compositeVertices(verticesO1, valuesO1);
+        CompositeVectorVector compositeVerticesO2 = compositeVertices(verticesO2, valuesO2);
 
-        CompositeInterpolator interp_composite_O1(gt, composite_verticesO1, order1);
-        CompositeInterpolator interp_composite_O2(gt, composite_verticesO2, order2);
+        CompositeInterpolator compositeInterpO1(gt, compositeVerticesO1, order1);
+        CompositeInterpolator compositeInterpO2(gt, compositeVerticesO2, order2);
 
-        PolynomialVector intPoly_composite_O1 = interp_composite_O1.interpolatoryVectorAnalytical();
-        PolynomialVector intPoly_composite_O2 = interp_composite_O2.interpolatoryVectorAnalytical();
+        PolynomialCompositeCoordinate compositeCoordinateO1 = compositeInterpO1.interpolatoryVectorAnalytical();
+        PolynomialCompositeCoordinate compositeCoordinateO2 = compositeInterpO2.interpolatoryVectorAnalytical();
 
-        PolynomialVector intPoly_global_O1 = intPoly_composite_O1;      intPoly_global_O1.erase(intPoly_global_O1.end());
-        PolynomialVector intPoly_global_O2 = intPoly_composite_O2;      intPoly_global_O2.erase(intPoly_global_O2.end());
+        // Local polynomial vector is a subset of the composite polynomial vector
+        PolynomialLocalCoordinate localCoordinateO1;
+        PolynomialLocalCoordinate localCoordinateO2;
+        for (int i = 0; i < mydim; i++)  { localCoordinateO1[i] = compositeCoordinateO1[i]; }
+        for (int i = 0; i < mydim; i++)  { localCoordinateO2[i] = compositeCoordinateO2[i]; }
 
-        LocalPolynomial J_O1 = JacobianDeterminantAnalytical(intPoly_global_O1);
-        LocalPolynomial J_O2 = JacobianDeterminantAnalytical(intPoly_global_O2);
+        LocalPolynomial jacO1 = JacobianDeterminantAnalytical(localCoordinateO1);
+        LocalPolynomial jacO2 = JacobianDeterminantAnalytical(localCoordinateO2);
 
-        integralO1_    = (intPoly_composite_O1[mydim] * J_O1).integrateRefSimplex();
-        integralO2_ = (intPoly_composite_O2[mydim] * J_O2).integrateRefSimplex();
+        integralO1_ = (compositeCoordinateO1[mydim] * jacO1).integrateRefSimplex();
+        integralO2_ = (compositeCoordinateO2[mydim] * jacO2).integrateRefSimplex();
 
         error_ = fabs(integralO1_ - integralO2_);
     }
@@ -130,7 +135,7 @@ private:
         return rez;
     }
 
-    LocalPolynomial JacobianDeterminantAnalytical(const PolynomialVector & analyticalMap) const
+    LocalPolynomial JacobianDeterminantAnalytical(const PolynomialLocalCoordinate & analyticalMap) const
     {
         LocalPolynomial rez;
         GlobalVector mid;
@@ -170,8 +175,6 @@ class AdaptiveIntegrator {
 
     typedef ElementTwoOrders<ct, mydim, 2, 4> Element;
     typedef std::vector<Element> ElementVector;
-
-    typedef Function<GlobalVector, ct> GlobalFunction;
 
     typedef Dune::ReferenceElement< ct, mydim > ReferenceElement;
     typedef Dune::ReferenceElements< ct, mydim > ReferenceElements;

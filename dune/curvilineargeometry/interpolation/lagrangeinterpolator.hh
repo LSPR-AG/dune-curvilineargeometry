@@ -49,7 +49,12 @@ namespace Dune {
 
 template<class ctype, int mydim, int cdim>
 class LagrangeInterpolator {
-  protected:
+public:
+
+	/***********************************************************************************/
+	/*  Type definitions                                                               */
+	/***********************************************************************************/
+
     static const int mydimension= mydim;
     static const int coorddimension = cdim;
 
@@ -63,10 +68,12 @@ class LagrangeInterpolator {
     typedef std::vector<NumVector2D>                           NumVector3D;
 
     typedef std::vector<std::vector<ctype> >                   PowerVector;
-    typedef FieldVector<ctype, mydimension>                    LocalVector;
-    typedef FieldVector< ctype, coorddimension >               GlobalVector;
+    typedef FieldVector<ctype, mydimension>                    LocalCoordinate;
+    typedef FieldVector< ctype, coorddimension >               GlobalCoordinate;
     typedef Polynomial<ctype, mydimension>                     LocalPolynomial;
     typedef std::vector<LocalPolynomial>                       PolynomialVector;
+    typedef FieldVector<LocalPolynomial, mydimension>          PolynomialLocalCoordinate;
+    typedef FieldVector<LocalPolynomial, coorddimension>       PolynomialGlobalCoordinate;
     typedef typename Dune::PolynomialTraits<ctype>::Monomial   Monomial;
 
     typedef Dune::ReferenceElement< ctype, mydimension >       ReferenceElement;
@@ -75,9 +82,13 @@ class LagrangeInterpolator {
     const ReferenceElement *refElement_;
     InterpolatoryOrderType order_;
 
-    std::vector<GlobalVector> point_;
+    std::vector<GlobalCoordinate> point_;
 
-  public:
+
+
+	/***********************************************************************************/
+	/*  Methods                                                                        */
+	/***********************************************************************************/
 
     /** \brief Empty constructor. Used mostly as a patch, please use the other two constructors for actual interpolators */
     LagrangeInterpolator() {}
@@ -92,7 +103,7 @@ class LagrangeInterpolator {
      */
     LagrangeInterpolator (
     		const ReferenceElement &refElement,
-    		const std::vector<GlobalVector> & point,
+    		const std::vector<GlobalCoordinate> & point,
     		InterpolatoryOrderType order) :
         refElement_( &refElement ),
         point_(point)
@@ -110,7 +121,7 @@ class LagrangeInterpolator {
      */  
     LagrangeInterpolator (
     		Dune::GeometryType gt,
-    		const std::vector<GlobalVector> & point,
+    		const std::vector<GlobalCoordinate> & point,
     		InterpolatoryOrderType order) :
         refElement_( &ReferenceElements::general( gt ) ),
         point_(point)
@@ -137,13 +148,13 @@ class LagrangeInterpolator {
     /** \brief Coordinate of the interpolatory point_
      *  \param[in]  i	interpolatory vertex internal index
      */
-    GlobalVector vertex(InternalIndexType vertexIndex) const {
+    GlobalCoordinate vertex(InternalIndexType vertexIndex) const {
     	assert(vertexIndex < dofPerOrder());
     	return point_[vertexIndex];
     }
 
     /** \brief Coordinates of all interpolatory points */
-    std::vector<GlobalVector> vertexSet() const { return point_; }
+    std::vector<GlobalCoordinate> vertexSet() const { return point_; }
 
     /** \brief Internal vertex index of a corner in the interpolatory vertex vector
      *  \param[in]  cornerLinearIndex	index of a corner wrt set of corners of the entity
@@ -156,7 +167,7 @@ class LagrangeInterpolator {
     /** \brief Coordinate of a corner, given corner index
      *  \param[in]  cornerLinearIndex	index of a corner wrt set of corners of the entity
      */
-    GlobalVector corner(InternalIndexType cornerLinearIndex) const {return vertex(cornerIndex(cornerLinearIndex)); }
+    GlobalCoordinate corner(InternalIndexType cornerLinearIndex) const {return vertex(cornerIndex(cornerLinearIndex)); }
 
     /** \brief Number of corners of this element */
     int nCorner() const { return refElement_->size(mydim); }
@@ -173,7 +184,7 @@ class LagrangeInterpolator {
      * 
      *  note: there is one lagrange polynomial corresponding to each interpolatory vertex, therefore it makes sense to have the same index for polynomials and vertices
      */
-    double lagrangePolynomial(InternalIndexType vertexIndex, const LocalVector &local) const
+    double lagrangePolynomial(InternalIndexType vertexIndex, const LocalCoordinate &local) const
     {
     	PowerVector pw = powerVector(local);
     	return lagrangePolynomial(vertexIndex, pw);
@@ -184,7 +195,7 @@ class LagrangeInterpolator {
      * 
      *  note: the map is given by linear superposition of lagrange polynomials with interpolatory vertex coordinates
      */
-    GlobalVector global(const LocalVector &local) const
+    GlobalCoordinate global(const LocalCoordinate &local) const
     {
     	// In case of 0-dim geometry, a 0-dim vector is mapped to a single point defining the geometry
     	if (mydim == 0) { return point_[0]; }
@@ -192,7 +203,7 @@ class LagrangeInterpolator {
     	// Pre-compute all monomials used in computation to save time
     	NumVector1D M = hierarchicMonomial(local);
 
-        GlobalVector rez(0.0);
+        GlobalCoordinate rez(0.0);
         //for (int j = 0; j < coorddimension; j++) { rez[j] = 0; }
 
         for (int i = 0; i < dofPerOrder(); i++)
@@ -204,7 +215,7 @@ class LagrangeInterpolator {
     }
 
     /** \brief  Analytic map from local to global coordinates, given explicitly by the polynomial class  */
-    PolynomialVector interpolatoryVectorAnalytical() const {
+    PolynomialGlobalCoordinate interpolatoryVectorAnalytical() const {
         if (!type().isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: interpolatoryVectorAnalytical() only implemented for Simplex geometries at the moment"); }
 
         return interpolatoryVectorAnalyticalSimplex();
@@ -231,7 +242,7 @@ class LagrangeInterpolator {
 
         std::vector<InternalIndexType> subentityIndex = Dune::CurvilinearGeometryHelper::subentityInternalCoordinateSet<ctype, mydim>(type(), order_, mydim - subdim, subentityNo);
 
-        std::vector<GlobalVector> subentityPoint;
+        std::vector<GlobalCoordinate> subentityPoint;
         for (int i = 0; i < subentityIndex.size(); i++)  { subentityPoint.push_back(point_[subentityIndex[i]]); }
 
         Dune::GeometryType subentityType;
@@ -249,7 +260,7 @@ class LagrangeInterpolator {
     // 1D: 1, x, x^2, x^3, ...
     // 2D: 1, x, y, x^2, xy, y^2, x^3, x^2y, xy^2, y^3, ...
     // 3D: 1, x, y, z, x^2, xy, xz, y^2, yz, z^2, x^3, x^2y, x^2z, xy^2, xyz, xz^2, y^3, y^2z yz^2, z^3, ...
-    NumVector1D hierarchicMonomial(const LocalVector &local) const
+    NumVector1D hierarchicMonomial(const LocalCoordinate &local) const
 	{
     	NumVector1D rez(1, 1.0);
 
@@ -633,15 +644,15 @@ class LagrangeInterpolator {
 
 
     /** \brief  Analytic map from local to global coordinates, given explicitly by the polynomial class. Implementation for simplex  */
-    PolynomialVector interpolatoryVectorAnalyticalSimplex() const {
+    PolynomialGlobalCoordinate interpolatoryVectorAnalyticalSimplex() const {
         int dof = dofPerOrder();
-        PolynomialVector rez;
+        PolynomialGlobalCoordinate rez;
 
         // Specialization for points - just return a constant polynomial vector
     	if (mydim == 0) {
     		for (int d = 0; d < coorddimension; d++)
     		{
-    			rez.push_back(LocalPolynomial(Monomial(point_[0][d], std::vector<int>())));
+    			rez[d] = LocalPolynomial(Monomial(point_[0][d], std::vector<int>()));
     		}
     		return rez;
     	}
@@ -651,7 +662,7 @@ class LagrangeInterpolator {
 
         // Step 0. Construct an interpolatory grid over the element
         IntegerCoordinateVector simplexPoints = Dune::CurvilinearGeometryHelper::simplexGridEnumerate<mydim>(order_);
-        std::vector<LocalVector> localCoordinateSet = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<ctype, mydim>(simplexPoints, order_);
+        std::vector<LocalCoordinate> localCoordinateSet = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<ctype, mydim>(simplexPoints, order_);
 
         // Step 1. Construct monomial basis and set of local coordinates
         for (int i = 0; i < simplexPoints.size(); i++)
@@ -694,9 +705,8 @@ class LagrangeInterpolator {
                 tmpPoly.axpy(lagrange_basis[i], point_[i][d]);
             }
 
-            rez.push_back(tmpPoly);
-            // Remove all terms that are insignificantly small
-            rez[d].cleanUp();
+            rez[d] = tmpPoly;  // Write this global coordinate to a vector
+            rez[d].cleanUp();  // Remove all terms that are insignificantly small
         }
 
         return rez;

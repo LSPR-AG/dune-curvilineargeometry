@@ -26,20 +26,17 @@
 
 using namespace Dune;
 
-typedef FieldVector< double, 1 > FieldVector1D;
-typedef FieldVector< double, 2 > FieldVector2D;
-typedef FieldVector< double, 3 > FieldVector3D;
+static const int DIM1D = 1;
+static const int DIM2D = 2;
+static const int DIM3D = 3;
+
+typedef FieldVector< double, DIM1D > FieldVector1D;
+typedef FieldVector< double, DIM2D > FieldVector2D;
+typedef FieldVector< double, DIM3D > FieldVector3D;
 
 typedef std::vector<FieldVector1D> FieldVectorVector1D;
 typedef std::vector<FieldVector2D> FieldVectorVector2D;
 typedef std::vector<FieldVector3D> FieldVectorVector3D;
-
-typedef Polynomial<double, 1> Polynomial1D;
-typedef Polynomial<double, 2> Polynomial2D;
-typedef Polynomial<double, 3> Polynomial3D;
-typedef std::vector<Polynomial1D> PolynomialVector1D;
-typedef std::vector<Polynomial2D> PolynomialVector2D;
-typedef std::vector<Polynomial3D> PolynomialVector3D;
 
 
 
@@ -54,7 +51,7 @@ std::vector<FieldVector< double, dim > > sampleRandom(int sampleNo) {
 
 // Generates set of coordinates randomly (uniformly) sampled over an edge
 template <>
-FieldVectorVector1D sampleRandom<1>(int sampleNo) {
+FieldVectorVector1D sampleRandom<DIM1D>(int sampleNo) {
     FieldVectorVector1D rez;
 
     for (int i = 0; i < sampleNo; i++)
@@ -68,7 +65,7 @@ FieldVectorVector1D sampleRandom<1>(int sampleNo) {
 
 // Generates set of coordinates randomly (uniformly) sampled over a triangle
 template <>
-FieldVectorVector2D sampleRandom<2>(int sampleNo) {
+FieldVectorVector2D sampleRandom<DIM2D>(int sampleNo) {
     FieldVectorVector2D rez;
 
     for (int i = 0; i < sampleNo; i++)
@@ -87,7 +84,7 @@ FieldVectorVector2D sampleRandom<2>(int sampleNo) {
 
 // Generates set of coordinates randomly (uniformly) sampled over a tetrahedron
 template <>
-FieldVectorVector3D sampleRandom<3>(int sampleNo) {
+FieldVectorVector3D sampleRandom<DIM3D>(int sampleNo) {
     FieldVectorVector3D rez;
 
     for (int i = 0; i < sampleNo; i++)
@@ -110,44 +107,62 @@ FieldVectorVector3D sampleRandom<3>(int sampleNo) {
     return rez;
 }
 
+
+
+
 // Evaluates a given vector function for a given vector of input coordinates, returns a vector of output coordinates
-template <int dim, int dimworld, typename Functor>
-std::vector<FieldVector< double, dimworld > > evaluateFunction(
-        std::vector<FieldVector< double, dim > > & localsample,
-        Functor f )
+template <typename Interpolator>
+struct FunctionEvaluator
 {
-    std::vector<FieldVector< double, dimworld > > rez;
-    for (int i = 0; i < localsample.size(); i++) {rez.push_back(f(localsample[i])); }
-    return rez;
-}
+	typedef std::vector<typename Interpolator::LocalCoordinate >   LocalCoordinateSet;
+	typedef std::vector<typename Interpolator::GlobalCoordinate >  GlobalCoordinateSet;
+
+	template<typename Functor>
+	static GlobalCoordinateSet eval(const LocalCoordinateSet & localsample, const Functor & f)
+	{
+		GlobalCoordinateSet rez;
+	    for (int i = 0; i < localsample.size(); i++) {rez.push_back(f(localsample[i])); }
+	    return rez;
+	}
+};
 
 // Evaluates an elementInterpolator for a given vector of input coordinates, returns a vector of output coordinates
-template <int dim, int dimworld>
-std::vector<FieldVector< double, dimworld > > evaluateInterpolatorNumerical(
-        std::vector<FieldVector< double, dim > > & localsample,
-        LagrangeInterpolator<double, dim, dimworld> & interp )
+template <typename Interpolator>
+struct InterpolatorEvaluator
 {
-    std::vector<FieldVector< double, dimworld > > rez;
-    for (int i = 0; i < localsample.size(); i++) {rez.push_back(interp.global(localsample[i])); }
-    return rez;
-}
+	typedef std::vector<typename Interpolator::LocalCoordinate >   LocalCoordinateSet;
+	typedef std::vector<typename Interpolator::GlobalCoordinate >  GlobalCoordinateSet;
+
+	static GlobalCoordinateSet eval(const LocalCoordinateSet & localsample, const Interpolator & interp)
+	{
+		GlobalCoordinateSet rez;
+	    for (int i = 0; i < localsample.size(); i++) {rez.push_back(interp.global(localsample[i])); }
+	    return rez;
+	}
+};
 
 // Evaluates a vector of polynomials for a given vector of input coordinates, returns a vector of output coordinates
-template <int dim, int dimworld>
-std::vector<FieldVector< double, dimworld > > evaluatePolynomialVector(
-        std::vector< FieldVector< double, dim > > & localsample,
-        std::vector< Polynomial<double, dim> >& polynomialvector )
+template <typename Interpolator>
+struct PolynomialCoordEvaluator
 {
-    std::vector<FieldVector< double, dimworld > > rez;
-    for (int i = 0; i < localsample.size(); i++) {
-        FieldVector< double, dimworld > tmp;
-        for (int j = 0; j < dimworld; j++) {
-            tmp[j] = polynomialvector[j].evaluate(localsample[i]);
-        }
-        rez.push_back(tmp);
-    }
-    return rez;
-}
+	typedef typename  Interpolator::GlobalCoordinate               GlobalCoordinate;
+	typedef std::vector<typename Interpolator::LocalCoordinate >   LocalCoordinateSet;
+	typedef std::vector<typename Interpolator::GlobalCoordinate >  GlobalCoordinateSet;
+	typedef typename Interpolator::PolynomialGlobalCoordinate      PolynomialGlobalCoordinate;
+
+	static GlobalCoordinateSet eval(const LocalCoordinateSet & localsample, const PolynomialGlobalCoordinate & polynomialvector)
+	{
+		GlobalCoordinateSet rez;
+	    for (int i = 0; i < localsample.size(); i++) {
+	    	GlobalCoordinate tmp;
+	        for (int j = 0; j < Interpolator::coorddimension; j++)  { tmp[j] = polynomialvector[j].evaluate(localsample[i]); }
+	        rez.push_back(tmp);
+	    }
+	    return rez;
+	}
+};
+
+
 
 // Initializes a field vector, such that it can be done in one line in main code
 FieldVector1D initFieldVector(double x) {
@@ -201,155 +216,84 @@ void print(std::vector<FieldVector< double, dim >> xVec) {
 
 
 
-// Runs a test to compare how well the exact edge given by f
+
+
+// Runs a test to compare how well the exact geometry given by f
 // is approximated by Lagrange interpolation. Also checks if
 // analytical and numerical lagrange interpolation give the same
 // result which they should
 
 // TODO: Implement Real-Numerical in LagrangeInterpolation, then add to this test
-template <typename Functor>
-void edgeTest3D(Functor f)
+template <int mydim, int cdim, typename Functor>
+void InterpolatorConsistencyTest(Functor f)
 {
-    LagrangeInterpolator<double, 1, 3> interps[5];
-    std::vector<Polynomial<double, 1> > analytics[5];
+	static const int nTests = 5;
+	static const int nPoints = 20;
 
-    FieldVectorVector1D random1D_20 = sampleRandom<1>(20);
-    FieldVectorVector3D sample_real_3D_line_p20_randomtest = evaluateFunction<1,3>(random1D_20, f);
+	typedef LagrangeInterpolator<double, mydim, cdim>           Interpolator;
+	typedef typename Interpolator::LocalCoordinate              LocalCoordinate;
+	typedef typename Interpolator::GlobalCoordinate             GlobalCoordinate;
+	typedef typename Interpolator::PolynomialGlobalCoordinate   PolynomialGlobalCoordinate;
 
-    Dune::GeometryType edgeGeometry;   edgeGeometry.makeSimplex(1);
+	typedef typename std::vector<LocalCoordinate>               LocalCoordinateSet;
+	typedef typename std::vector<GlobalCoordinate>              GlobalCoordinateSet;
 
-    std::cout << "*********************** Start Edge Test *************************" << std::endl;
-    for (int i = 0; i < 5; i++)
+	typedef FunctionEvaluator<Interpolator>         FunctionEvaluator;
+	typedef InterpolatorEvaluator<Interpolator>     InterpolatorEvaluator;
+	typedef PolynomialCoordEvaluator<Interpolator>  PolynomialCoordEvaluator;
+
+	Interpolator                interps[nTests];
+	PolynomialGlobalCoordinate  analytics[nTests];
+
+    Dune::GeometryType geomType;   geomType.makeSimplex(mydim);
+
+
+    std::cout << "*********************** Start " << geomType << " Test *************************" << std::endl;
+
+    // Test mapping for actual interpolatory points
+    for (int i = 0; i < nTests; i++)
     {
-        FieldVectorVector1D grid1D = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, 1>(i+1);
-        FieldVectorVector3D sample_real_3D_line_gridtest = evaluateFunction<1,3, Functor>(grid1D, f);
-        interps[i] = LagrangeInterpolator<double, 1, 3>(edgeGeometry, sample_real_3D_line_gridtest, i + 1);
+    	LocalCoordinateSet  regularRefGridVertexLocal  = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, mydim>(i+1);
+    	GlobalCoordinateSet regularRefGridVertexGlobal = FunctionEvaluator::eval(regularRefGridVertexLocal, f);
+        interps[i]   = Interpolator(geomType, regularRefGridVertexGlobal, i + 1);
         analytics[i] = interps[i].interpolatoryVectorAnalytical();
 
-        FieldVectorVector3D sample_numerical_3D_line_gridtest = evaluateInterpolatorNumerical<1,3>(grid1D, interps[i]);
-        FieldVectorVector3D sample_analytical_3D_line_gridtest = evaluatePolynomialVector<1,3>(grid1D, analytics[i]);
+        GlobalCoordinateSet interpolatorPredictionGlobal = InterpolatorEvaluator::eval(regularRefGridVertexLocal, interps[i]);
+        GlobalCoordinateSet polynomialPredictionGlobal   = PolynomialCoordEvaluator::eval(regularRefGridVertexLocal, analytics[i]);
 
-        std::cout << "Surface test - gridsample - order " << i + 1;
-        std::cout << ", Real-Numerical error: " << norm2sqVector<3>(sample_real_3D_line_gridtest, sample_numerical_3D_line_gridtest);
-        std::cout << ", Numerical-Analytical error: " << norm2sqVector<3>(sample_numerical_3D_line_gridtest, sample_analytical_3D_line_gridtest) << std::endl;
+        std::cout << "Gridsample> order: " << i + 1;
+        std::cout << ", Real-Numerical error: " << norm2sqVector<cdim>(regularRefGridVertexGlobal, interpolatorPredictionGlobal);
+        std::cout << ", Numerical-Analytical error: " << norm2sqVector<cdim>(interpolatorPredictionGlobal, polynomialPredictionGlobal) << std::endl;
     }
 
-
-    for (int i = 0; i < 5; i++)
+    // Test mapping for random points within reference element
+    LocalCoordinateSet  randomPointSampleLocal  = sampleRandom<mydim>(nPoints);
+    GlobalCoordinateSet randomPointSampleGlobal = FunctionEvaluator::eval(randomPointSampleLocal, f);
+    for (int i = 0; i < nTests; i++)
     {
-        FieldVectorVector3D sample_numerical_3D_line_randomtest = evaluateInterpolatorNumerical<1,3>(random1D_20, interps[i]);
-        FieldVectorVector3D sample_analytical_3D_line_randomtest = evaluatePolynomialVector<1,3>(random1D_20, analytics[i]);
+    	GlobalCoordinateSet interpolatorPredictionGlobal = InterpolatorEvaluator::eval(randomPointSampleLocal, interps[i]);
+    	GlobalCoordinateSet polynomialPredictionGlobal   = PolynomialCoordEvaluator::eval(randomPointSampleLocal, analytics[i]);
 
-        std::cout << "Edge test - randomsample - pointnumber 20";
-        std::cout << ", Real-Numerical error: " << norm2sqVector<3>(sample_real_3D_line_p20_randomtest, sample_numerical_3D_line_randomtest);
-        std::cout << ", Numerical-Analytical error: " << norm2sqVector<3>(sample_numerical_3D_line_randomtest, sample_analytical_3D_line_randomtest) << std::endl;
+        std::cout << "Random sample> pointnumber: " << nPoints;
+        std::cout << ", Real-Numerical error: " << norm2sqVector<cdim>(randomPointSampleGlobal, interpolatorPredictionGlobal);
+        std::cout << ", Numerical-Analytical error: " << norm2sqVector<cdim>(interpolatorPredictionGlobal, polynomialPredictionGlobal) << std::endl;
     }
-    std::cout << "*********************** Finish Edge Test *************************" << std::endl << std::endl;
+    std::cout << "*********************** Finish " << geomType << " Test *************************" << std::endl << std::endl;
 }
 
 
 
-// Runs a test to compare how well the exact surface given by f
-// is approximated by Lagrange interpolation. Also checks if
-// analytical and numerical lagrange interpolation give the same
-// result which they should
-template <typename Functor>
-void surfaceTest3D(Functor f)
-{
-    LagrangeInterpolator<double, 2, 3> interps[5];
-    std::vector<Polynomial<double, 2> > analytics[5];
+struct f3dLine1     { FieldVector3D operator()(const FieldVector1D & x) const { return initFieldVector(1, 0, 0); }  };
+struct f3dLine2     { FieldVector3D operator()(const FieldVector1D & x) const { return initFieldVector(x[0], 0, 0); }  };
+struct f3dLine3     { FieldVector3D operator()(const FieldVector1D & x) const { return initFieldVector(x[0] * x[0], x[0], 1); }  };
+struct f3dLine4     { FieldVector3D operator()(const FieldVector1D & x) const { return initFieldVector(x[0] * x[0] * x[0], x[0], 1); }  };
 
-    FieldVectorVector2D random2D_20 = sampleRandom<2>(20);
-    FieldVectorVector3D sample_real_3D_surface_p20_randomtest = evaluateFunction<2,3, Functor>(random2D_20, f);
+struct f3dSurface1  { FieldVector3D operator()(const FieldVector2D & x) const { return initFieldVector(x[0], x[1], 0); }  };
+struct f3dSurface2  { FieldVector3D operator()(const FieldVector2D & x) const { return initFieldVector(x[0], x[1], x[0]); }  };
+struct f3dSurface3  { FieldVector3D operator()(const FieldVector2D & x) const { return initFieldVector(x[0], x[1], x[0] * x[1]); }  };
 
-    Dune::GeometryType triangleGeometry;   triangleGeometry.makeSimplex(2);
-
-    std::cout << "*********************** Start Surface Test *************************" << std::endl;
-    for (int i = 0; i < 5; i++)
-    {
-        FieldVectorVector2D grid2D = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, 2>(i+1);
-        FieldVectorVector3D sample_real_3D_surface_gridtest = evaluateFunction<2,3>(grid2D, f);
-        interps[i] = LagrangeInterpolator<double, 2, 3>(triangleGeometry, sample_real_3D_surface_gridtest, i + 1);
-        analytics[i] = interps[i].interpolatoryVectorAnalytical();
-
-        FieldVectorVector3D sample_numerical_3D_surface_gridtest = evaluateInterpolatorNumerical<2,3>(grid2D, interps[i]);
-        FieldVectorVector3D sample_analytical_3D_surface_gridtest = evaluatePolynomialVector<2,3>(grid2D, analytics[i]);
-
-        std::cout << "Surface test - gridsample - order " << i + 1;
-        std::cout << ", Real-Numerical error: " << norm2sqVector<3>(sample_real_3D_surface_gridtest, sample_numerical_3D_surface_gridtest);
-        std::cout << ", Numerical-Analytical error: " << norm2sqVector<3>(sample_numerical_3D_surface_gridtest, sample_analytical_3D_surface_gridtest) << std::endl;
-    }
-
-
-    for (int i = 0; i < 5; i++)
-    {
-        FieldVectorVector3D sample_numerical_3D_surface_randomtest = evaluateInterpolatorNumerical<2,3>(random2D_20, interps[i]);
-        FieldVectorVector3D sample_analytical_3D_surface_randomtest = evaluatePolynomialVector<2,3>(random2D_20, analytics[i]);
-
-        std::cout << "Surface test - randomsample - pointnumber 20";
-        std::cout << ", Real-Numerical error: " << norm2sqVector<3>(sample_real_3D_surface_p20_randomtest, sample_numerical_3D_surface_randomtest);
-        std::cout << ", Numerical-Analytical error: " << norm2sqVector<3>(sample_numerical_3D_surface_randomtest, sample_analytical_3D_surface_randomtest) << std::endl;
-    }
-    std::cout << "*********************** Finish Surface Test *************************" << std::endl << std::endl;
-}
-
-// Runs a test to compare how well the exact volume given by *f
-// is approximated by Lagrange interpolation. Also checks if
-// analytical and numerical lagrange interpolation give the same
-// result which they should
-template <typename Functor>
-void volumeTest3D(Functor f)
-{
-    LagrangeInterpolator<double, 3, 3> interps[5];
-    std::vector<Polynomial<double, 3> > analytics[5];
-
-    FieldVectorVector3D random3D_20 = sampleRandom<3>(20);
-    FieldVectorVector3D sample_real_3D_volume_p20_randomtest = evaluateFunction<3,3, Functor>(random3D_20, f);
-
-    Dune::GeometryType tetrahedronGeometry;   tetrahedronGeometry.makeSimplex(3);
-
-    std::cout << "*********************** Start Volume Test *************************" << std::endl;
-    for (int i = 0; i < 5; i++)
-    {
-        FieldVectorVector3D grid3D = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, 3>(i+1);
-        FieldVectorVector3D sample_real_3D_volume_gridtest = evaluateFunction<3,3>(grid3D, f);
-        interps[i] = LagrangeInterpolator<double, 3, 3>(tetrahedronGeometry, sample_real_3D_volume_gridtest, i + 1);
-        analytics[i] = interps[i].interpolatoryVectorAnalytical();
-
-        FieldVectorVector3D sample_numerical_3D_volume_gridtest = evaluateInterpolatorNumerical<3,3>(grid3D, interps[i]);
-        FieldVectorVector3D sample_analytical_3D_volume_gridtest = evaluatePolynomialVector<3,3>(grid3D, analytics[i]);
-
-        std::cout << "Volume test - gridsample - order " << i + 1;
-        std::cout << ", Real-Numerical error: "       << norm2sqVector<3>(sample_real_3D_volume_gridtest, sample_numerical_3D_volume_gridtest);
-        std::cout << ", Numerical-Analytical error: " << norm2sqVector<3>(sample_numerical_3D_volume_gridtest, sample_analytical_3D_volume_gridtest) << std::endl;
-    }
-
-
-    for (int i = 0; i < 5; i++)
-    {
-        FieldVectorVector3D sample_numerical_3D_volume_randomtest = evaluateInterpolatorNumerical<3,3>(random3D_20, interps[i]);
-        FieldVectorVector3D sample_analytical_3D_volume_randomtest = evaluatePolynomialVector<3,3>(random3D_20, analytics[i]);
-
-        std::cout << "Volume test - randomsample - pointnumber 20";
-        std::cout << ", Real-Numerical error: "       << norm2sqVector<3>(sample_real_3D_volume_p20_randomtest, sample_numerical_3D_volume_randomtest);
-        std::cout << ", Numerical-Analytical error: " << norm2sqVector<3>(sample_numerical_3D_volume_randomtest, sample_analytical_3D_volume_randomtest) << std::endl;
-    }
-    std::cout << "*********************** End Volume Test *************************" << std::endl << std::endl;
-}
-
-
-
-struct f3dLine1 {   FieldVector3D operator()(const FieldVector1D & x) { return initFieldVector(1, 0, 0); }  };
-struct f3dLine2 {   FieldVector3D operator()(const FieldVector1D & x) { return initFieldVector(x[0], 0, 0); }  };
-struct f3dLine3 {   FieldVector3D operator()(const FieldVector1D & x) { return initFieldVector(x[0] * x[0], x[0], 1); }  };
-struct f3dLine4 {   FieldVector3D operator()(const FieldVector1D & x) { return initFieldVector(x[0] * x[0] * x[0], x[0], 1); }  };
-
-struct f3dSurface1 {   FieldVector3D operator()(const FieldVector2D & x) { return initFieldVector(x[0], x[1], 0); }  };
-struct f3dSurface2 {   FieldVector3D operator()(const FieldVector2D & x) { return initFieldVector(x[0], x[1], x[0]); }  };
-struct f3dSurface3 {   FieldVector3D operator()(const FieldVector2D & x) { return initFieldVector(x[0], x[1], x[0] * x[1]); }  };
-
-struct f3dVolume1 {   FieldVector3D operator()(const FieldVector3D & x) { return initFieldVector(x[0], x[1], x[0] * x[1] * x[2]); }  };
-struct f3dVolume2 {   FieldVector3D operator()(const FieldVector3D & x) { return initFieldVector(4 * x[0] * x[0] * x[0] * x[0] , x[1] + 3*x[2], x[0] * x[1] * x[2]); }  };
+struct f3dVolume1   { FieldVector3D operator()(const FieldVector3D & x) const { return initFieldVector(x[0], x[1], x[0] * x[1] * x[2]); }  };
+struct f3dVolume2   { FieldVector3D operator()(const FieldVector3D & x) const { return initFieldVector(4 * x[0] * x[0] * x[0] * x[0] , x[1] + 3*x[2], x[0] * x[1] * x[2]); }  };
 
 
 
@@ -357,13 +301,13 @@ struct f3dVolume2 {   FieldVector3D operator()(const FieldVector3D & x) { return
 int main() {
     srand (time(NULL));
 
-    edgeTest3D(f3dLine1());
-    edgeTest3D(f3dLine2());
-    edgeTest3D(f3dLine3());
-    edgeTest3D(f3dLine4());
-    surfaceTest3D(f3dSurface1());
-    surfaceTest3D(f3dSurface2());
-    surfaceTest3D(f3dSurface3());
-    volumeTest3D(f3dVolume1());
-    volumeTest3D(f3dVolume2());
+    InterpolatorConsistencyTest<DIM1D, DIM3D, f3dLine1>(f3dLine1());
+    InterpolatorConsistencyTest<DIM1D, DIM3D, f3dLine2>(f3dLine2());
+    InterpolatorConsistencyTest<DIM1D, DIM3D, f3dLine3>(f3dLine3());
+    InterpolatorConsistencyTest<DIM1D, DIM3D, f3dLine4>(f3dLine4());
+    InterpolatorConsistencyTest<DIM2D, DIM3D, f3dSurface1>(f3dSurface1());
+    InterpolatorConsistencyTest<DIM2D, DIM3D, f3dSurface2>(f3dSurface2());
+    InterpolatorConsistencyTest<DIM2D, DIM3D, f3dSurface3>(f3dSurface3());
+    InterpolatorConsistencyTest<DIM3D, DIM3D, f3dVolume1>(f3dVolume1());
+    InterpolatorConsistencyTest<DIM3D, DIM3D, f3dVolume2>(f3dVolume2());
 }

@@ -165,39 +165,6 @@ FieldVector3D initFieldVector(double x, double y, double z) {
     return rez;
 }
 
-/*
-template<class ctype, int mydim>
-Dune::FieldVector< ctype, mydim > localCorner(int i)
-{
-    Dune::FieldVector< ctype, mydim > rez;
-
-    switch (mydim)
-    {
-    case 1:
-        switch (i)
-        {
-        case 0: rez[0] = 0.0;  break;
-        case 1: rez[0] = 1.0;  break;
-        } break;
-    case 2:
-        switch (i)
-        {
-        case 0: rez[0] = 0.0;  rez[1] = 0.0;  break;
-        case 1: rez[0] = 1.0;  rez[1] = 0.0;  break;
-        case 2: rez[0] = 0.0;  rez[1] = 1.0;  break;
-        } break;
-    case 3:
-        switch (i)
-        {
-        case 0: rez[0] = 0.0;  rez[1] = 0.0;  rez[2] = 0.0;  break;
-        case 1: rez[0] = 1.0;  rez[1] = 0.0;  rez[2] = 0.0;  break;
-        case 2: rez[0] = 0.0;  rez[1] = 1.0;  rez[2] = 0.0;  break;
-        case 3: rez[0] = 0.0;  rez[1] = 0.0;  rez[2] = 1.0;  break;
-        } break;
-    }
-    return rez;
-}
-*/
 
 // ************************************************************************************************
 // IMPLEMENTING FUNCTORS - EXAMPLE LOCAL-TO-GLOBAL MAPS
@@ -258,78 +225,69 @@ template<> struct myFunctorNonlinear1<double, 3, 3> : public Base33  { Base33::R
 // ************************************************************************************************
 
 // Returns one of 5 possible polynomials such that polynomial order = index
-template<class ctype, int mydim>
-Polynomial<ctype, mydim> BasisPolynomial1D(int index)
+template <class CurvGeom>
+typename CurvGeom::LocalPolynomial BasisPolynomial(int index)
 {
-    Polynomial<ctype, mydim> rez(Monomial(1, 0));
+	typedef typename CurvGeom::LocalPolynomial  LocalPolynomial;
 
-    if (index > 0) { rez += Monomial(2, 1); }
-    if (index > 1) { rez += Monomial(3, 2); }
-    if (index > 2) { rez += Monomial(4, 3); }
-    if (index > 3) { rez += Monomial(5, 4); }
-    if (index > 4) { rez += Monomial(6, 5); }
-
-    return rez;
-}
-
-// Returns one of 5 possible polynomials such that polynomial order = index
-template<class ctype, int mydim>
-Polynomial<ctype, mydim> BasisPolynomial2D(int index)
-{
-    Polynomial<ctype, mydim> rez(Monomial(1, 0, 0));
-
-    if (index > 0) { rez += Monomial(2, 1, 0);  rez += Monomial(2, 0, 1); }
-    if (index > 1) { rez += Monomial(3, 2, 0);  rez += Monomial(3, 0, 2); rez += Monomial(1, 1, 1); }
-    if (index > 2) { rez += Monomial(4, 3, 0);  rez += Monomial(4, 0, 3); rez += Monomial(1, 1, 2); }
-    if (index > 3) { rez += Monomial(5, 4, 0);  rez += Monomial(5, 0, 4); rez += Monomial(1, 1, 3); }
-    if (index > 4) { rez += Monomial(6, 5, 0);  rez += Monomial(6, 0, 5); rez += Monomial(1, 1, 4); }
-
-    return rez;
-}
-
-// Returns one of 5 possible polynomials such that polynomial order = index
-template<class ctype, int mydim>
-Polynomial<ctype, mydim> BasisPolynomial3D(int index)
-{
-    Polynomial<ctype, mydim> rez(Monomial(1, 0, 0, 0));
-
-    if (index > 0) { rez += Monomial(2, 1, 0, 0);  rez += Monomial(2, 0, 1, 0);  rez += Monomial(2, 0, 0, 1); }
-    if (index > 1) { rez += Monomial(3, 2, 0, 0);  rez += Monomial(3, 0, 2, 0);  rez += Monomial(3, 0, 0, 2); rez += Monomial(1, 1, 1, 0); }
-    if (index > 2) { rez += Monomial(4, 3, 0, 0);  rez += Monomial(4, 0, 3, 0);  rez += Monomial(4, 0, 0, 3); rez += Monomial(1, 1, 1, 1); }
-    if (index > 3) { rez += Monomial(5, 4, 0, 0);  rez += Monomial(5, 0, 4, 0);  rez += Monomial(5, 0, 0, 4); rez += Monomial(1, 1, 1, 2); }
-    if (index > 4) { rez += Monomial(6, 5, 0, 0);  rez += Monomial(6, 0, 5, 0);  rez += Monomial(6, 0, 0, 5); rez += Monomial(1, 1, 1, 3); }
-
-    return rez;
-}
-
-template<class ctype, int mydim>
-Polynomial<ctype, mydim> BasisPolynomial(int index)
-{
-    switch (mydim)
+    switch (CurvGeom::mydimension)
     {
-    case 1: return BasisPolynomial1D<ctype, mydim>(index);  break;
-    case 2: return BasisPolynomial2D<ctype, mydim>(index);  break;
-    case 3: return BasisPolynomial3D<ctype, mydim>(index);  break;
+    case 1:
+    {
+    	LocalPolynomial rez(Monomial(1, 0));
+        if (index > 0) { rez += Monomial(2, 1); }
+        if (index > 1) { rez += Monomial(3, 2); }
+        if (index > 2) { rez += Monomial(4, 3); }
+        if (index > 3) { rez += Monomial(5, 4); }
+        if (index > 4) { rez += Monomial(6, 5); }
+        return rez;
+    }  break;
+    case 2:
+    {
+    	LocalPolynomial rez(Monomial(1, 0, 0));
+
+        if (index > 0) { rez += Monomial(2, 1, 0);  rez += Monomial(2, 0, 1); }
+        if (index > 1) { rez += Monomial(3, 2, 0);  rez += Monomial(3, 0, 2); rez += Monomial(1, 1, 1); }
+        if (index > 2) { rez += Monomial(4, 3, 0);  rez += Monomial(4, 0, 3); rez += Monomial(1, 1, 2); }
+        if (index > 3) { rez += Monomial(5, 4, 0);  rez += Monomial(5, 0, 4); rez += Monomial(1, 1, 3); }
+        if (index > 4) { rez += Monomial(6, 5, 0);  rez += Monomial(6, 0, 5); rez += Monomial(1, 1, 4); }
+
+        return rez;
+    }  break;
+    case 3:
+    {
+    	LocalPolynomial rez(Monomial(1, 0, 0, 0));
+        if (index > 0) { rez += Monomial(2, 1, 0, 0);  rez += Monomial(2, 0, 1, 0);  rez += Monomial(2, 0, 0, 1); }
+        if (index > 1) { rez += Monomial(3, 2, 0, 0);  rez += Monomial(3, 0, 2, 0);  rez += Monomial(3, 0, 0, 2); rez += Monomial(1, 1, 1, 0); }
+        if (index > 2) { rez += Monomial(4, 3, 0, 0);  rez += Monomial(4, 0, 3, 0);  rez += Monomial(4, 0, 0, 3); rez += Monomial(1, 1, 1, 1); }
+        if (index > 3) { rez += Monomial(5, 4, 0, 0);  rez += Monomial(5, 0, 4, 0);  rez += Monomial(5, 0, 0, 4); rez += Monomial(1, 1, 1, 2); }
+        if (index > 4) { rez += Monomial(6, 5, 0, 0);  rez += Monomial(6, 0, 5, 0);  rez += Monomial(6, 0, 0, 5); rez += Monomial(1, 1, 1, 3); }
+        return rez;
+    }  break;
+    default:  DUNE_THROW(RangeError, "Unexpected mydimension");   break;
     }
 }
 
 
 // Construct a mydim+1 polynomial vector to test the Surface Dot Product Integral
-template<class ctype, int mydim>
-std::vector< Polynomial<ctype, mydim> > BasisVectorDiagonal()
+// Only for edges in 2d and faces in 3d
+template<class CurvGeom>
+typename CurvGeom::PolynomialGlobalCoordinate BasisVectorDiagonal()
 {
-    std::vector< Polynomial<ctype, mydim> > rez;
+	typedef typename CurvGeom::LocalPolynomial            LocalPolynomial;
+	typedef typename CurvGeom::PolynomialGlobalCoordinate PolyCoord;
+	PolyCoord rez;
 
-    switch (mydim)
+    switch (CurvGeom::mydimension)
     {
     case 1:
-        rez.push_back(Polynomial<ctype, mydim> (Monomial(1, 1)));
-        rez.push_back(Polynomial<ctype, mydim> (Monomial(1, 1)));
+        rez[0] = LocalPolynomial (Monomial(1, 1));
+        rez[1] = LocalPolynomial (Monomial(1, 1));
         break;
     case 2:
-        rez.push_back(Polynomial<ctype, mydim> (Monomial(1, 1, 0)));
-        rez.push_back(Polynomial<ctype, mydim> (Monomial(1, 0, 1)));
-        rez.push_back(Polynomial<ctype, mydim> (Monomial(1, 1, 1)));
+        rez[0] = LocalPolynomial (Monomial(1, 1, 0));
+        rez[1] = LocalPolynomial (Monomial(1, 0, 1));
+        rez[2] = LocalPolynomial (Monomial(1, 1, 1));
         break;
     }
 
@@ -669,6 +627,8 @@ TestStruct test06_integration(bool verbose, const SimplexGeom & simplexGeom, int
 	static const int cdim  = SimplexGeom::coorddimension;
 	static const int mydim = SimplexGeom::mydimension;
 
+	typedef typename SimplexGeom::LocalPolynomial  LocalPolynomial;
+
 	TestStruct rez(0, 0, 0.0);
 
     if (interpOrder < functionOrder) {
@@ -677,18 +637,22 @@ TestStruct test06_integration(bool verbose, const SimplexGeom & simplexGeom, int
     {
         for (int bf_ord = 0; bf_ord <= 5; bf_ord++)
         {
-            Polynomial<ctype, mydim> basisP = BasisPolynomial<ctype, mydim>(bf_ord);
+        	LocalPolynomial basisP = BasisPolynomial<SimplexGeom>(bf_ord);
 
             double int_rez  = SimplexIntegrationHelper::integrateScalar(simplexGeom, basisP, RELATIVE_TOLERANCE, ACCURACY_GOAL);
             double int_true = integralResult<mydim, cdim>(bf_ord, functType);
 
             rez.nTot_++;
             double err = fabs((int_rez - int_true) / int_true);  // NOTE: Make sure that none of the integrands amounts to zero
-            if (err > RELATIVE_TOLERANCE)  { rez.nFail_++; }     // NOTE: It is important relative error requested from the integrator is at least as good as the real relative error
-            rez.worst_ = std::max(rez.worst_, err);
+            if (err > RELATIVE_TOLERANCE)  {
+            	//std::cout << "Integrating polynomial " << basisP.to_string() << std::endl;
+            	//std::cout << "Function type "          << functType << std::endl;
+            	//std::cout << "result=" << int_rez << ", expected=" << int_true << std::endl;
+            	//DUNE_THROW(MathError, "Unexpected test fail");
 
-            //std::cout << ": Integral of order " << bf_ord << " over entity dim " << mydim << " and order " << interpOrder << " evaluated to ";
-            //std::cout << int_rez << " which has error: " << int_rez - integralResults<mydim, cdim>(bf_ord, f_type) << std::endl;
+            	rez.nFail_++;
+            }     // NOTE: It is important relative error requested from the integrator is at least as good as the real relative error
+            rez.worst_ = std::max(rez.worst_, err);
         }
     }
 
@@ -707,6 +671,7 @@ TestStruct test07_dot_integration(bool verbose, const SimplexGeom & simplexGeom,
 	typedef typename SimplexGeom::ctype  ctype;
 	static const int cdim  = SimplexGeom::coorddimension;
 	static const int mydim = SimplexGeom::mydimension;
+	typedef typename SimplexGeom::PolynomialGlobalCoordinate   PolynomialGlobalCoordinate;
 
 	TestStruct rez(0, 0, 0.0);
 
@@ -717,7 +682,7 @@ TestStruct test07_dot_integration(bool verbose, const SimplexGeom & simplexGeom,
     {
         double tmpTolerance = 1.0e-10;
 
-        std::vector<Polynomial<ctype, mydim>> basisVectorP = BasisVectorDiagonal<ctype, mydim>();
+        PolynomialGlobalCoordinate basisVectorP = BasisVectorDiagonal<SimplexGeom>();
 
         // Need a basis function which is a vector in global coordinates
         double int_rez  = SimplexIntegrationHelper::integrateAnalyticalDot(simplexGeom, basisVectorP);
@@ -750,7 +715,7 @@ bool testReport(const TestStruct & rez, std::string testname, bool verbose) {
 
 
 template<typename CurvGeom, typename Functor>
-bool SimplexTest(bool verbose, Functor f, int testIndex, int interpOrder, int functType, int functionOrder, std::string f_name)
+bool SimplexTest(bool verbose, Functor f, int testIndex, int interpOrder, int functionOrder, int functType, std::string f_name)
 {
 	if (verbose) { std::cout << " * testing order " << interpOrder << " behaviour for " << f_name << std::endl; }
 
@@ -864,12 +829,13 @@ bool SimplexTestWrapper(bool verbose)
     typedef myFunctorLinear    <double, mydim, cdim>  Flin;
     typedef myFunctorNonlinear1<double, mydim, cdim>  Fquad1;
 
-    static const int MIN_TEST = 1;
-    static const int MAX_TEST = 7;
+    static const int MIN_TEST = 1;  // FIXME 1
+    static const int MAX_TEST = 7;  // FIXME 7
     static const int N_INTERP_ORDER = 5;
 
     bool rez = true;
 
+    /*
     std::cout << "[Running CurvilinearGeometry tests..." << std::endl;
     for (int iTest = MIN_TEST; iTest <= MAX_TEST; iTest++)
     {
@@ -878,14 +844,16 @@ bool SimplexTestWrapper(bool verbose)
         for (int ord = 1; ord <= N_INTERP_ORDER; ord++)
         {
         	test_pass &= SimplexTest<CurvGeom, FiD>   (verbose, FiD(),    iTest, ord, 1, 1, "identity map");
-        	test_pass &= SimplexTest<CurvGeom, Flin>  (verbose, Flin(),   iTest, ord, 1, 1, "linear map");
-        	test_pass &= SimplexTest<CurvGeom, Fquad1>(verbose, Fquad1(), iTest, ord, 2, 2, "quadratic map");
+        	test_pass &= SimplexTest<CurvGeom, Flin>  (verbose, Flin(),   iTest, ord, 1, 2, "linear map");
+        	test_pass &= SimplexTest<CurvGeom, Fquad1>(verbose, Fquad1(), iTest, ord, 2, 3, "quadratic map");
         }
 
         if (!test_pass)  { std::cout << "--Warning: Have Failed tests" << std::endl; }
         rez &= test_pass;
     }
     std::cout << "... Finished CurvilinearGeometry tests]" << std::endl;
+
+     */
 
     std::cout << "[Running Cached CurvilinearGeometry tests..." << std::endl;
     for (int iTest = MIN_TEST; iTest <= MAX_TEST; iTest++)
@@ -894,14 +862,14 @@ bool SimplexTestWrapper(bool verbose)
         for (int ord = 1; ord <= N_INTERP_ORDER; ord++)
         {
         	test_pass_cache &= SimplexTest<CachedCurvGeom, FiD>   (verbose, FiD(),    iTest, ord, 1, 1, "identity map");
-        	test_pass_cache &= SimplexTest<CachedCurvGeom, Flin>  (verbose, Flin(),   iTest, ord, 1, 1, "linear map");
-        	test_pass_cache &= SimplexTest<CachedCurvGeom, Fquad1>(verbose, Fquad1(), iTest, ord, 2, 2, "quadratic map");
+        	test_pass_cache &= SimplexTest<CachedCurvGeom, Flin>  (verbose, Flin(),   iTest, ord, 1, 2, "linear map");
+        	test_pass_cache &= SimplexTest<CachedCurvGeom, Fquad1>(verbose, Fquad1(), iTest, ord, 2, 3, "quadratic map");
         }
 
         if (!test_pass_cache)  { std::cout << "--Warning: Have Failed tests" << std::endl; }
         rez &= test_pass_cache;
     }
-    std::cout << "... Finished CurvilinearGeometry tests]" << std::endl;
+    std::cout << "... Finished Cached CurvilinearGeometry tests]" << std::endl;
 
     return rez;
 }
