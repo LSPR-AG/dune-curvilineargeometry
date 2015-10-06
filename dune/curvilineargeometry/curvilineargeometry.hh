@@ -429,7 +429,8 @@ namespace Dune
     ctype integrationElement ( const LocalCoordinate &local ) const
     {
         PolynomialGlobalCoordinate analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
-        return integrationElement ( local, analyticalMap );
+        PolynomialJacobianTransposed polyjt = JacobianTransposeAnalytical::eval(analyticalMap);
+        return integrationElement ( local, polyjt );
     }
 
 
@@ -710,10 +711,10 @@ namespace Dune
 
 
     /** \brief Implements generalized integration element I = sqrt(det(J^T J))  */
-    ctype integrationElement ( const LocalCoordinate &local, const PolynomialGlobalCoordinate & analyticalMap ) const
+    ctype integrationElement ( const LocalCoordinate &local, const PolynomialJacobianTransposed & polyjt ) const
     {
       //assert(mydim > 0);
-      return MatrixHelper::template sqrtDetAAT< mydimension, coorddimension >( jacobianTransposed( local, analyticalMap ) );
+      return MatrixHelper::template sqrtDetAAT< mydimension, coorddimension >( jacobianTransposed( local, polyjt ) );
     }
 
 
@@ -873,7 +874,6 @@ namespace Dune
 
     ~CachedCurvilinearGeometry()
     {
-    	if (polyjt_)       { delete polyjt_; };
     	if (polyht_)       { delete polyht_; };
         if (jacDet_)       { delete jacDet_; };
         if (intElemSq_)    { delete intElemSq_; };
@@ -906,36 +906,32 @@ namespace Dune
 
     GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
-    	if (!polyjt_)  { polyjt_ = new PolynomialJacobianTransposed(JacobianTransposeAnalytical::eval(analyticalMap_)); }
-        return Base::subentityNormal(indexInInside, local, false, false, *polyjt_);
+        return Base::subentityNormal(indexInInside, local, false, false, polyjt_);
     }
 
 
     GlobalCoordinate subentityUnitNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
-    	if (!polyjt_)  { polyjt_ = new PolynomialJacobianTransposed(JacobianTransposeAnalytical::eval(analyticalMap_)); }
-        return Base::subentityNormal(indexInInside, local, true, false, *polyjt_);
+        return Base::subentityNormal(indexInInside, local, true, false, polyjt_);
     }
 
 
     GlobalCoordinate subentityIntegrationNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
     {
-    	if (!polyjt_)  { polyjt_ = new PolynomialJacobianTransposed(JacobianTransposeAnalytical::eval(analyticalMap_)); }
-        return Base::subentityNormal(indexInInside, local, false, true, *polyjt_);
+        return Base::subentityNormal(indexInInside, local, false, true, polyjt_);
     }
 
 
     bool local ( const GlobalCoordinate &global, LocalCoordinate & local ) const
     {
         if (mydim == 0)  { return true; }
-        if (!polyjt_)  { polyjt_ = new PolynomialJacobianTransposed(JacobianTransposeAnalytical::eval(analyticalMap_)); }
-        return Base::local(global, local, *polyjt_);
+        return Base::local(global, local, polyjt_);
     }
 
 
     ctype integrationElement ( const LocalCoordinate &local ) const
     {
-        return Base::integrationElement ( local, analyticalMap_ );
+        return Base::integrationElement ( local, polyjt_ );
     }
 
 
@@ -954,16 +950,14 @@ namespace Dune
     /** \brief Compute Jt using pre-computed analytical map */
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local ) const
     {
-    	if (!polyjt_)  { polyjt_ = new PolynomialJacobianTransposed(JacobianTransposeAnalytical::eval(analyticalMap_)); }
-        return Base::jacobianTransposed(local, *polyjt_) ;
+        return Base::jacobianTransposed(local, polyjt_) ;
     }
 
 
     /** \brief Compute Jit using pre-computed analytical map */
     JacobianInverseTransposed jacobianInverseTransposed ( const LocalCoordinate &local ) const
     {
-    	if (!polyjt_)  { polyjt_ = new PolynomialJacobianTransposed(JacobianTransposeAnalytical::eval(analyticalMap_)); }
-        return Base::jacobianInverseTransposed(local, *polyjt_);
+        return Base::jacobianInverseTransposed(local, polyjt_);
     }
 
 
@@ -1011,8 +1005,8 @@ namespace Dune
     // Initialization runs at the constructor
     void init()  {
     	analyticalMap_ = Base::interpolatoryVectorAnalytical();
+    	polyjt_ = JacobianTransposeAnalytical::eval(analyticalMap_);
 
-    	polyjt_ = nullptr;
     	polyht_ = nullptr;
     	jacDet_ = nullptr;
     	intElemSq_ = nullptr;
@@ -1026,9 +1020,9 @@ namespace Dune
 
   private:
     mutable PolynomialGlobalCoordinate analyticalMap_;
-    mutable PolynomialJacobianTransposed * polyjt_;
-    mutable PolynomialHessianTransposed  * polyht_;
+    mutable PolynomialJacobianTransposed polyjt_;
 
+    mutable PolynomialHessianTransposed  * polyht_;
     mutable LocalPolynomial  * jacDet_;
     mutable LocalPolynomial  * intElemSq_;
     mutable PolynomialGlobalCoordinate * normIntElem_;
