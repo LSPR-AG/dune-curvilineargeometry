@@ -521,12 +521,11 @@ namespace Dune
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local, const PolynomialJacobianTransposed & polyjt ) const
     {
         JacobianTransposed jt;
-
         for (int i = 0; i < coorddimension; i++)
         {
             for (int j = 0; j < mydimension; j++)
             {
-                jt[j][i] = polyjt[i][j].evaluate(local);
+                jt[j][i] = polyjt[j][i].evaluate(local);
             }
         }
 
@@ -616,8 +615,9 @@ namespace Dune
     	// [FIXME] In future, modify all tests such that there is no detJ directly on the boundary, such geometries should not be used
     	// *********************************************************************************** //
     	JacobianTransposed jt = jacobianTransposed(local, polyjt);
-    	if(DifferentialHelper::MatrixDeterminant<ctype, cdim>::eval(jt) < 1.0e-10)  {
-    		std::cout << "Warning!! CurvilinearGeometry subentityNormal reports zero Jacobian determinant. Normal not well-defined!" << std::endl;
+    	ctype detJ = DifferentialHelper::MatrixDeterminant<ctype, cdim>::eval(jt);
+    	if(fabs(detJ) < 1.0e-10)  {
+    		std::cout << "Warning!! CurvilinearGeometry subentityNormal of element cdim= " << cdim << ", mydim=" << mydim << " reports small Jacobian determinant detJ=" << detJ << ". Normal not well-defined!" << std::endl;
     		return GlobalCoordinate(0.0);
     	}
     	// *********************************************************************************** //
@@ -714,7 +714,8 @@ namespace Dune
     ctype integrationElement ( const LocalCoordinate &local, const PolynomialJacobianTransposed & polyjt ) const
     {
       //assert(mydim > 0);
-      return MatrixHelper::template sqrtDetAAT< mydimension, coorddimension >( jacobianTransposed( local, polyjt ) );
+      ctype rez = MatrixHelper::template sqrtDetAAT< mydimension, coorddimension >( jacobianTransposed( local, polyjt ) );
+      return rez;
     }
 
 

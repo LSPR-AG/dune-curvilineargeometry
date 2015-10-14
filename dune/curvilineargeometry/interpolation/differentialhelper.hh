@@ -177,8 +177,8 @@ struct JacobianDeterminantAnalytical<CurvGeom, DIM2D, DIM2D>
 	{
 	    LocalPolynomial rez = analyticalMap[0].derivative(0) * analyticalMap[1].derivative(1) - analyticalMap[0].derivative(1) * analyticalMap[1].derivative(0);
 
-	    // Clean-up in case some summands summed up to 0
-	    rez.cleanUp();
+	    rez.compactify();   // Add-up all monomials that are the same
+	    rez.cleanUp();      // Clean-up in case some summands summed up to 0
 
 	    // Change sign if determinant is negative
 	    if (rez.evaluate(curvgeom.refElement().position( 0, 0 )) < 0) { rez *= -1; }
@@ -202,8 +202,8 @@ struct JacobianDeterminantAnalytical<CurvGeom, DIM3D, DIM3D>
 	    rez += analyticalMap[0].derivative(1) * ( analyticalMap[1].derivative(2) * analyticalMap[2].derivative(0) - analyticalMap[1].derivative(0) * analyticalMap[2].derivative(2) );
 	    rez += analyticalMap[0].derivative(2) * ( analyticalMap[1].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[1].derivative(1) * analyticalMap[2].derivative(0) );
 
-	    // Clean-up in case some summands summed up to 0
-	    rez.cleanUp();
+	    rez.compactify();   // Add-up all monomials that are the same
+	    rez.cleanUp();      // Clean-up in case some summands summed up to 0
 
 	    // Change sign if determinant is negative
 	    if (rez.evaluate(curvgeom.refElement().position( 0, 0 )) < 0) { rez *= -1; }
@@ -264,6 +264,10 @@ struct NormalIntegrationElementAnalytical<CurvGeom, DIM3D, DIM2D>
 	    rez[1] = analyticalMap[0].derivative(0) * analyticalMap[2].derivative(1) - analyticalMap[2].derivative(0) * analyticalMap[0].derivative(1);
 	    rez[2] = analyticalMap[1].derivative(0) * analyticalMap[0].derivative(1) - analyticalMap[0].derivative(0) * analyticalMap[1].derivative(1);
 
+	    rez[0].compactify();   // Add-up all monomials that are the same
+	    rez[1].compactify();   // Add-up all monomials that are the same
+	    rez[2].compactify();   // Add-up all monomials that are the same
+
 	    return rez;
 	}
 };
@@ -306,6 +310,7 @@ struct IntegrationElementSquaredAnalytical<CurvGeom, cdim, DIM1D>
 	        rez += tmp * tmp;
 	    }
 
+	    rez.compactify();   // Add-up all monomials that are the same
 	    return rez;
 	}
 };
@@ -326,6 +331,7 @@ struct IntegrationElementSquaredAnalytical<CurvGeom, DIM3D, DIM2D>
 	        rez += normalIntegrationElement[i] * normalIntegrationElement[i];
 	    }
 
+	    rez.compactify();   // Add-up all monomials that are the same
 	    return rez;
 	}
 };
