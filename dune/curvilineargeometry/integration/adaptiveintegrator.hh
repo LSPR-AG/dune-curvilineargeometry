@@ -125,7 +125,7 @@ private:
     CompositeVectorVector compositeVertices(const GlobalVectorVector & vertices, const std::vector<double> & values) const
     {
         CompositeVectorVector rez;
-        for (int i = 0; i < vertices.size(); i++)
+        for (unsigned int i = 0; i < vertices.size(); i++)
         {
             CompositeVector tmp;
             for (int j = 0; j < mydim; j++) { tmp[j] = vertices[i][j]; }
@@ -208,7 +208,7 @@ protected:
 
       int indices[2][2] = { {0,1}, {1,2} };
 
-      for (int i = 0; i < 2; i++)
+      for (unsigned int i = 0; i < 2; i++)
       {
       GlobalVectorVector edge_vertices;
       std::vector<double> edge_values;
@@ -240,7 +240,7 @@ protected:
 
       int indices[2][3] = { {0,1,2}, {2,3,4} };
 
-      for (int i = 0; i < 2; i++)
+      for (unsigned int i = 0; i < 2; i++)
       {
       GlobalVectorVector edge_vertices;
       std::vector<double> edge_values;
@@ -277,7 +277,7 @@ protected:
 
       int indices[4][3] = {{0,1,3}, {1,2,4}, {4,3,1}, {3,4,5} };
 
-      for (int i = 0; i < 4; i++)
+      for (unsigned int i = 0; i < 4; i++)
       {
           GlobalVectorVector tri_vertices;
           std::vector<double> tri_values;
@@ -317,7 +317,7 @@ protected:
 
       int indices[4][6] = {{0,1,2,5,6,9}, {2,3,4,7,8,11}, {11,10,9,7,6,2}, {9,10,11,12,13,14} };
 
-      for (int i = 0; i < 4; i++)
+      for (unsigned int i = 0; i < 4; i++)
       {
           GlobalVectorVector tri_vertices;
           std::vector<double> tri_values;
@@ -379,8 +379,8 @@ protected:
       std::vector<double> values_O1;
       std::vector<double> values_O2;
 
-      for (int i = 0; i < vertices_O1.size(); i++) { values_O1.push_back(f(vertices_O1[i])); }
-      for (int i = 0; i < vertices_O2.size(); i++) { values_O2.push_back(f(vertices_O2[i])); }
+      for (unsigned int i = 0; i < vertices_O1.size(); i++) { values_O1.push_back(f(vertices_O1[i])); }
+      for (unsigned int i = 0; i < vertices_O2.size(); i++) { values_O2.push_back(f(vertices_O2[i])); }
 
       return Element(type(), vertices_O1, values_O1, vertices_O2, values_O2);
   }
@@ -422,7 +422,6 @@ public:
   // Integrates the provided function over reference tetrahedron, returns result
   template<typename Functor>
   double integrate( const Functor & f, double tolerance) {
-    Functor integrand_ = f;
     ElementVector elementHeap;
     elementHeap.push_back(referenceElementRefined(2,4,f));
 
@@ -447,7 +446,7 @@ public:
 
       double this_err = 0;
       double this_integral = 0;
-      for (int i = 0; i < newElements.size(); i++) {
+      for (unsigned int i = 0; i < newElements.size(); i++) {
           this_integral += newElements[i].integralHigherOrder();
           this_err += newElements[i].error();
           elementHeap.push_back(newElements[i]);
@@ -474,8 +473,7 @@ public:
       }*/
 
 
-      double lengthscale = fabs(thisElement.vertex(0)[0] - thisElement.vertex(2)[0]);
-
+     // double lengthscale = fabs(thisElement.vertex(0)[0] - thisElement.vertex(2)[0]);
      // std::cout << "points used: " << iterPoints << ", tmp result: " << rezIntegral << ", Queue Size: " << elementHeap.size();
      // std::cout << ", lengthscale: " << lengthscale << ", expected total error: " << totalError << ", previous local error: "<< thisElement.error() <<", expected local error " << this_err << std::endl;
     }

@@ -19,6 +19,8 @@
 
 using namespace Dune;
 
+
+// [FIXME] Rewrite all tests in quantitative form, report pass/fail
 int main ()
 {
   typedef PolynomialTraits<double>::Monomial  Monomial;

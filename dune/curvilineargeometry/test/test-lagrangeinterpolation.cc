@@ -39,7 +39,7 @@ typedef std::vector<FieldVector2D> FieldVectorVector2D;
 typedef std::vector<FieldVector3D> FieldVectorVector3D;
 
 
-
+// [TODO] Move all randomness to testhelperrandom.hh
 double randomReal(double a, double b) { return a + (b - a)*(double(rand()) / RAND_MAX); }
 
 // Constructs a random grid over a simplex with a given number of samples
@@ -165,6 +165,7 @@ struct PolynomialCoordEvaluator
 
 
 // Initializes a field vector, such that it can be done in one line in main code
+// [TODO] Move all fieldvector stuff to testhelpervector.hh
 FieldVector1D initFieldVector(double x) {
     FieldVector1D rez;
     rez[0] = x;

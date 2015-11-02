@@ -63,6 +63,7 @@ typedef std::pair<TestStruct, TestStruct>  TestPair;
 // ************************************************************************************************
 
 // Generates uniform random numbers in interval [a,b]
+// [TODO] Move all randomness to testhelperrandom.hh
 double randomReal(double a, double b) { return a + (b - a)*(double(rand()) / RAND_MAX); }
 
 // Constructs a random grid over a box, where each dimension is uniformly in the interval [a,b]
@@ -439,7 +440,7 @@ TestStruct test02_local_to_global(
 	// Only count as error if interpolatory polynomial is of sufficient order
     if (interpOrder < functionOrder) { if (verbose) { std::cout << ": Local-To-Global-test: --Omitted because polynomial order too small" << std::endl; } }
     else {
-        for (int i = 0; i < randomLocalSample.size(); i++)
+        for (unsigned int i = 0; i < randomLocalSample.size(); i++)
         {
             double err = (simplexGeom.global(randomLocalSample[i]) - f(randomLocalSample[i])[0]).two_norm();
 
@@ -475,7 +476,7 @@ TestPair test03_global_to_local(
 
     if (mydim != cdim) { if (verbose) { std::cout << ": Global-to-Local functionality not available for mismatching mydim and cdim" << std::endl; } }
     else {
-        for (int i = 0; i < global_vertices.size(); i++) {
+        for (unsigned int i = 0; i < global_vertices.size(); i++) {
         	rez.first.nTot_++;
         	rez.second.nTot_++;
 
@@ -514,7 +515,7 @@ TestPair test04_global_to_local(
 
     if (mydim != cdim) { if (verbose) { std::cout << ": Global-to-Local functionality not available for mismatching mydim and cdim" << std::endl; } }
     else {
-        for (int i = 0; i < randomLocalSample.size(); i++)
+        for (unsigned int i = 0; i < randomLocalSample.size(); i++)
         {
         	rez.first.nTot_++;
         	rez.second.nTot_++;
@@ -584,7 +585,7 @@ TestStruct test05_isoutside(
         // Thus compute point outside the element for each local grid point
         for (int biter = 0; biter < nSubentities; biter++)
         {
-            for (int i = 0; i < sublocal_coordinates.size(); i++)
+            for (unsigned int i = 0; i < sublocal_coordinates.size(); i++)
             {
             	LocalCoordinate  local  = Dune::CurvilinearGeometryHelper::coordinateInParent<ctype, subdim, mydim>(simplexGeom.type(), biter, sublocal_coordinates[i]);
                 GlobalCoordinate global = simplexGeom.global(local);
@@ -601,7 +602,7 @@ TestStruct test05_isoutside(
 
         // Check if each of the surrounding points is indeed outside
         // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        for (int i = 0; i < element_surround_points.size(); i++)
+        for (unsigned int i = 0; i < element_surround_points.size(); i++)
         {
         	rez.nTot_++;
         	bool isInside = simplexGeom.local(element_surround_points[i], L);
@@ -623,7 +624,6 @@ TestStruct test05_isoutside(
 template<class SimplexGeom, class SimplexIntegrationHelper>
 TestStruct test06_integration(bool verbose, const SimplexGeom & simplexGeom, int interpOrder, int functionOrder, int functType, double RELATIVE_TOLERANCE, double ACCURACY_GOAL)
 {
-	typedef typename SimplexGeom::ctype  ctype;
 	static const int cdim  = SimplexGeom::coorddimension;
 	static const int mydim = SimplexGeom::mydimension;
 
@@ -668,7 +668,6 @@ TestStruct test06_integration(bool verbose, const SimplexGeom & simplexGeom, int
 template<class SimplexGeom, class SimplexIntegrationHelper>
 TestStruct test07_dot_integration(bool verbose, const SimplexGeom & simplexGeom, int interpOrder, int functionOrder, int functType, double ABSOLUTE_TOLERANCE)
 {
-	typedef typename SimplexGeom::ctype  ctype;
 	static const int cdim  = SimplexGeom::coorddimension;
 	static const int mydim = SimplexGeom::mydimension;
 	typedef typename SimplexGeom::PolynomialGlobalCoordinate   PolynomialGlobalCoordinate;
@@ -680,8 +679,6 @@ TestStruct test07_dot_integration(bool verbose, const SimplexGeom & simplexGeom,
     }
     else if (((mydim == 1)&&(cdim == 2))||((mydim == 2)&&(cdim == 3)))
     {
-        double tmpTolerance = 1.0e-10;
-
         PolynomialGlobalCoordinate basisVectorP = BasisVectorDiagonal<SimplexGeom>();
 
         // Need a basis function which is a vector in global coordinates
@@ -714,6 +711,7 @@ bool testReport(const TestStruct & rez, std::string testname, bool verbose) {
 }
 
 
+// [FIXME] RandomSample size 20 should be a user controlled constant from args, with default value 20
 template<typename CurvGeom, typename Functor>
 bool SimplexTest(bool verbose, Functor f, int testIndex, int interpOrder, int functionOrder, int functType, std::string f_name)
 {
@@ -722,7 +720,7 @@ bool SimplexTest(bool verbose, Functor f, int testIndex, int interpOrder, int fu
 	// Extract geometry templates
 	typedef typename CurvGeom::ctype   ctype;
 	static const int mydim = CurvGeom::mydimension;
-	static const int cdim  = CurvGeom::coorddimension;
+	//static const int cdim  = CurvGeom::coorddimension;
 
 	// Define derived types
 	typedef typename CurvGeom::LocalCoordinate    LocalCoordinate;
@@ -739,7 +737,7 @@ bool SimplexTest(bool verbose, Functor f, int testIndex, int interpOrder, int fu
     // Construct local simplex grid and map it to global using given Functor
     LocalVectorVector local_vertices = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, mydim>(interpOrder);
     GlobalVectorVector global_vertices;
-    for (int i = 0; i < local_vertices.size(); i++) {global_vertices.push_back(f(local_vertices[i])[0]); }
+    for (unsigned int i = 0; i < local_vertices.size(); i++) { global_vertices.push_back(f(local_vertices[i])[0]); }
 
     // Construct a Curvilinear Geometry
     CurvGeom SimplexGeom(refElement, global_vertices, interpOrder);
@@ -764,46 +762,47 @@ bool SimplexTest(bool verbose, Functor f, int testIndex, int interpOrder, int fu
     double ABSOLUTE_TOLERANCE_7 = 1.0e-10;
 
     // Perform the actual tests
+    bool testResult = false;
     switch(testIndex)
     {
     case 1 :
     {
     	TestStruct test1_pass = test01_corner(f, SimplexGeom,       refElement, ABSOLUTE_TOLERANCE_1);
-    	return testReport(test1_pass, "1", verbose);
+    	testResult = testReport(test1_pass, "1", verbose);
     } break;
     case 2 :
     {
     	TestStruct test2_pass = test02_local_to_global(verbose, f, SimplexGeom,       randomLocalSample, interpOrder, functionOrder, ABSOLUTE_TOLERANCE_2);
-    	return testReport(test2_pass, "2", verbose);
+    	testResult = testReport(test2_pass, "2", verbose);
     } break;
     case 3 :
     {
     	TestPair   test3_pass = test03_global_to_local(verbose, SimplexGeom,       global_vertices, local_vertices, ABSOLUTE_TOLERANCE_3);
     	bool rez3  = testReport(test3_pass.first,  "3-isinside", verbose);
     	     rez3 &= testReport(test3_pass.second, "3-global_to_local", verbose);
-    	return rez3;
+    	testResult = rez3;
     } break;
     case 4 :
     {
     	TestPair   test4_pass = test04_global_to_local(verbose, SimplexGeom,       randomLocalSample, ABSOLUTE_TOLERANCE_4);
     	bool rez4  = testReport(test4_pass.first,  "4-isinside", verbose);
     	     rez4 &= testReport(test4_pass.second, "4-global_to_local", verbose);
-    	return rez4;
+    	testResult = rez4;
     } break;
     case 5 :
     {
     	TestStruct test5_pass = test05_isoutside<CurvGeom, LocalCoordinate, GlobalCoordinate>(verbose, SimplexGeom, nSubentities);
-    	return testReport(test5_pass, "5", verbose);
+    	testResult = testReport(test5_pass, "5", verbose);
     } break;
     case 6 :
     {
     	TestStruct test6_pass = test06_integration<CurvGeom, SimplexIntegrationHelper>(verbose, SimplexGeom, interpOrder, functionOrder, functType, RELATIVE_TOLERANCE, ACCURACY_GOAL);
-    	return testReport(test6_pass, "6", verbose);
+    	testResult = testReport(test6_pass, "6", verbose);
     } break;
     case 7 :
     {
     	TestStruct test7_pass = test07_dot_integration<CurvGeom, SimplexIntegrationHelper>(verbose, SimplexGeom, interpOrder, functionOrder, functType, ABSOLUTE_TOLERANCE_7);
-    	return testReport(test7_pass, "7", verbose);
+    	testResult = testReport(test7_pass, "7", verbose);
     } break;
 
     }
@@ -813,6 +812,8 @@ bool SimplexTest(bool verbose, Functor f, int testIndex, int interpOrder, int fu
     // ************************************************************
     // ALL TESTS FINISHED
     // ************************************************************
+
+    return testResult;
 }
 
 

@@ -143,13 +143,12 @@ class Polynomial {
   typedef unsigned int uint;
 
 public:
-  SummandVector         poly_;
-  mutable std::vector<double>   factorial_;       // DO NOT USE CTYPE HERE! Factorial has to be forced to be a real variable to fit all the numbers
   mutable bool                  cached_;          // Init this variable if the polynomial will not be edited any more, and needs to be optimized for efficient access
   mutable uint                  order_;           // The max polynomial order of the monomials
-  mutable std::vector<int>     orderdim_;        // Max monomial order for a given dimension
+  mutable std::vector<int>      orderdim_;        // Max monomial order for a given dimension
+  mutable std::vector<double>   factorial_;       // DO NOT USE CTYPE HERE! Factorial has to be forced to be a real variable to fit all the numbers
 
-
+  SummandVector         poly_;
 
 
 
@@ -180,11 +179,11 @@ public:
 
 
   Polynomial(const Polynomial & other) :
-    poly_(other.poly_),
     cached_(other.cached_),
     order_(other.order_),
     orderdim_(other.orderdim_),
-    factorial_(other.factorial_)
+    factorial_(other.factorial_),
+    poly_(other.poly_)
   {
 
   }

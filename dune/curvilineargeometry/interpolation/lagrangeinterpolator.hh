@@ -665,7 +665,7 @@ public:
         std::vector<LocalCoordinate> localCoordinateSet = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<ctype, mydim>(simplexPoints, order_);
 
         // Step 1. Construct monomial basis and set of local coordinates
-        for (int i = 0; i < simplexPoints.size(); i++)
+        for (unsigned int i = 0; i < simplexPoints.size(); i++)
         {
                 monomial_basis.push_back(LocalPolynomial(Monomial(1.0, simplexPoints[i])));
         }
