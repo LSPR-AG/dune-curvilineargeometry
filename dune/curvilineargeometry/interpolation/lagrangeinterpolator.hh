@@ -184,11 +184,13 @@ public:
      * 
      *  note: there is one lagrange polynomial corresponding to each interpolatory vertex, therefore it makes sense to have the same index for polynomials and vertices
      */
+    /*
     double lagrangePolynomial(InternalIndexType vertexIndex, const LocalCoordinate &local) const
     {
     	PowerVector pw = powerVector(local);
     	return lagrangePolynomial(vertexIndex, pw);
     }
+    */
 
     /** \brief  Numerically evaluates the curvilinear map from local to global coordinates
      *  \param[in]  local		The local coordinate to evaluate the polynomial

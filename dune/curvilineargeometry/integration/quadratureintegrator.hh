@@ -345,7 +345,12 @@ protected:
             */
         }
 
-        std::cout << "Finished recursive integral over geometry " << gt << "suggested order: " << suggestedOrder << " final order " << order << std::endl;
+        /** If suggested order significantly underestimates the actual order, the user should know about it  */
+        if (order - suggestedOrder > 2) {
+        	std::cout << "Warning: Integral over " << gt << " converged at order " << order << ", when suggested order is " << suggestedOrder << std::endl;
+        }
+
+
 
         return StatInfo(order, resultThis);
     }
