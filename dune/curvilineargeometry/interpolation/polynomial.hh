@@ -424,7 +424,11 @@ public:
 
     for (uint i = 0; i < poly_.size(); i++) {
       ctype powTmp = 1.0;
-      for (int d = 0; d < dim; d++) { powTmp *= pow(point[d], poly_[i].power_[d]); }
+      for (int d = 0; d < dim; d++) {
+    	  if (poly_[i].power_[d] > 0) {
+    		  powTmp *= pow(point[d], poly_[i].power_[d]);
+    	  }
+      }
       rez += poly_[i].pref_ * powTmp;
     }
     return rez;

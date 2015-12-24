@@ -319,6 +319,7 @@ namespace Dune
      *
      *  \param[in]  indexInInside   the order number of the subentity of interest
      *  \param[in]  local           local coordinate within the subentity, at which to evaluate the normal
+     *  \param[in]  thisjit         JacobianInverseTransposed at this coordinate. Optional. Accelerates computation if user already knows it
      *
      *  \return vector normal to the subentity, length is arbitrary
      *
@@ -328,11 +329,46 @@ namespace Dune
      *
      */
     // [TODO] Specialize only for cdim==mydim
-    GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
+    GlobalCoordinate subentityNormal(
+    	InternalIndexType indexInInside,
+    	const LocalCoordinate &local,
+    	JacobianInverseTransposed * thisjit = nullptr) const
     {
-        PolynomialGlobalCoordinate analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
-        PolynomialJacobianTransposed polyjt = JacobianTransposeAnalytical::eval(analyticalMap);
-        return subentityNormal(indexInInside, local, false, false, polyjt);
+    	if (thisjit != nullptr) {
+    		return subentityNormal(indexInInside, local, false, false, *thisjit);
+    	} else {
+            PolynomialGlobalCoordinate analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
+            PolynomialJacobianTransposed polyjt = JacobianTransposeAnalytical::eval(analyticalMap);
+            JacobianInverseTransposed jit = jacobianInverseTransposed(local, polyjt);
+
+            return subentityNormal(indexInInside, local, false, false, jit);
+    	}
+    }
+
+    /** \brief Same as subentityNormal, but normalizes the vector
+     *
+     *  \param[in]  indexInInside   the order number of the subentity of interest
+     *  \param[in]  local           local coordinate within the subentity, at which to evaluate the normal
+     *  \param[in]  thisjit         JacobianInverseTransposed at this coordinate. Optional. Accelerates computation if user already knows it
+     *
+     *  \return unit vector normal to the subentity
+     *
+     */
+    // [TODO] Specialize only for cdim==mydim
+    GlobalCoordinate subentityUnitNormal(
+        	InternalIndexType indexInInside,
+        	const LocalCoordinate &local,
+        	JacobianInverseTransposed * thisjit = nullptr) const
+    {
+    	if (thisjit != nullptr) {
+    		return subentityNormal(indexInInside, local, true, false, *thisjit);
+    	} else {
+            PolynomialGlobalCoordinate analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
+            PolynomialJacobianTransposed polyjt = JacobianTransposeAnalytical::eval(analyticalMap);
+            JacobianInverseTransposed jit = jacobianInverseTransposed(local, polyjt);
+
+            return subentityNormal(indexInInside, local, true, false, jit);
+    	}
     }
 
     /** \brief Same as subentityNormal, but normalizes the vector
@@ -341,31 +377,24 @@ namespace Dune
      *  \param[in]  local           local coordinate within the subentity, at which to evaluate the normal
      *
      *  \return unit vector normal to the subentity
+     *  \param[in]  thisjit         JacobianInverseTransposed at this coordinate. Optional. Accelerates computation if user already knows it
      *
      */
     // [TODO] Specialize only for cdim==mydim
-    GlobalCoordinate subentityUnitNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
+    GlobalCoordinate subentityIntegrationNormal(
+        	InternalIndexType indexInInside,
+        	const LocalCoordinate &local,
+        	JacobianInverseTransposed * thisjit = nullptr) const
     {
-        PolynomialGlobalCoordinate analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
-        PolynomialJacobianTransposed polyjt = JacobianTransposeAnalytical::eval(analyticalMap);
+    	if (thisjit != nullptr) {
+    		return subentityNormal(indexInInside, local, false, true, *thisjit);
+    	} else {
+            PolynomialGlobalCoordinate analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
+            PolynomialJacobianTransposed polyjt = JacobianTransposeAnalytical::eval(analyticalMap);
+            JacobianInverseTransposed jit = jacobianInverseTransposed(local, polyjt);
 
-        return subentityNormal(indexInInside, local, true, false, polyjt);
-    }
-
-    /** \brief Same as subentityNormal, but normalizes the vector
-     *
-     *  \param[in]  indexInInside   the order number of the subentity of interest
-     *  \param[in]  local           local coordinate within the subentity, at which to evaluate the normal
-     *
-     *  \return unit vector normal to the subentity
-     *
-     */
-    // [TODO] Specialize only for cdim==mydim
-    GlobalCoordinate subentityIntegrationNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
-    {
-        PolynomialGlobalCoordinate analyticalMap = elementInterpolator_.interpolatoryVectorAnalytical();
-        PolynomialJacobianTransposed polyjt = JacobianTransposeAnalytical::eval(analyticalMap);
-        return subentityNormal(indexInInside, local, false, true, polyjt);
+            return subentityNormal(indexInInside, local, false, true, jit);
+    	}
     }
 
 
@@ -594,37 +623,9 @@ namespace Dune
     /** \brief Finds the normal of a (codim=1) subentity of a volume. Defined for cdim == mydim
      * Constructs normal in local coordinates using referenceElement, then maps it to global using inverse Jacobi transform  */
     // [TODO] Specialize only for the volume case
-    // [FIXME] Defend against the case of det(jit) == 0
-    GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local, bool is_normalized, bool is_integrationelement, const PolynomialJacobianTransposed & polyjt ) const
+    GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local, bool is_normalized, bool is_integrationelement, const JacobianInverseTransposed & jit ) const
     {
-    	/*
-    	if (mydim == 3)  {
-    		std::cout << "Local = " << local << std::endl;
-    		for (int i = 0; i < 3; i++)
-    		{
-    			for (int j = 0; j < 3; j++)
-    			{
-    				std::cout << polyjt[i][j].to_string() << std::endl;
-    			}
-    			std::cout << std::endl;
-    		}
-    	}
-    	*/
-
-    	// Escape Sequence for dealing with detJ = 0.
-    	// [FIXME] In future, modify all tests such that there is no detJ directly on the boundary, such geometries should not be used
-    	// *********************************************************************************** //
-    	JacobianTransposed jt = jacobianTransposed(local, polyjt);
-    	ctype detJ = DifferentialHelper::MatrixDeterminant<ctype, cdim>::eval(jt);
-    	if(fabs(detJ) < 1.0e-10)  {
-    		std::cout << "Warning!! CurvilinearGeometry subentityNormal of element cdim= " << cdim << ", mydim=" << mydim << " reports small Jacobian determinant detJ=" << detJ << ". Normal not well-defined!" << std::endl;
-    		return GlobalCoordinate(0.0);
-    	}
-    	// *********************************************************************************** //
-
-        JacobianInverseTransposed jit = jacobianInverseTransposed(local, polyjt);
         LocalCoordinate refNormal = refElement().integrationOuterNormal(indexInInside);
-
         GlobalCoordinate normal;
         jit.mv( refNormal, normal );
 
@@ -744,7 +745,17 @@ namespace Dune
   public:
     void setup ( const JacobianTransposed &jt )
     {
-      detInv_ = MatrixHelper::template rightInvA< mydimension, coorddimension >( jt, static_cast< Base & >( *this ) );
+    	// Escape Sequence for dealing with detJ = 0.
+    	// [FIXME] In future, modify all tests such that there is no detJ directly on the boundary, such geometries should not be used
+    	// *********************************************************************************** //
+    	//ctype detJ = DifferentialHelper::MatrixDeterminant<ctype, cdim>::eval(jt);
+    	//if(fabs(detJ) < 1.0e-10)  {
+    	//	std::cout << "Warning!! CurvilinearGeometry of element cdim= " << cdim << ", mydim=" << mydim << " reports small Jacobian determinant detJ=" << detJ << ". Normal not well-defined!" << std::endl;
+    	//	DUNE_THROW(IOError, "Bad Jacobian");
+    	//}
+    	// *********************************************************************************** //
+
+    	detInv_ = MatrixHelper::template rightInvA< mydimension, coorddimension >( jt, static_cast< Base & >( *this ) );
     }
 
     void setupDeterminant ( const JacobianTransposed &jt )
@@ -905,21 +916,45 @@ namespace Dune
     }
 
 
-    GlobalCoordinate subentityNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
+    GlobalCoordinate subentityNormal(
+        	InternalIndexType indexInInside,
+        	const LocalCoordinate &local,
+        	JacobianInverseTransposed * thisjit = nullptr) const
     {
-        return Base::subentityNormal(indexInInside, local, false, false, polyjt_);
+    	if (thisjit != nullptr) {
+    		return Base::subentityNormal(indexInInside, local, false, false, *thisjit);
+    	} else {
+            JacobianInverseTransposed jit = Base::jacobianInverseTransposed(local, polyjt_);
+            return Base::subentityNormal(indexInInside, local, false, false, jit);
+    	}
     }
 
 
-    GlobalCoordinate subentityUnitNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
+    GlobalCoordinate subentityUnitNormal(
+        	InternalIndexType indexInInside,
+        	const LocalCoordinate &local,
+        	JacobianInverseTransposed * thisjit = nullptr) const
     {
-        return Base::subentityNormal(indexInInside, local, true, false, polyjt_);
+    	if (thisjit != nullptr) {
+    		return Base::subentityNormal(indexInInside, local, true, false, *thisjit);
+    	} else {
+            JacobianInverseTransposed jit = Base::jacobianInverseTransposed(local, polyjt_);
+            return Base::subentityNormal(indexInInside, local, true, false, jit);
+    	}
     }
 
 
-    GlobalCoordinate subentityIntegrationNormal(InternalIndexType indexInInside, const LocalCoordinate &local ) const
+    GlobalCoordinate subentityIntegrationNormal(
+        	InternalIndexType indexInInside,
+        	const LocalCoordinate &local,
+        	JacobianInverseTransposed * thisjit = nullptr) const
     {
-        return Base::subentityNormal(indexInInside, local, false, true, polyjt_);
+    	if (thisjit != nullptr) {
+    		return Base::subentityNormal(indexInInside, local, false, true, *thisjit);
+    	} else {
+            JacobianInverseTransposed jit = Base::jacobianInverseTransposed(local, polyjt_);
+            return Base::subentityNormal(indexInInside, local, false, true, jit);
+    	}
     }
 
 
