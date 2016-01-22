@@ -396,7 +396,7 @@ class CurvilinearGeometryHelper {
      *  \param[in]  order                  interpolatory order of the entity
      *  \param[in]  cornerInternalCoord    internal integer coordinates of the corners of the face within the reference tetrahedron
      *
-     *  [FIXME] - there should exist a nicer algorithm to do this...
+     *  [TODO] - there should exist a nicer algorithm to do this...
      *
      *  Algorithm:
      *    1) Write all coordinate numbers in a ((order + 1) x (order + 1) x (order + 1)) matrix
