@@ -153,19 +153,19 @@ namespace Dune
     typedef FieldMatrix< LocalPolynomial, mydimension, mydimension >    PolynomialHessianTransposed;    //! type of polynomial hessian transposed
 
     // Define analytic differential operators over this geometry
-    typedef typename Dune::DifferentialHelper::JacobianTransposeAnalytical<This>                        JacobianTransposeAnalytical;
-    typedef typename Dune::DifferentialHelper::HessianTransposeAnalytical<This>                         HessianTransposeAnalytical;
-    typedef typename Dune::DifferentialHelper::JacobianDeterminantAnalytical<This, cdim, mydim>         JacDetAnalytical;
-    typedef typename Dune::DifferentialHelper::NormalIntegrationElementAnalytical<This, cdim, mydim>    IntElemNormalAnalytical;
-    typedef typename Dune::DifferentialHelper::IntegrationElementSquaredAnalytical <This, cdim, mydim>  IntElemSquaredAnalytical;
+    typedef typename DifferentialHelper::JacobianTransposeAnalytical<This>                        JacobianTransposeAnalytical;
+    typedef typename DifferentialHelper::HessianTransposeAnalytical<This>                         HessianTransposeAnalytical;
+    typedef typename DifferentialHelper::JacobianDeterminantAnalytical<This, cdim, mydim>         JacDetAnalytical;
+    typedef typename DifferentialHelper::NormalIntegrationElementAnalytical<This, cdim, mydim>    IntElemNormalAnalytical;
+    typedef typename DifferentialHelper::IntegrationElementSquaredAnalytical <This, cdim, mydim>  IntElemSquaredAnalytical;
 
     // Define integration routines for this geometry
-    typedef typename Dune::IntegralHelper<This, Traits::QUADRATURE_NORM_TYPE>  IntegrationHelper;
+    typedef IntegralHelper<This, Traits::QUADRATURE_NORM_TYPE>  IntegrationHelper;
 
 
     // Define tests that help to determine if a point is inside an entity
-    typedef typename Dune::CurvilinearPointLocation::FarPointTest<This, cdim, mydim>      FarPointTest;
-    typedef typename Dune::CurvilinearPointLocation::BarycentricTest<This, cdim, mydim>   BarycentricTest;
+    typedef typename CurvilinearPointLocation::FarPointTest<This, cdim, mydim>      FarPointTest;
+    typedef typename CurvilinearPointLocation::BarycentricTest<This, cdim, mydim>   BarycentricTest;
 
 
   private:

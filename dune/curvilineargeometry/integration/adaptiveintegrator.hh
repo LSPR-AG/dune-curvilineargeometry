@@ -54,12 +54,15 @@ class ElementTwoOrders {
     typedef FieldVector< ct, mydim + 1 >     CompositeVector;
     typedef std::vector< GlobalVector >      GlobalVectorVector;
     typedef std::vector< CompositeVector >   CompositeVectorVector;
-    //typedef std::vector<ct>                  SampleVector;
     typedef Polynomial<ct, mydim>            LocalPolynomial;
 
-    typedef FieldVector<LocalPolynomial, mydim>            PolynomialLocalCoordinate;
-    typedef FieldVector<LocalPolynomial, mydim + 1>        PolynomialCompositeCoordinate;
     typedef LagrangeInterpolator<double, mydim, mydim + 1> CompositeInterpolator;
+
+    typedef typename CompositeInterpolator::PolynomialLocalCoordinate   PolynomialLocalCoordinate;
+    typedef typename CompositeInterpolator::PolynomialGlobalCoordinate  PolynomialCompositeCoordinate;
+
+    //typedef FieldVector<LocalPolynomial, mydim>            PolynomialLocalCoordinate;
+    //typedef FieldVector<LocalPolynomial, mydim + 1>        PolynomialCompositeCoordinate;
 
 private:
     GlobalVectorVector vertexSet_;

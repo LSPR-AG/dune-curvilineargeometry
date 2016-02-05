@@ -8,6 +8,7 @@ set(TESTS
   test_curvilineargeometry)
 
 add_executable(test_polynomial test-polynomial.cc)
+add_executable(test_polynomialvector test-polynomialvector.cc)
 add_executable(test_lagrangeinterpolation test-lagrangeinterpolation.cc)
 add_executable(test_adaptiveintegration test-adaptiveintegration.cc)
 add_executable(test_quadratureintegration test-quadratureintegration.cc)
@@ -22,6 +23,7 @@ target_link_libraries(test_quadratureintegration dunecommon dunegeometry)
 target_link_libraries(test_quadratureintegration-matrix dunecommon dunegeometry)
 target_link_libraries(test_quadratureintegration-speed dunecommon dunegeometry)
 target_link_libraries(test_polynomial dunecommon dunegeometry)
+target_link_libraries(test_polynomialvector dunecommon dunegeometry)
 target_link_libraries(test_curvilineargeometry dunecommon dunegeometry)
 
 # We do not want want to build the tests during make all,

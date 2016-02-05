@@ -135,18 +135,21 @@ struct PolynomialTraits
 template<class ctype, int dim>
 class Polynomial {
 
-  typedef Polynomial<ctype, dim> LocalPolynomial;
-  typedef typename PolynomialTraits<ctype>::Monomial Monomial;
-  typedef typename std::vector<Monomial> SummandVector;
-  typedef FieldVector< ctype, dim > LocalCoordinate;
-
   typedef unsigned int uint;
 
-public:
   mutable bool                  cached_;          // Init this variable if the polynomial will not be edited any more, and needs to be optimized for efficient access
   mutable uint                  order_;           // The max polynomial order of the monomials
   mutable std::vector<int>      orderdim_;        // Max monomial order for a given dimension
   mutable std::vector<double>   factorial_;       // DO NOT USE CTYPE HERE! Factorial has to be forced to be a real variable to fit all the numbers
+
+public:
+
+
+  /** \brief Public Typedefs */
+  typedef typename PolynomialTraits<ctype>::Monomial Monomial;
+  typedef Polynomial<ctype, dim>                     LocalPolynomial;
+  typedef typename std::vector<Monomial>             SummandVector;
+  typedef FieldVector< ctype, dim >                  LocalCoordinate;
 
   SummandVector         poly_;
 
@@ -189,7 +192,9 @@ public:
   }
 
 
-  Monomial zeroMonomial() const { return Monomial(0.0, std::vector<int> (dim, 0)); }
+  // [TODO] Possibly there is a better place for these functions
+  static Monomial zeroMonomial()         { return Monomial(0.0, std::vector<int> (dim, 0)); }
+  static Monomial constMonomial(ctype a) { return Monomial(a,   std::vector<int> (dim, 0)); }
 
 
   /** \brief Add a summand to a Polynomial
@@ -366,16 +371,29 @@ public:
    *  \returns    Returns the total summand power (order) maximized over summands
    */
   uint order() const {
-    int rez = 0;
+    uint rez = 0;
 
     for (uint i = 0; i < poly_.size(); i++) {
-      int maxTmp = 0;
-      for (int d = 0; d < dim; d++) { maxTmp += poly_[i].power_[d]; }
+      uint maxTmp = 0;
+      for (uint d = 0; d < dim; d++) { maxTmp += poly_[i].power_[d]; }
       rez = std::max(rez, maxTmp);
     }
 
     return rez;
   }
+
+
+  /** \brief Order of Polynomial, argument-based
+   *
+   *  \returns    Returns the maximal power of an argument
+   */
+  int order(int paramNo) const {
+	  assert((paramNo>=0)&&(paramNo < dim));
+	  int rez = 0;
+	  for (uint i = 0; i < poly_.size(); i++) { rez = std::max(rez, poly_[i].power_[paramNo]); }
+	  return rez;
+  }
+
 
 
   /** \brief Magnitude of Polynomial
