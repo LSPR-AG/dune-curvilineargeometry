@@ -746,7 +746,7 @@ namespace Dune
     void setup ( const JacobianTransposed &jt )
     {
     	// Escape Sequence for dealing with detJ = 0.
-    	// [FIXME] In future, modify all tests such that there is no detJ directly on the boundary, such geometries should not be used
+    	// [FIXME] In future, modify all tests such that there is no detJ=0 directly on the boundary, such geometries should not be used
     	// *********************************************************************************** //
     	//ctype detJ = DifferentialHelper::MatrixDeterminant<ctype, cdim>::eval(jt);
     	//if(fabs(detJ) < 1.0e-10)  {
