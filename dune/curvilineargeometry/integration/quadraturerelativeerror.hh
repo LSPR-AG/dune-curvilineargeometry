@@ -1,18 +1,10 @@
 #ifndef DUNE_QUADRATURE_RELATIVE_ERROR
 #define DUNE_QUADRATURE_RELATIVE_ERROR
 
+#include<dune/curvilineargeometry/integration/quadraturetypedef.hh>
+
 namespace Dune
 {
-
-enum QuadratureNorm {
-	QUADRATURE_NORM_DEFAULT = 0,       // Default norm to be used for scalars
-	QUADRATURE_NORM_L1 = 1,
-	QUADRATURE_NORM_L2 = 2,			   // Ratio of two-norms of error / value
-	QUADRATURE_NORM_RELATIVE_L2 = 3,   // two-norm of vector of ratios (error_i / value_i)
-	QUADRATURE_NORM_INDIVIDUAL = 4     // max of all ratios error_i / value_i
-};
-
-
 
 // ***************************************************
 // Calculates relative 1-norm of a scalar
@@ -200,19 +192,25 @@ struct QuadratureRelativeError<ctype, QUADRATURE_NORM_L2> {
 	// FieldVector
 	template<class ValueType, int mydim>
 	static ctype eval( Dune::FieldVector<ValueType, mydim> & delta, Dune::FieldVector<ValueType, mydim> & mag, ctype ACCURACY_GOAL) {
-		return delta.two_norm() / mag.two_norm();
+		ctype normDelta = delta.two_norm();
+		ctype normMag = mag.two_norm();
+		return QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(normDelta, normMag, ACCURACY_GOAL);
 	}
 
 	// DynamicVector
 	template<class ValueType>
 	static ctype eval( Dune::DynamicVector<ValueType> & delta, Dune::DynamicVector<ValueType> & mag, ctype ACCURACY_GOAL) {
-		return delta.two_norm() / mag.two_norm();
+		ctype normDelta = delta.two_norm();
+		ctype normMag = mag.two_norm();
+		return QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(normDelta, normMag, ACCURACY_GOAL);
 	}
 
 	// DynamicMatrix
 	template<class ValueType>
 	static ctype eval( Dune::DynamicMatrix<ValueType> & delta, Dune::DynamicMatrix<ValueType> & mag, ctype ACCURACY_GOAL) {
-		return delta.frobenius_norm() / mag.frobenius_norm();
+		ctype normDelta = delta.frobenius_norm();
+		ctype normMag = mag.frobenius_norm();
+		return QuadratureRelativeError<ctype, QUADRATURE_NORM_DEFAULT>::eval(normDelta, normMag, ACCURACY_GOAL);
 	}
 
 };

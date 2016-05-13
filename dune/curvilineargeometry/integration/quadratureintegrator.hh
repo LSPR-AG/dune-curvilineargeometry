@@ -44,6 +44,7 @@
 #include <dune/geometry/quadraturerules.hh>
 
 #include <dune/curvilineargeometry/integration/quadraturerelativeerror.hh>
+#include <dune/curvilineargeometry/integration/quadratureabsolutevalue.hh>
 
 
 
@@ -294,7 +295,12 @@ protected:
             do
             {
                 order++;
-                if (order >= MAX_INT_ORDER)  { DUNE_THROW(Dune::IOError, "QUAD_INTEGRATOR failed to converge to required accuracy"); }
+                if (order >= MAX_INT_ORDER)  {
+                	std::cout << "Integral=" << writeVector(resultThis) << std::endl;
+                	std::cout << "Error=" << writeVector(relErrorThis) << std::endl;
+
+                	DUNE_THROW(Dune::IOError, "QUAD_INTEGRATOR failed to converge to required accuracy");
+                }
                 prevQuadSize = thisQuadSize;
                 thisQuadSize = QRules::rule(gt, order).size();
             } while (prevQuadSize == thisQuadSize);
@@ -326,12 +332,24 @@ protected:
                 relErrorThis[iResult] = relErrorNew;
             }
 
-            /*
+
+
+            // [FIXME] DEBUG
+            /**
+            std::vector<ctype> normRez(nResult);
+            for (unsigned int iResult = 0; iResult < nResult; iResult++)  {
+            	normRez[iResult] = Dune::QuadratureAbsoluteValue<ctype, QUADRATURE_NORM_L2>::eval(resultThis[iResult]);
+            }
+
             std::cout << "--- processed order=" << order
-            		  << " quadrature size="    << thisQuadSize
+            		  << " quadrature size="  << thisQuadSize
+					  << " result absolute value=" << writeVector<ctype>(normRez)
             		  << " estimated relative error=" << writeVector<ctype>(relErrorThis)
-            		  << " desired error=" << RELATIVE_TOLERANCE << std::endl;
-            */
+            		  << " desired error=" << RELATIVE_TOLERANCE
+            		  << " accuracy goal=" << ACCURACY_GOAL << std::endl;
+            **/
+
+
 
             // Write a matrix to a file for debugging purposes
             // FIXME DEBUG
@@ -346,9 +364,11 @@ protected:
         }
 
         /** If suggested order significantly underestimates the actual order, the user should know about it  */
+        /*
         if (order - suggestedOrder > 2) {
         	std::cout << "Warning: Integral over " << gt << " converged at order " << order << ", when suggested order is " << suggestedOrder << std::endl;
         }
+        */
 
 
 
@@ -356,7 +376,7 @@ protected:
     }
 
     template<typename Val>
-    static std::string writeVector(std::vector<Val> a)
+    static std::string writeVector(std::vector<Val>&  a)
     {
     	std::stringstream aaa;
 
