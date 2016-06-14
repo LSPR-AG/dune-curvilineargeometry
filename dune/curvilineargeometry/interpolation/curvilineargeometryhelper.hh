@@ -321,6 +321,7 @@ class CurvilinearGeometryHelper {
 
     	std::vector<InternalIndexType> rez;
 
+    	//std::cout << "Lol elem=" << gt << std::endl;
     	const Dune::ReferenceElement< ct, cdim > & ref = Dune::ReferenceElements< ct, cdim >::general(gt);
 
     	int nSubentity = ref.size(subentityCodim);
