@@ -296,10 +296,14 @@ protected:
             {
                 order++;
                 if (order >= MAX_INT_ORDER)  {
+                	// [FIXME] Debug. One should really make the user aware if there is poor convergence
+                	std::cout << "!!!Warning!!!: " << "QUAD_INTEGRATOR failed to converge to required accuracy" << std::endl;
                 	std::cout << "Integral=" << writeVector(resultThis) << std::endl;
                 	std::cout << "Error=" << writeVector(relErrorThis) << std::endl;
 
-                	DUNE_THROW(Dune::IOError, "QUAD_INTEGRATOR failed to converge to required accuracy");
+                	return StatInfo(order, resultThis);
+
+                	//DUNE_THROW(Dune::IOError, "QUAD_INTEGRATOR failed to converge to required accuracy");
                 }
                 prevQuadSize = thisQuadSize;
                 thisQuadSize = QRules::rule(gt, order).size();
