@@ -83,6 +83,25 @@ class QuadratureIntegrator {
         const Geometry & geom_;
     };
 
+public:
+
+    struct IdentityFunctor
+    {
+    	static const int mydimension = mydim;
+    	typedef FieldVector< ctype, mydimension > LocalCoordinate;
+
+        typedef ctype                        ResultValue;
+        typedef typename std::vector<ctype>  ResultType;
+
+        static const unsigned int RETURN_SIZE = 1;
+
+        IdentityFunctor() {}
+
+        ResultType operator()(const LocalCoordinate & x) const { return ResultType(1, ResultValue(1.0)); }
+
+        ResultValue zeroValue(unsigned int rezIndex) const { return ResultValue(0.0); }
+    };
+
 
 
 
