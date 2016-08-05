@@ -170,7 +170,7 @@ class CurvilinearGeometryHelper {
     	assert(gt.isSimplex());   // So far only simplex geometries allowed
     	assert(subInd <= mydim);  // In simplex geometries nCorners = mydim + 1
 
-    	Dune::FieldVector<ctype, cdim> rez;         // By convention initialized as 0-vector
+    	Dune::FieldVector<ctype, cdim> rez(0.0);
     	if (subInd > 0) { rez[subInd - 1] = 1; }  // Thus generating coordinates {[0,0,0], [1,0,0], [0,1,0], [0,0,1]}
 
     	return rez;
@@ -261,18 +261,18 @@ class CurvilinearGeometryHelper {
     }
 
 
-    /** \brief Finds coordinate inside parent of this entity. mydim and cdim define dimensions of subentity and parent respectively
+    /** \brief Finds a local coordinate inside the parent of this entity. mydim and cdim define dimensions of subentity and parent respectively
      *  \param[in]  gt        GeometryType of the subentity
      *  \param[in]  subIndex  index of the subentity inside of the specified entity
-     *  \param[in]  p         coordinate of the point inside of the subentity
+     *  \param[in]  p         local coordinate of the point inside of the subentity
      */
     template<class ct, int mydim, int cdim>
-    static Dune::FieldVector<ct, cdim> coordinateInParent(Dune::GeometryType gt, unsigned int subIndex, Dune::FieldVector<ct, mydim> & p)
+    static Dune::FieldVector<ct, cdim> coordinateInParent(Dune::GeometryType gt, unsigned int subIndex, const Dune::FieldVector<ct, mydim> & p)
     {
     	static const int codimSub  = cdim - mydim;
     	static const int codimVert = cdim;
 
-    	typedef Dune::FieldVector<ct, cdim>  ParentCoordinate;
+    	typedef Dune::FieldVector<ct, cdim>  ParentLocalCoordinate;
     	const Dune::ReferenceElement< ct, cdim > & ref = Dune::ReferenceElements< ct, cdim >::general(gt);
 
     	assert((cdim == gt.dim()) && (mydim < cdim));
@@ -280,23 +280,23 @@ class CurvilinearGeometryHelper {
     	switch (mydim) {
     		case 1  :
     		{
-    			ParentCoordinate p0 = ref.position(ref.subEntity(subIndex, codimSub, 0, codimVert), codimVert);
-    			ParentCoordinate p1 = ref.position(ref.subEntity(subIndex, codimSub, 1, codimVert), codimVert);
-    			ParentCoordinate pv1 = p0 - p1;
+    			ParentLocalCoordinate p0 = ref.position(ref.subEntity(subIndex, codimSub, 0, codimVert), codimVert);
+    			ParentLocalCoordinate p1 = ref.position(ref.subEntity(subIndex, codimSub, 1, codimVert), codimVert);
+    			ParentLocalCoordinate pv1 = p0 - p1;
     			pv1 *= p[0];
 
-    			ParentCoordinate rez = p0 + pv1;
+    			ParentLocalCoordinate rez = p0 + pv1;
     			return rez;
     		} break;
     		case 2  :
     		{
-    			ParentCoordinate p0 = ref.position(ref.subEntity(subIndex, codimSub, 0, codimVert), codimVert);
-    			ParentCoordinate p1 = ref.position(ref.subEntity(subIndex, codimSub, 1, codimVert), codimVert);
-    			ParentCoordinate p2 = ref.position(ref.subEntity(subIndex, codimSub, 2, codimVert), codimVert);
+    			ParentLocalCoordinate p0 = ref.position(ref.subEntity(subIndex, codimSub, 0, codimVert), codimVert);
+    			ParentLocalCoordinate p1 = ref.position(ref.subEntity(subIndex, codimSub, 1, codimVert), codimVert);
+    			ParentLocalCoordinate p2 = ref.position(ref.subEntity(subIndex, codimSub, 2, codimVert), codimVert);
 
-    			ParentCoordinate pv1 = p1 - p0;   pv1 *= p[0];
-    			ParentCoordinate pv2 = p2 - p0;   pv2 *= p[1];
-    			ParentCoordinate rez = p0 + pv1 + pv2;
+    			ParentLocalCoordinate pv1 = p1 - p0;   pv1 *= p[0];
+    			ParentLocalCoordinate pv2 = p2 - p0;   pv2 *= p[1];
+    			ParentLocalCoordinate rez = p0 + pv1 + pv2;
 
     			return rez;
     		} break;

@@ -269,6 +269,7 @@ namespace Dune
     /** \brief obtain the centroid of the mapping's image */
     GlobalCoordinate center () const { return global( refElement().position( 0, 0 ) ); }
 
+
     /** \brief evaluate the mapping
      *
      *  \param[in]  local  local coordinate to map
@@ -280,16 +281,31 @@ namespace Dune
         return elementInterpolator_.global(local);
     }
 
+
     /** \brief Construct CurvilinearGeometry classes for all mydim-1 subentities of this element
      *
      *  \returns a vector of CurvilinearGeometry classes corresponding to mydim-1 subentity geometries
      */
     template<int subdim>
-    CurvilinearGeometry< ctype, subdim, cdim>  subentityGeometry(InternalIndexType subentityIndex) const
+    CurvilinearGeometry< ctype, subdim, cdim> subentityGeometry(InternalIndexType subentityIndex) const
     {
         LagrangeInterpolator <ct, subdim, cdim> interp = elementInterpolator_.template SubentityInterpolator<subdim>(subentityIndex);
         return CurvilinearGeometry< ctype, subdim, cdim> (interp);
     }
+
+
+    /** \brief Find the local coordinate within an entity, given the local coordinate within its subentity
+     *
+     *  \param[in]  subentityLocal  local coordinate within a subentity
+     *  \param[in]  subentityIndex  the order number of the subentity of interest
+     *
+     *  \returns corresponding global coordinate
+     */
+    template<int subdim>
+    LocalCoordinate coordinateInParent(const Dune::FieldVector<ctype, subdim> & subentityLocal, InternalIndexType subentityIndex) const {
+        return Dune::CurvilinearGeometryHelper::template coordinateInParent<ctype, subdim, mydimension>(type(), subentityIndex, subentityLocal);
+    }
+
 
     /** \brief Construct a global coordinate normal of the curvilinear element evaluated at a given local coordinate
      *
