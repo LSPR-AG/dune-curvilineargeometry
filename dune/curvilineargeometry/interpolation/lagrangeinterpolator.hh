@@ -217,6 +217,7 @@ public:
         return rez;
     }
 
+
     /** \brief  Analytic map from local to global coordinates, given explicitly by the polynomial class  */
     PolynomialGlobalCoordinate interpolatoryVectorAnalytical() const {
         if (!type().isSimplex())  { DUNE_THROW(Dune::IOError, "CURVILINEAR_ELEMENT_INTERPOLATOR: interpolatoryVectorAnalytical() only implemented for Simplex geometries at the moment"); }

@@ -39,6 +39,12 @@
 #include <dune/curvilineargeometry/integration/integrationhelper.hh>
 
 
+/********************************
+ * [TODO]
+ * 1) Remove non-cached geometry altogether, there is no use case where it is better than the cached one
+ */
+
+
 
 namespace Dune
 {
@@ -902,6 +908,8 @@ namespace Dune
 
     ~CachedCurvilinearGeometry()
     {
+		if (analyticalMap_)       { delete analyticalMap_; };
+    	if (polyjt_)       { delete polyjt_; };
     	if (polyht_)       { delete polyht_; };
         if (jacDet_)       { delete jacDet_; };
         if (intElemSq_)    { delete intElemSq_; };
@@ -923,8 +931,8 @@ namespace Dune
     {
         if (!Base::type().isSimplex()) { DUNE_THROW(Dune::IOError, "__ERROR: normal() method only implemented for simplex geometries at the moment"); }
 
-             if ((mydim == 1) && (cdim == 2)) { return Base::normalEdge(local, analyticalMap_); }
-        else if ((mydim == 2) && (cdim == 3)) { return Base::normalTriangle(local, analyticalMap_); }
+             if ((mydim == 1) && (cdim == 2)) { return Base::normalEdge(local, interpolatoryVectorAnalyticalRef()); }
+        else if ((mydim == 2) && (cdim == 3)) { return Base::normalTriangle(local, interpolatoryVectorAnalyticalRef()); }
         else
         {
             DUNE_THROW(Dune::IOError, "__ERROR: normal() method only defined for edges in 2D and triangles in 3D");
@@ -940,7 +948,7 @@ namespace Dune
     	if (thisjit != nullptr) {
     		return Base::subentityNormal(indexInInside, local, false, false, *thisjit);
     	} else {
-            JacobianInverseTransposed jit = Base::jacobianInverseTransposed(local, polyjt_);
+            JacobianInverseTransposed jit = Base::jacobianInverseTransposed(local, jacobianTransposedAnalyticalRef());
             return Base::subentityNormal(indexInInside, local, false, false, jit);
     	}
     }
@@ -954,7 +962,7 @@ namespace Dune
     	if (thisjit != nullptr) {
     		return Base::subentityNormal(indexInInside, local, true, false, *thisjit);
     	} else {
-            JacobianInverseTransposed jit = Base::jacobianInverseTransposed(local, polyjt_);
+            JacobianInverseTransposed jit = Base::jacobianInverseTransposed(local, jacobianTransposedAnalyticalRef());
             return Base::subentityNormal(indexInInside, local, true, false, jit);
     	}
     }
@@ -968,7 +976,7 @@ namespace Dune
     	if (thisjit != nullptr) {
     		return Base::subentityNormal(indexInInside, local, false, true, *thisjit);
     	} else {
-            JacobianInverseTransposed jit = Base::jacobianInverseTransposed(local, polyjt_);
+            JacobianInverseTransposed jit = Base::jacobianInverseTransposed(local, jacobianTransposedAnalyticalRef());
             return Base::subentityNormal(indexInInside, local, false, true, jit);
     	}
     }
@@ -977,13 +985,13 @@ namespace Dune
     bool local ( const GlobalCoordinate &global, LocalCoordinate & local ) const
     {
         if (mydim == 0)  { return true; }
-        return Base::local(global, local, polyjt_);
+        return Base::local(global, local, jacobianTransposedAnalyticalRef());
     }
 
 
     ctype integrationElement ( const LocalCoordinate &local ) const
     {
-        return Base::integrationElement ( local, polyjt_ );
+        return Base::integrationElement ( local, jacobianTransposedAnalyticalRef() );
     }
 
 
@@ -1002,26 +1010,44 @@ namespace Dune
     /** \brief Compute Jt using pre-computed analytical map */
     JacobianTransposed jacobianTransposed ( const LocalCoordinate &local ) const
     {
-        return Base::jacobianTransposed(local, polyjt_) ;
+        return Base::jacobianTransposed(local, jacobianTransposedAnalyticalRef()) ;
     }
 
 
     /** \brief Compute Jit using pre-computed analytical map */
     JacobianInverseTransposed jacobianInverseTransposed ( const LocalCoordinate &local ) const
     {
-        return Base::jacobianInverseTransposed(local, polyjt_);
+        return Base::jacobianInverseTransposed(local, jacobianTransposedAnalyticalRef());
     }
 
 
     /** \brief Retrieve pre-computed analytical map from local to global coordinates */
-    PolynomialGlobalCoordinate interpolatoryVectorAnalytical() const       { return analyticalMap_; }
+    // [TODO] Get rid of this method altogether, the reference one is more efficient
+    PolynomialGlobalCoordinate interpolatoryVectorAnalytical() const       {
+    	return interpolatoryVectorAnalyticalRef();
+    }
+
+
+    /** \brief Retrieve pre-computed analytical map from local to global coordinates */
+    const PolynomialGlobalCoordinate & interpolatoryVectorAnalyticalRef() const       {
+    	if (!analyticalMap_) { analyticalMap_ = new PolynomialGlobalCoordinate(Base::interpolatoryVectorAnalytical()); }
+    	return *analyticalMap_;
+    }
+
+
+    /** \brief Compute analytical polynomial jacobian transposed */
+    const PolynomialJacobianTransposed & jacobianTransposedAnalyticalRef() const
+    {
+    	if (!polyjt_)  { polyjt_ = new PolynomialJacobianTransposed(JacobianTransposeAnalytical::eval(interpolatoryVectorAnalyticalRef())); }
+    	return *polyjt_;
+    }
 
 
     /** \brief Retrieve pre-computed analytical Jacobian determinant. If it does not exist yet, pre-compute it */
     LocalPolynomial JacobianDeterminantAnalytical() const {
     	if (!jacDet_)  {
     		assert((mydim > 0)&&(mydim == cdim));  // Analytical Jacobian determinant only defined for volume-geometries
-    		jacDet_ = new LocalPolynomial(JacDetAnalytical::eval(*this, analyticalMap_));
+    		jacDet_ = new LocalPolynomial(JacDetAnalytical::eval(*this, interpolatoryVectorAnalyticalRef()));
     	}
 
     	return *jacDet_;
@@ -1033,7 +1059,7 @@ namespace Dune
     	if (!normIntElem_)  {
     		bool valid_dim = ((mydimension == 1) && (coorddimension == 2)) || ((mydimension == 2) && (coorddimension == 3));
     		assert(valid_dim);  // Analytical integration element only defined for surface-geometries and line-geometries
-    		normIntElem_ = new PolynomialGlobalCoordinate(IntElemNormalAnalytical::eval(*this, analyticalMap_));
+    		normIntElem_ = new PolynomialGlobalCoordinate(IntElemNormalAnalytical::eval(*this, interpolatoryVectorAnalyticalRef()));
     	}
 
     	return *normIntElem_;
@@ -1044,7 +1070,7 @@ namespace Dune
     LocalPolynomial IntegrationElementSquaredAnalytical() const  {
     	if (!intElemSq_)  {
     		assert((mydim > 0)&&(mydim != cdim));  // Analytical integration element only defined for surface-geometries and line-geometries
-    		intElemSq_ = new LocalPolynomial(IntElemSquaredAnalytical::eval(*this, analyticalMap_));
+    		intElemSq_ = new LocalPolynomial(IntElemSquaredAnalytical::eval(*this, interpolatoryVectorAnalyticalRef()));
     	}
 
     	return *intElemSq_;
@@ -1056,9 +1082,8 @@ namespace Dune
 
     // Initialization runs at the constructor
     void init()  {
-    	analyticalMap_ = Base::interpolatoryVectorAnalytical();
-    	polyjt_ = JacobianTransposeAnalytical::eval(analyticalMap_);
-
+    	analyticalMap_ = nullptr;
+    	polyjt_ = nullptr;
     	polyht_ = nullptr;
     	jacDet_ = nullptr;
     	intElemSq_ = nullptr;
@@ -1071,8 +1096,8 @@ namespace Dune
 
 
   private:
-    mutable PolynomialGlobalCoordinate analyticalMap_;
-    mutable PolynomialJacobianTransposed polyjt_;
+    mutable PolynomialGlobalCoordinate * analyticalMap_;
+    mutable PolynomialJacobianTransposed * polyjt_;
 
     mutable PolynomialHessianTransposed  * polyht_;
     mutable LocalPolynomial  * jacDet_;
