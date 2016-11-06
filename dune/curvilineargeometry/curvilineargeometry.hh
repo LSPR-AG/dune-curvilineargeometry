@@ -28,8 +28,9 @@
 
 #include <dune/geometry/referenceelements.hh>
 #include <dune/geometry/type.hh>
-#include <dune/geometry/genericgeometry/geometrytraits.hh>
-#include <dune/geometry/genericgeometry/matrixhelper.hh>
+#include <dune/geometry/affinegeometry.hh>
+//#include <dune/geometry/genericgeometry/geometrytraits.hh>
+//#include <dune/geometry/genericgeometry/matrixhelper.hh>
 
 #include <dune/curvilineargeometry/interpolation/polynomial.hh>
 #include <dune/curvilineargeometry/interpolation/curvilineargeometryhelper.hh>
@@ -75,7 +76,6 @@ namespace Dune
   template< class ct >
   struct CurvilinearGeometryTraits
   {
-    typedef GenericGeometry::MatrixHelper< GenericGeometry::DuneCoordTraits< ct > > MatrixHelper;
 
     static const unsigned int QUADRATURE_NORM_TYPE = Dune::QUADRATURE_NORM_L2;
 
@@ -180,7 +180,12 @@ namespace Dune
     typedef typename Traits::template VertexStorage< mydimension, coorddimension >::Type::const_iterator VertexIterator;
 
   protected:
-    typedef typename Traits::MatrixHelper MatrixHelper;
+	//typedef typename Traits::MatrixHelper MatrixHelper;
+    //typedef GenericGeometry::MatrixHelper< GenericGeometry::DuneCoordTraits< ct > > MatrixHelper;
+	//typedef typename Dune::AffineGeometry<ct, mydim, cdim>::MatrixHelper   MatrixHelper;
+    typedef Impl::FieldMatrixHelper< ct > MatrixHelper;
+
+
     typedef Dune::ReferenceElements< ctype, mydimension > ReferenceElements;
 
 
@@ -777,7 +782,8 @@ namespace Dune
     	//}
     	// *********************************************************************************** //
 
-    	detInv_ = MatrixHelper::template rightInvA< mydimension, coorddimension >( jt, static_cast< Base & >( *this ) );
+    	Base & thisAsBase = static_cast< Base & >( *this );
+    	detInv_ = MatrixHelper::template rightInvA< mydimension, coorddimension >( jt, thisAsBase );
     }
 
     void setupDeterminant ( const JacobianTransposed &jt )

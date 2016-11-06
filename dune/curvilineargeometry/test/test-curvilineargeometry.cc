@@ -730,7 +730,9 @@ bool SimplexTest(bool verbose, Functor f, int testIndex, int interpOrder, int fu
     typedef typename CurvGeom::IntegrationHelper        SimplexIntegrationHelper;
 
     // Construct reference element
-    Dune::GeometryType simplexGeometryType( Dune::GenericGeometry::SimplexTopology< mydim >::type::id, mydim );
+    //Dune::GeometryType simplexGeometryType( Dune::GenericGeometry::SimplexTopology< mydim >::type::id, mydim );
+    Dune::GeometryType simplexGeometryType;
+    simplexGeometryType.makeSimplex(mydim);
     const Dune::ReferenceElement< ctype, mydim > &refElement = Dune::ReferenceElements< ctype, mydim >::general( simplexGeometryType );
     int nSubentities = refElement.size(1);
 
