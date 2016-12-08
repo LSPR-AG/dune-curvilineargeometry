@@ -192,41 +192,30 @@ int main ()
 
   static const unsigned int NORM_TYPE = Dune::QUADRATURE_NORM_L2;
 
-  recursiveWrite(QuadIntegrator1D::template integrateRecursive<unityJacobianFunctor, function1d1, NORM_TYPE>(edgeGeometry, function1d1(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator1D::template integrateRecursive<unityJacobianFunctor, function1d2, NORM_TYPE>(edgeGeometry, function1d2(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator1D::template integrateRecursive<unityJacobianFunctor, function1d3, NORM_TYPE>(edgeGeometry, function1d3(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator1D::template integrateRecursive<unityJacobianFunctor, function1d4, NORM_TYPE>(edgeGeometry, function1d4(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
 
-  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d1, NORM_TYPE>(faceGeometry, function2d1(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d2, NORM_TYPE>(faceGeometry, function2d2(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d3, NORM_TYPE>(faceGeometry, function2d3(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d4, NORM_TYPE>(faceGeometry, function2d4(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d5, NORM_TYPE>(faceGeometry, function2d5(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d6, NORM_TYPE>(faceGeometry, function2d6(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d7, NORM_TYPE>(faceGeometry, function2d7(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d8, NORM_TYPE>(faceGeometry, function2d8(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+  for (int i = 0; i < 100; i++) {
+	  // recursiveWrite(QuadIntegrator1D::template integrateRecursive<unityJacobianFunctor, function1d1, NORM_TYPE>(edgeGeometry, function1d1(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  // recursiveWrite(QuadIntegrator1D::template integrateRecursive<unityJacobianFunctor, function1d2, NORM_TYPE>(edgeGeometry, function1d2(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  // recursiveWrite(QuadIntegrator1D::template integrateRecursive<unityJacobianFunctor, function1d3, NORM_TYPE>(edgeGeometry, function1d3(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  // recursiveWrite(QuadIntegrator1D::template integrateRecursive<unityJacobianFunctor, function1d4, NORM_TYPE>(edgeGeometry, function1d4(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  //
+	  //  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d1, NORM_TYPE>(faceGeometry, function2d1(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  //  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d2, NORM_TYPE>(faceGeometry, function2d2(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  //  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d3, NORM_TYPE>(faceGeometry, function2d3(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  //  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d4, NORM_TYPE>(faceGeometry, function2d4(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  //  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d5, NORM_TYPE>(faceGeometry, function2d5(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  //  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d6, NORM_TYPE>(faceGeometry, function2d6(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  //  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d7, NORM_TYPE>(faceGeometry, function2d7(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  //  recursiveWrite(QuadIntegrator2D::template integrateRecursive<unityJacobianFunctor, function2d8, NORM_TYPE>(faceGeometry, function2d8(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  //
+	  //  recursiveWrite(QuadIntegrator3D::template integrateRecursive<unityJacobianFunctor, function3d1, NORM_TYPE>(elemGeometry, function3d1(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	  // recursiveWrite(QuadIntegrator3D::template integrateRecursive<unityJacobianFunctor, function3d2, NORM_TYPE>(elemGeometry, function3d2(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+	    recursiveWrite(QuadIntegrator3D::template integrateRecursive<unityJacobianFunctor, function3d3, NORM_TYPE>(elemGeometry, function3d3(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
+  }
 
-  recursiveWrite(QuadIntegrator3D::template integrateRecursive<unityJacobianFunctor, function3d1, NORM_TYPE>(elemGeometry, function3d1(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator3D::template integrateRecursive<unityJacobianFunctor, function3d2, NORM_TYPE>(elemGeometry, function3d2(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-  recursiveWrite(QuadIntegrator3D::template integrateRecursive<unityJacobianFunctor, function3d3, NORM_TYPE>(elemGeometry, function3d3(), unityJacobianFunctor(), RELATIVE_TOLERANCE, ACCURACY_GOAL));
-
-  depthTest<1, NORM_TYPE>(25, RELATIVE_TOLERANCE, ACCURACY_GOAL);
-  depthTest<2, NORM_TYPE>(25, RELATIVE_TOLERANCE, ACCURACY_GOAL);
-  depthTest<3, NORM_TYPE>(25, RELATIVE_TOLERANCE, ACCURACY_GOAL);
-
-
-  /*
-  statWrite(funIntegrator1D.integrateStat(edgeGeometry, function1d1(), 10));
-  statWrite(funIntegrator1D.integrateStat(edgeGeometry, function1d3(), 10));
-  statWrite(funIntegrator1D.integrateStat(edgeGeometry, function1d4(), 61));
-
-  statWrite(funIntegrator2D.integrateStat(faceGeometry, function2d1(), 10));
-  statWrite(funIntegrator2D.integrateStat(faceGeometry, function2d3(), 10));
-  statWrite(funIntegrator2D.integrateStat(faceGeometry, function2d4(), 10));
-  statWrite(funIntegrator2D.integrateStat(faceGeometry, function2d7(), 30));
-  */
-
-
+//  depthTest<1, NORM_TYPE>(25, RELATIVE_TOLERANCE, ACCURACY_GOAL);
+//  depthTest<2, NORM_TYPE>(25, RELATIVE_TOLERANCE, ACCURACY_GOAL);
+//  depthTest<3, NORM_TYPE>(25, RELATIVE_TOLERANCE, ACCURACY_GOAL);
 
   return 0;
 }
