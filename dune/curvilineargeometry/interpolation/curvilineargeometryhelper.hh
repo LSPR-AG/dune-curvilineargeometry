@@ -265,6 +265,8 @@ class CurvilinearGeometryHelper {
      *  \param[in]  gt        GeometryType of the subentity
      *  \param[in]  subIndex  index of the subentity inside of the specified entity
      *  \param[in]  p         local coordinate of the point inside of the subentity
+     *
+     *  [TODO] Reimplement using ReferenceElement::Geometry()
      */
     template<class ct, int mydim, int cdim>
     static Dune::FieldVector<ct, cdim> coordinateInParent(Dune::GeometryType gt, unsigned int subIndex, const Dune::FieldVector<ct, mydim> & p)
@@ -387,6 +389,38 @@ class CurvilinearGeometryHelper {
 
         return corner;
     }
+
+
+    // [TODO] Implement for generic entities. Currently only hardcoded for triangle
+    static unsigned int permutation2index(const std::vector<unsigned int> & vind) {
+    	assert(vind.size() == 3);
+
+    	if				(vind == std::vector<unsigned int> {0, 1, 2}) { return 0; }
+    	else if		(vind == std::vector<unsigned int> {0, 2, 1}) { return 1; }
+    	else if		(vind == std::vector<unsigned int> {1, 0, 2}) { return 2; }
+    	else if		(vind == std::vector<unsigned int> {1, 2, 0}) { return 3; }
+    	else if		(vind == std::vector<unsigned int> {2, 0, 1}) { return 4; }
+    	else if		(vind == std::vector<unsigned int> {2, 1, 0}) { return 5; }
+    	else { DUNE_THROW(Dune::IOError, "Unexpected permutation"); }
+    }
+
+
+    // [TODO] Implement for generic entities. Currently only hardcoded for triangle
+    template<class T>
+    static std::vector<T> permuteVec(const std::vector<T> & v, unsigned int pindex) {
+    	assert(v.size() == 3);
+    	assert(pindex < 6);
+
+    	switch(pindex) {
+    	case 0 :  return std::vector<T> {v[0], v[1], v[2]};  break;
+    	case 1 :  return std::vector<T> {v[0], v[2], v[1]};  break;
+    	case 2 :  return std::vector<T> {v[1], v[0], v[2]};  break;
+    	case 3 :  return std::vector<T> {v[1], v[2], v[0]};  break;
+    	case 4 :  return std::vector<T> {v[2], v[0], v[1]};  break;
+    	case 5 :  return std::vector<T> {v[2], v[1], v[0]};  break;
+    	}
+    }
+
 
 
   private:
