@@ -720,29 +720,42 @@ bool SimplexTest(bool verbose, Functor f, int testIndex, int interpOrder, int fu
 	// Extract geometry templates
 	typedef typename CurvGeom::ctype   ctype;
 	static const int mydim = CurvGeom::mydimension;
-	//static const int cdim  = CurvGeom::coorddimension;
+
 
 	// Define derived types
-	typedef typename CurvGeom::LocalCoordinate    LocalCoordinate;
-	typedef typename CurvGeom::GlobalCoordinate   GlobalCoordinate;
-    typedef std::vector< LocalCoordinate > LocalVectorVector;
-    typedef std::vector< GlobalCoordinate > GlobalVectorVector;
+	typedef typename CurvGeom::LocalCoordinate    		LocalCoordinate;
+	typedef typename CurvGeom::GlobalCoordinate   		GlobalCoordinate;
+    typedef std::vector< LocalCoordinate > 				LocalVectorVector;
+    typedef std::vector< GlobalCoordinate > 			GlobalVectorVector;
     typedef typename CurvGeom::IntegrationHelper        SimplexIntegrationHelper;
+
+    typedef typename Dune::Geo::ReferenceElements<ctype,mydim>::ReferenceElement	ReferenceElement;
 
     // Construct reference element
     //Dune::GeometryType simplexGeometryType( Dune::GenericGeometry::SimplexTopology< mydim >::type::id, mydim );
-    Dune::GeometryType simplexGeometryType;
-    simplexGeometryType.makeSimplex(mydim);
-    const Dune::ReferenceElement< ctype, mydim > &refElement = Dune::ReferenceElements< ctype, mydim >::general( simplexGeometryType );
+
+//    Dune::GeometryType simplexGeometryType;
+//    simplexGeometryType.makeSimplex(mydim);
+
+    Dune::GeometryType simplexGeometryType=Dune::GeometryTypes::simplex(mydim);
+
+
+//    const Dune::ReferenceElement< ctype, mydim > refElement = Dune::ReferenceElements< ctype, mydim >::general( simplexGeometryType );
+    const ReferenceElement& refElement = Dune::ReferenceElements< ctype, mydim >::general( simplexGeometryType );
+
     int nSubentities = refElement.size(1);
 
     // Construct local simplex grid and map it to global using given Functor
     LocalVectorVector local_vertices = Dune::CurvilinearGeometryHelper::simplexGridCoordinateSet<double, mydim>(interpOrder);
-    GlobalVectorVector global_vertices;
+    typedef typename CurvGeom::Vertices Vertices;
+    Vertices global_vertices;
+//    GlobalVectorVector global_vertices;
     for (unsigned int i = 0; i < local_vertices.size(); i++) { global_vertices.push_back(f(local_vertices[i])[0]); }
 
     // Construct a Curvilinear Geometry
     CurvGeom SimplexGeom(refElement, global_vertices, interpOrder);
+//    auto SimplexGeom=typename CurvGeom.template CurvGeom<GlobalVectorVector>(refElement, global_vertices, interpOrder));
+//    auto SimplexGeom=typename CurvGeom.template CurvGeom<GlobalVectorVector>(refElement, global_vertices, interpOrder);
 
     // Produce a set of sample points randomly sampled over the entity
     LocalVectorVector randomLocalSample = sampleRandom<mydim>(20);

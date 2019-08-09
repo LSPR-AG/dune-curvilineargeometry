@@ -53,11 +53,11 @@ namespace Dune
   // External Forward Declarations
   // -----------------------------
 
-  template< class ctype, int dim >
-  class ReferenceElement;
-
-  template< class ctype, int dim >
-  struct ReferenceElements;
+//  template< class ctype, int dim >
+//  class ReferenceElement;
+//
+//  template< class ctype, int dim >
+//  struct ReferenceElements;
 
 
 
@@ -869,6 +869,8 @@ namespace Dune
     typedef typename Base::LocalCoordinate              LocalCoordinate;
     typedef typename Base::GlobalCoordinate             GlobalCoordinate;
 
+    typedef typename std::vector< GlobalCoordinate >	Vertices;
+
     typedef typename Base::JacobianTransposed           JacobianTransposed;
     typedef typename Base::JacobianInverseTransposed    JacobianInverseTransposed;
 
@@ -888,8 +890,8 @@ namespace Dune
 
     typedef typename Dune::IntegralHelper<This, Traits::QUADRATURE_NORM_TYPE>  IntegrationHelper;
 
-
-    template< class Vertices >
+    // DOC ME - removed the const qualitifer before ReferenceElement
+//    template< class Vertices >
     CachedCurvilinearGeometry ( const ReferenceElement &refElement, const Vertices &vertices, int order)
        : Base(refElement, vertices, order)
     {
@@ -897,7 +899,7 @@ namespace Dune
     }
 
 
-    template< class Vertices >
+//    template< class Vertices >
     CachedCurvilinearGeometry ( Dune::GeometryType gt, const Vertices &vertices, int order)
       : Base ( gt, vertices, order)
     {

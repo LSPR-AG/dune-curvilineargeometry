@@ -179,7 +179,8 @@ class AdaptiveIntegrator {
     typedef ElementTwoOrders<ct, mydim, 2, 4> Element;
     typedef std::vector<Element> ElementVector;
 
-    typedef Dune::ReferenceElement< ct, mydim > ReferenceElement;
+//    typedef Dune::ReferenceElement< ct, mydim > ReferenceElement;
+    typedef typename Dune::Geo::ReferenceElements<ct,mydim>::ReferenceElement	ReferenceElement;
     typedef Dune::ReferenceElements< ct, mydim > ReferenceElements;
 
 protected:

@@ -59,26 +59,27 @@ public:
     static const int mydimension= mydim;
     static const int coorddimension = cdim;
 
-    typedef typename Dune::CurvilinearGeometryHelper::InternalIndexType        InternalIndexType;
-    typedef typename Dune::CurvilinearGeometryHelper::InterpolatoryOrderType   InterpolatoryOrderType;
-    typedef typename Dune::CurvilinearGeometryHelper::IntegerCoordinateVector  IntegerCoordinateVector;
+    typedef typename Dune::CurvilinearGeometryHelper::InternalIndexType        			InternalIndexType;
+    typedef typename Dune::CurvilinearGeometryHelper::InterpolatoryOrderType   			InterpolatoryOrderType;
+    typedef typename Dune::CurvilinearGeometryHelper::IntegerCoordinateVector  			IntegerCoordinateVector;
 
 
-    typedef std::vector<ctype>                                              NumVector1D;
-    typedef std::vector<NumVector1D>                                        NumVector2D;
-    typedef std::vector<NumVector2D>                                        NumVector3D;
+    typedef std::vector<ctype>                                              			NumVector1D;
+    typedef std::vector<NumVector1D>                                        			NumVector2D;
+    typedef std::vector<NumVector2D>                                        			NumVector3D;
 
-    typedef std::vector<std::vector<ctype> >                                PowerVector;
-    typedef FieldVector<ctype, mydimension>                                 LocalCoordinate;
-    typedef FieldVector< ctype, coorddimension >                            GlobalCoordinate;
-    typedef Polynomial<ctype, mydimension>                                  LocalPolynomial;
-    typedef std::vector<LocalPolynomial>                                    PolynomialVector;
-    typedef PolynomialFieldVector<ctype, mydimension, mydimension>          PolynomialLocalCoordinate;
-    typedef PolynomialFieldVector<ctype, mydimension, coorddimension>       PolynomialGlobalCoordinate;
-    typedef typename Dune::PolynomialTraits<ctype>::Monomial                Monomial;
+    typedef std::vector<std::vector<ctype> >                                			PowerVector;
+    typedef FieldVector<ctype, mydimension>                                 			LocalCoordinate;
+    typedef FieldVector< ctype, coorddimension >                            			GlobalCoordinate;
+    typedef Polynomial<ctype, mydimension>                                  			LocalPolynomial;
+    typedef std::vector<LocalPolynomial>                                    			PolynomialVector;
+    typedef PolynomialFieldVector<ctype, mydimension, mydimension>          			PolynomialLocalCoordinate;
+    typedef PolynomialFieldVector<ctype, mydimension, coorddimension>       			PolynomialGlobalCoordinate;
+    typedef typename Dune::PolynomialTraits<ctype>::Monomial                			Monomial;
 
-    typedef Dune::ReferenceElement< ctype, mydimension >                    ReferenceElement;
-    typedef Dune::ReferenceElements< ctype, mydimension >                   ReferenceElements;
+//    typedef Dune::ReferenceElement< ctype, mydimension >                    			ReferenceElement;
+    typedef typename Dune::Geo::ReferenceElements<ctype,mydimension>::ReferenceElement	ReferenceElement;
+    typedef Dune::ReferenceElements< ctype, mydimension >                   			ReferenceElements;
 
     const ReferenceElement *refElement_;
     InterpolatoryOrderType order_;
