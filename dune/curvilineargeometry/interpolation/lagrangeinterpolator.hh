@@ -250,8 +250,8 @@ public:
         std::vector<GlobalCoordinate> subentityPoint;
         for (int i = 0; i < subentityIndex.size(); i++)  { subentityPoint.push_back(point_[subentityIndex[i]]); }
 
-        Dune::GeometryType subentityType;
-        subentityType.makeSimplex(subdim);
+        Dune::GeometryType subentityType=Dune::GeometryTypes::simplex(subdim);
+//        subentityType.makeSimplex(subdim);
         return LagrangeInterpolator< ctype, subdim, cdim > (subentityType, subentityPoint, order_);
     }
 

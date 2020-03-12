@@ -275,7 +275,9 @@ class CurvilinearGeometryHelper {
     	static const int codimVert = cdim;
 
     	typedef Dune::FieldVector<ct, cdim>  ParentLocalCoordinate;
-    	const Dune::ReferenceElement< ct, cdim > & ref = Dune::ReferenceElements< ct, cdim >::general(gt);
+//    	const Dune::ReferenceElement< ct, cdim > & ref = Dune::Geo::ReferenceElements< ct, cdim >::general(gt);
+//    	const Dune::Geo::ReferenceElement< ct, cdim > & ref = Dune::Geo::ReferenceElements< ct, cdim >::general(gt);
+    	const auto & ref = Dune::Geo::ReferenceElements< ct, cdim >::general(gt);
 
     	assert((cdim == gt.dim()) && (mydim < cdim));
     	//if (mydim == cdim)  { return p; }

@@ -246,7 +246,8 @@ void InterpolatorConsistencyTest(Functor f)
 	Interpolator                interps[nTests];
 	PolynomialGlobalCoordinate  analytics[nTests];
 
-    Dune::GeometryType geomType;   geomType.makeSimplex(mydim);
+//    Dune::GeometryType geomType;   geomType.makeSimplex(mydim);
+    Dune::GeometryType geomType=Dune::GeometryTypes::simplex(mydim);
 
 
     std::cout << "*********************** Start " << geomType << " Test *************************" << std::endl;

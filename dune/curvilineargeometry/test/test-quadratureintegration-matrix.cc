@@ -215,7 +215,8 @@ template<class ctype, int dim>
 void powerTest(unsigned int N_TEST)
 {
 	const unsigned int MAX_MATRIX_DIM = 30;
-	Dune::GeometryType simplexGeometry;   simplexGeometry.makeSimplex(dim);
+//	Dune::GeometryType simplexGeometry;   simplexGeometry.makeSimplex(dim);
+	Dune::GeometryType simplexGeometry=Dune::GeometryTypes::simplex(dim);
 
 	typedef matrixPolyRandomFunctor<ctype, dim>      PolyFunctor;
 	typedef Dune::QuadratureIntegrator<ctype, dim>   PolyQuadIntegrator;
@@ -255,7 +256,8 @@ void powerTestRecursive(unsigned int N_TEST)
 	const double   ACCURACY_GOAL = 1.0e-20;
 	const unsigned int NORM_TYPE = Dune::QUADRATURE_NORM_L2;
 
-	Dune::GeometryType simplexGeometry;   simplexGeometry.makeSimplex(dim);
+//	Dune::GeometryType simplexGeometry;   simplexGeometry.makeSimplex(dim);
+	Dune::GeometryType simplexGeometry=Dune::GeometryTypes::simplex(dim);
 
 	typedef matrixPolyRandomFunctor<ctype, dim>      PolyFunctor;
 	typedef Dune::QuadratureIntegrator<ctype, dim>   PolyQuadIntegrator;
@@ -293,7 +295,8 @@ void powerTestRootRecursive(unsigned int N_TEST)
 	const unsigned int MAX_MATRIX_DIM = 30;
 	const double   REL_TOL = 1.0e-5;          // For non-polynomial integrals use higher tolerance
 
-	Dune::GeometryType simplexGeometry;   simplexGeometry.makeSimplex(dim);
+//	Dune::GeometryType simplexGeometry;   simplexGeometry.makeSimplex(dim);
+	Dune::GeometryType simplexGeometry=Dune::GeometryTypes::simplex(dim);
 
 	typedef matrixPolySqrtRandomFunctor<ctype, dim>  PolySqrtFunctor;
 	typedef Dune::QuadratureIntegrator<ctype, dim>   PolyQuadIntegrator;
