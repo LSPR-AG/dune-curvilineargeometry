@@ -102,9 +102,9 @@ int main ()
 
   std::cout << "initialized" << std::endl;
 
-  Dune::GeometryType edgeGeometry;   edgeGeometry.makeSimplex(1);
-  Dune::GeometryType faceGeometry;   faceGeometry.makeSimplex(2);
-  Dune::GeometryType elemGeometry;   elemGeometry.makeSimplex(3);
+  Dune::GeometryType edgeGeometry=Dune::GeometryTypes::simplex(1);
+  Dune::GeometryType faceGeometry=Dune::GeometryTypes::simplex(2);
+  Dune::GeometryType elemGeometry=Dune::GeometryTypes::simplex(3);
 
   typedef Dune::QuadratureIntegrator<double, 1> QuadIntegrator1D;
   typedef Dune::QuadratureIntegrator<double, 2> QuadIntegrator2D;
