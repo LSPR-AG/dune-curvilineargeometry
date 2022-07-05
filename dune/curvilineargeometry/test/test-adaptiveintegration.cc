@@ -52,8 +52,8 @@ int main ()
 {
   std::cout << "initialized" << std::endl;
 
-  Dune::GeometryType edgeGeometry=Dune::GeometryTypes::simplex(1);
-  Dune::GeometryType faceGeometry=Dune::GeometryTypes::simplex(2);
+  Dune::GeometryType edgeGeometry=Dune::GeometryTypes::line;
+  Dune::GeometryType faceGeometry=Dune::GeometryTypes::triangle;
 
 
   AdaptiveIntegrator<double, 1> funIntegrator1D(edgeGeometry);

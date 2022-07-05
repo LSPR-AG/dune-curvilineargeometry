@@ -71,9 +71,9 @@ struct BarycentricTest<CurvGeom, DIM2D, DIM2D>
 	static bool isInside(const CurvGeom & curvgeom, const GlobalCoordinate &globalC, ctype tolerance)
 	{
 	    SubentityInterpolatorVector edgeInterpolatorSet;
-	    edgeInterpolatorSet.push_back(curvgeom.interpolator().SubentityInterpolator<DIM1D>(0));
-	    edgeInterpolatorSet.push_back(curvgeom.interpolator().SubentityInterpolator<DIM1D>(1));
-	    edgeInterpolatorSet.push_back(curvgeom.interpolator().SubentityInterpolator<DIM1D>(2));
+	    edgeInterpolatorSet.push_back(curvgeom.interpolator().template SubentityInterpolator<DIM1D>(0));
+	    edgeInterpolatorSet.push_back(curvgeom.interpolator().template SubentityInterpolator<DIM1D>(1));
+	    edgeInterpolatorSet.push_back(curvgeom.interpolator().template SubentityInterpolator<DIM1D>(2));
 
 	    ctype triangleArea   = volume(curvgeom.tolerance);
 	    ctype barycentricSum = 0.0;

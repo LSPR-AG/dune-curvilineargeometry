@@ -277,7 +277,7 @@ class CurvilinearGeometryHelper {
     	typedef Dune::FieldVector<ct, cdim>  ParentLocalCoordinate;
 //    	const Dune::ReferenceElement< ct, cdim > & ref = Dune::Geo::ReferenceElements< ct, cdim >::general(gt);
 //    	const Dune::Geo::ReferenceElement< ct, cdim > & ref = Dune::Geo::ReferenceElements< ct, cdim >::general(gt);
-    	const auto & ref = Dune::Geo::ReferenceElements< ct, cdim >::general(gt);
+    	const auto & ref = Dune::Geo::template ReferenceElements< ct, cdim >::general(gt);
 
     	assert((cdim == gt.dim()) && (mydim < cdim));
     	//if (mydim == cdim)  { return p; }
@@ -326,7 +326,7 @@ class CurvilinearGeometryHelper {
     	std::vector<InternalIndexType> rez;
 
     	//std::cout << "Lol elem=" << gt << std::endl;
-    	const Dune::ReferenceElement< ct, cdim > & ref = Dune::ReferenceElements< ct, cdim >::general(gt);
+    	const auto & ref = Dune::Geo::template ReferenceElements< ct, cdim >::general(gt);
 
     	int nSubentity = ref.size(subentityCodim);
     	int nSubCorner = ref.size(0, subentityCodim, cdim);
