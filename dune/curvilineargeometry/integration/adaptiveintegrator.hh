@@ -32,7 +32,6 @@
 #include <math.h>
 #include <config.h>
 
-#include <dune/common/function.hh>
 #include <dune/common/fvector.hh>
 #include <dune/geometry/referenceelements.hh>
 #include <dune/geometry/type.hh>

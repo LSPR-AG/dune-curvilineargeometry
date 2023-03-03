@@ -15,6 +15,7 @@
 #include <config.h>
 #include<iostream>
 #include <math.h>
+#include <functional>
 
 #include <dune/geometry/referenceelements.hh>
 #include <dune/geometry/type.hh>
@@ -29,9 +30,9 @@ typedef FieldVector< double, 1 > GlobalVector1D;
 typedef FieldVector< double, 2 > GlobalVector2D;
 typedef FieldVector< double, 3 > GlobalVector3D;
 
-typedef Function<GlobalVector1D, double> GlobalFunction1D;
-typedef Function<GlobalVector2D, double> GlobalFunction2D;
-typedef Function<GlobalVector3D, double> GlobalFunction3D;
+typedef std::function<GlobalVector1D(double)> GlobalFunction1D;
+typedef std::function<GlobalVector2D(double)> GlobalFunction2D;
+typedef std::function<GlobalVector3D(double)> GlobalFunction3D;
 
 typedef Dune::Polynomial<double, 1>  Polynomial1D;
 typedef Dune::Polynomial<double, 2>  Polynomial2D;

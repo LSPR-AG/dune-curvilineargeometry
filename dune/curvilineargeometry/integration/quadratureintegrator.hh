@@ -34,7 +34,6 @@
 #include <config.h>
 
 #include <dune/common/exceptions.hh>
-#include <dune/common/function.hh>
 #include <dune/common/fvector.hh>
 #include <dune/common/dynvector.hh>
 #include <dune/common/dynmatrix.hh>
